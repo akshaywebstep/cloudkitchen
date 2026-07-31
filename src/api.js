@@ -1,7 +1,7 @@
-const API_ENV = "live"; // Change to "local" for local backend.
+const API_ENV = "local"; // Change to "local" for local backend.
 
 export const API_BASE_OPTIONS = {
-  local: "http://localhost:3000/api/v1",
+  local: "https://dev2.screeningstar.co.in/api/v1",
   live: "https://dev2.screeningstar.co.in/api/v1",
 };
 const TOKEN_KEY = "cloudKitchenToken";
@@ -117,7 +117,10 @@ export const api = {
   branch: (branchId) => request(`/kitchen/branch/${branchId}`),
   createBranch: (body) => request("/kitchen/branch", { method: "POST", body }),
   updateBranch: (branchId, body) => request(`/kitchen/branch/${branchId}`, { method: "PUT", body }),
+  deleteBranch: (branchId) => request(`/kitchen/branch/${branchId}`, { method: "DELETE" }),
   createBranchIngredients: (branchId, body) => request(`/kitchen/branch/${branchId}/ingredient`, { method: "POST", body }),
+  updateBranchIngredient: (branchId, inventoryId, body) => request(`/kitchen/branch/${branchId}/ingredient/${inventoryId}`, { method: "PUT", body }),
+  deleteBranchIngredient: (branchId, inventoryId) => request(`/kitchen/branch/${branchId}/ingredient/${inventoryId}`, { method: "DELETE" }),
   branchIngredients: (branchId, params = {}) => request(`/kitchen/branch/${branchId}/ingredient?${new URLSearchParams(params)}`),
   createStock: (branchId, body) => request(`/kitchen/branch/${branchId}/ingredient/stock`, { method: "POST", body }),
   stocks: (branchId) => request(`/kitchen/branch/${branchId}/ingredient/stock`),

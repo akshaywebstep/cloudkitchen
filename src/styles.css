@@ -212,3 +212,17 @@ button:active {
     min-width: 900px;
   }
 }
+
+
+@media(min-width:2000px){
+  .mainContainer{
+    max-width: 1800px;
+    margin: 0 auto;
+  }
+  .mainSidebar{
+    position: relative;
+  }
+  .mainContentBox{
+    padding-left: 0 !important;
+  }
+}
