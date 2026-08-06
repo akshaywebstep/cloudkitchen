@@ -1,5 +1,6 @@
 {
   "type": "module",
+  "homepage": "/demo/cloud-kitchen-dashboard",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
