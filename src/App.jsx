@@ -26,16 +26,14 @@ import { SetupFlowPage } from "./components/desktop/setup/SetupFlowPage";
 
 // Desktop pages
 import { DashboardPage } from "./components/desktop/pages/DashboardPage";
-import { AnalyticsPage } from "./components/desktop/pages/AnalyticsPage";
 import { OrderListPage } from "./components/desktop/pages/OrderListPage";
-import { OrderPage } from "./components/desktop/pages/OrderPage";
 import { CustomerListPage } from "./components/desktop/pages/CustomerListPage";
 import { CategoryPage } from "./components/desktop/pages/CategoryPage";
 import { AddMenuPage } from "./components/desktop/pages/AddMenuPage";
 import { CustomerReviewPage } from "./components/desktop/pages/CustomerReviewPage";
 import { KitchenFormPage } from "./components/desktop/pages/KitchenFormPage";
 import { IngredientSetupPage } from "./components/desktop/pages/IngredientSetupPage";
-import { UtilityPage } from "./components/desktop/pages/UtilityPage";
+import { StaffListPage } from "./components/desktop/pages/StaffListPage";
 
 // Mobile app
 import { MobileApp } from "./components/mobile/MobileApp";
@@ -394,8 +392,8 @@ export default function App() {
     // Main dashboard
     desktopContent = (
       <>
-        <Sidebar collapsed={sidebarCollapsed} />
-        <main className={`min-w-0 flex-1 transition-all duration-300 mainContentBox ${sidebarCollapsed ? "lg:pl-[90px]" : "lg:pl-[300px]"}`}>
+        <Sidebar collapsed={sidebarCollapsed} onLogout={handleLogout} />
+        <main className={`min-w-0 flex-1 transition-all duration-300 mainContentBox ${sidebarCollapsed ? "lg:pl-[90px]" : "lg:pl-[280px]"}`}>
           <Topbar
             apiState={apiState}
             onLogout={handleLogout}
@@ -408,11 +406,10 @@ export default function App() {
           <div className="page-shell px-5 py-7 sm:px-8 lg:px-10">
             <Routes>
               <Route path="/" element={<DashboardPage apiState={apiState} />} />
-              <Route path="/analytics" element={<AnalyticsPage />} />
-              <Route path="/order" element={<OrderPage />} />
-              <Route path="/orders" element={<OrderListPage />} />
+              <Route path="/orders" element={<OrderListPage apiState={apiState} onToast={triggerToast} />} />
               <Route path="/customers" element={<CustomerListPage />} />
-              <Route path="/menu" element={<CategoryPage liveMenuItems={liveMenuItems} apiState={apiState} />} />
+              <Route path="/staff" element={<StaffListPage apiState={apiState} onToast={triggerToast} />} />
+              <Route path="/menu" element={<CategoryPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
               <Route path="/add-menu" element={<AddMenuPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
               <Route path="/reviews" element={<CustomerReviewPage />} />
               <Route path="/kitchen" element={<KitchenFormPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
@@ -427,8 +424,6 @@ export default function App() {
                   />
                 }
               />
-              <Route path="/icons" element={<UtilityPage title="Icons" subtitle="Reusable action icons and quick links for the kitchen app." />} />
-              <Route path="/table" element={<UtilityPage title="Table" subtitle="Compact restaurant data table preview." />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardTitle } from "../../ui/Card";
+import { PageHeader } from "../../ui/PageHeader";
 import { SelectPill } from "../../ui/SelectPill";
 import { Pagination } from "../../ui/Pagination";
 import { orderRows, trendingMenus } from "../../../constants/mockData";
@@ -17,9 +18,27 @@ import { orderRows, trendingMenus } from "../../../constants/mockData";
 export function DashboardPage({ apiState }) {
   const navigate = useNavigate();
   const liveMenuCount = apiState?.menus?.length || 56;
+  const branchName = apiState?.kitchen?.kitchenName || apiState?.branches?.[0]?.name || "Main Cloud Kitchen";
 
   return (
     <div className="mx-auto  space-y-7 pb-10">
+      {/* Top Banner matching Reference */}
+      <PageHeader
+        badge="Cloud Kitchen Hub"
+        activeBadge={`${apiState?.branches?.length || 1} Active Kitchen Outlets`}
+        title="Operations Dashboard"
+        subtitle={`Live overview, real-time order requests, branch metrics, and performance analytics for ${branchName}.`}
+        actions={
+          <button
+            className="flex items-center gap-2 rounded-full bg-[#8D0606] px-6 py-3 text-xs font-bold text-white shadow-md shadow-rose-950/20 transition hover:bg-[#780404] active:scale-98"
+            onClick={() => navigate("/orders")}
+            type="button"
+          >
+            <ShoppingBag size={16} />
+            <span>Live POS Feed</span>
+          </button>
+        }
+      />
       {/* Metrics Row */}
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
@@ -316,7 +335,7 @@ function OrderRow({ row, navigate }) {
   return (
     <button
       className="grid w-full grid-cols-5 items-center gap-3 py-3 px-2 text-left transition hover:bg-slate-50/80 rounded-xl"
-      onClick={() => navigate("/order")}
+      onClick={() => navigate("/orders")}
       type="button"
     >
       {/* Thumbnail + Dish Name + Order Code */}

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import Select from "react-select";
 import {
   Menu,
   Bell,
@@ -22,16 +23,13 @@ import { BackendConnectionModal } from "./BackendConnectionModal";
 const PATH_TITLES = {
   "/": "Dashboard Overview",
   "/ingredients": "Ingredient Inventory",
-  "/analytics": "Analytics & Reports",
   "/reviews": "Customer Feedback",
-  "/order": "Order Details",
   "/orders": "Order List Management",
   "/customers": "Customer Profiles",
-  "/icons": "UI Utility Icons",
-  "/menu": "Category Foods",
-  "/table": "Data Tables",
+  "/menu": "Food Menu",
   "/kitchen": "Add / Edit Branch Kitchen",
   "/add-menu": "Add Menu Item",
+  "/staff": "Staff Management",
 };
 
 export function Topbar({ apiState, onLogout, onToast, onLogin, refreshKitchenData, onBranchChange, onToggleSidebar }) {
@@ -44,15 +42,15 @@ export function Topbar({ apiState, onLogout, onToast, onLogin, refreshKitchenDat
   const title = PATH_TITLES[location.pathname] || "Dashboard Overview";
 
   const panelItems = {
-    notifications: ["New order #245888 received", "Low stock alert: Rice", "Branch Main profile updated"],
-    messages: ["Rider: Order picked up", "Customer requested extra sauce", "Support ticket #102 resolved"],
-    gifts: ["15% Special burger campaign live", "Free delivery promo enabled", "Weekend combo activated"],
+    notifications: [],
+    messages: [],
+    gifts: [],
   };
 
   const alertBadges = [
-    { key: "notifications", icon: Bell, count: 3, color: "bg-[#8D0606]" },
-    { key: "messages", icon: MessageSquareText, count: 2, color: "bg-[#8D0606]" },
-    { key: "gifts", icon: Gift, count: 1, color: "bg-amber-500" },
+    { key: "notifications", icon: Bell, count: 0, color: "bg-slate-400" },
+    { key: "messages", icon: MessageSquareText, count: 0, color: "bg-slate-400" },
+    { key: "gifts", icon: Gift, count: 0, color: "bg-slate-400" },
   ];
 
   return (
@@ -171,6 +169,81 @@ export function Topbar({ apiState, onLogout, onToast, onLogin, refreshKitchenDat
   );
 }
 
+const branchSelectStyles = {
+  control: (base, state) => ({
+    ...base,
+    minHeight: "36px",
+    height: "36px",
+    backgroundColor: "#f8fafc",
+    borderColor: state.isFocused ? "#8D0606" : "#e2e8f0",
+    borderRadius: "0.75rem",
+    boxShadow: state.isFocused ? "0 0 0 2px rgba(141, 6, 6, 0.12)" : "none",
+    "&:hover": {
+      borderColor: state.isFocused ? "#8D0606" : "#cbd5e1",
+    },
+    cursor: "pointer",
+    paddingLeft: "2px",
+    fontSize: "12px",
+    fontWeight: "700",
+    transition: "all 0.15s ease",
+  }),
+  valueContainer: (base) => ({
+    ...base,
+    padding: "0 6px",
+  }),
+  singleValue: (base) => ({
+    ...base,
+    color: "#0f172a",
+    fontWeight: "700",
+    fontSize: "12px",
+  }),
+  menu: (base) => ({
+    ...base,
+    backgroundColor: "#ffffff",
+    borderRadius: "1rem",
+    border: "1px solid #f1f5f9",
+    boxShadow: "0 10px 30px -5px rgba(0, 0, 0, 0.12), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
+    padding: "6px",
+    zIndex: 99999,
+    overflow: "hidden",
+    marginTop: "6px",
+  }),
+  menuList: (base) => ({
+    ...base,
+    padding: "2px",
+    maxHeight: "220px",
+  }),
+  option: (base, state) => ({
+    ...base,
+    backgroundColor: state.isSelected
+      ? "#8D0606"
+      : state.isFocused
+      ? "#fff1f1"
+      : "transparent",
+    color: state.isSelected ? "#ffffff" : state.isFocused ? "#8D0606" : "#334155",
+    borderRadius: "0.6rem",
+    padding: "8px 12px",
+    fontSize: "12px",
+    fontWeight: state.isSelected ? "700" : "600",
+    cursor: "pointer",
+    transition: "all 0.12s ease",
+    "&:active": {
+      backgroundColor: state.isSelected ? "#8D0606" : "#fee2e2",
+    },
+  }),
+  indicatorSeparator: () => ({ display: "none" }),
+  dropdownIndicator: (base, state) => ({
+    ...base,
+    color: state.isFocused ? "#8D0606" : "#94a3b8",
+    padding: "4px 8px",
+    transition: "transform 0.2s ease, color 0.15s ease",
+    transform: state.selectProps.menuIsOpen ? "rotate(180deg)" : "none",
+    "&:hover": {
+      color: "#8D0606",
+    },
+  }),
+};
+
 function BranchHeaderSelect({ apiState, onBranchChange, navigate }) {
   const branches = apiState?.branches || [];
   const selectedBranchId = resolveSelectedBranchId(branches, apiState?.selectedBranchId);
@@ -187,22 +260,36 @@ function BranchHeaderSelect({ apiState, onBranchChange, navigate }) {
     );
   }
 
+  const options = branches.map((branch) => ({
+    value: String(branch.id),
+    label: getBranchLabel(branch),
+  }));
+
+  const currentOption =
+    options.find((opt) => String(opt.value) === String(selectedBranchId)) || options[0];
+
   return (
-    <div className="hidden lg:block">
-      <div className="relative flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 shadow-2xs">
-        <Building2 size={16} className="text-[#8D0606] shrink-0" />
-        <select
-          className="bg-transparent text-xs font-semibold text-slate-800 outline-none cursor-pointer pr-4"
-          value={selectedBranchId}
-          onChange={(e) => onBranchChange?.(e.target.value)}
-        >
-          {branches.map((branch) => (
-            <option key={branch.id} value={branch.id}>
-              {getBranchLabel(branch)}
-            </option>
-          ))}
-        </select>
-      </div>
+    <div className="hidden lg:block w-52">
+      <Select
+        options={options}
+        value={currentOption}
+        onChange={(selected) => onBranchChange?.(selected?.value)}
+        isSearchable={false}
+        styles={branchSelectStyles}
+        formatOptionLabel={(option, { context }) => (
+          <div className="flex items-center gap-2">
+            <Building2
+              size={14}
+              className={
+                context === "menu" && option.value === currentOption.value
+                  ? "text-inherit shrink-0"
+                  : "text-[#8D0606] shrink-0"
+              }
+            />
+            <span className="truncate">{option.label}</span>
+          </div>
+        )}
+      />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Star, UserRound, MessageSquareQuote } from "lucide-react";
 import { SearchFilterRow } from "../../ui/SearchFilterRow";
 import { Pagination } from "../../ui/Pagination";
+import { PageHeader } from "../../ui/PageHeader";
 import { reviewCards } from "../../../constants/mockData";
 
 export function CustomerReviewPage() {
@@ -22,6 +23,14 @@ export function CustomerReviewPage() {
 
   return (
     <div className="mx-auto max-w-[1360px] space-y-6 pb-12">
+      {/* Top Banner matching Reference */}
+      <PageHeader
+        badge="Customer Feedback"
+        activeBadge={`${filteredReviews.length} Verified Reviews`}
+        title="Customer Reviews"
+        subtitle="Verified customer ratings and review comments across all kitchen orders."
+      />
+
       <SearchFilterRow
         calendarTone="red"
         searchQuery={searchQuery}
@@ -32,22 +41,6 @@ export function CustomerReviewPage() {
       />
 
       <section className="space-y-6">
-        <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="grid size-11 place-items-center rounded-xl bg-rose-50 text-[#8D0606] border border-rose-100">
-              <MessageSquareQuote size={22} />
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold text-slate-900">Customer Feedback & Reviews</h2>
-              <p className="text-xs font-normal text-slate-400">
-                Verified customer ratings and review comments across all kitchen orders
-              </p>
-            </div>
-          </div>
-          <span className="rounded-xl bg-[#fff1f1] px-3.5 py-1.5 text-xs font-semibold text-[#8D0606] self-start sm:self-auto">
-            {filteredReviews.length} Reviews Found
-          </span>
-        </div>
 
         <div className="grid gap-5 xl:grid-cols-2">
           {paginatedReviews.map((review, index) => (

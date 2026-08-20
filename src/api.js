@@ -113,7 +113,7 @@ export const api = {
   cities: (params = {}) => request(`/master/city?${new URLSearchParams({ limit: "500", ...params })}`, { token: "" }),
   cuisines: (params = {}) => request(`/master/cuisine?${new URLSearchParams({ page: "1", limit: "20", status: "ACTIVE", ...params })}`, { token: "" }),
   ingredients: (params = {}) => request(`/master/ingredient?${new URLSearchParams({ page: "1", limit: "20", status: "ACTIVE", ...params })}`, { token: "" }),
-  branches: () => request("/kitchen/branch"),
+  branches: (params = {}) => request(`/kitchen/branch?${new URLSearchParams(params)}`),
   branch: (branchId) => request(`/kitchen/branch/${branchId}`),
   createBranch: (body) => request("/kitchen/branch", { method: "POST", body }),
   updateBranch: (branchId, body) => request(`/kitchen/branch/${branchId}`, { method: "PUT", body }),
@@ -124,6 +124,53 @@ export const api = {
   branchIngredients: (branchId, params = {}) => request(`/kitchen/branch/${branchId}/ingredient?${new URLSearchParams(params)}`),
   createStock: (branchId, body) => request(`/kitchen/branch/${branchId}/ingredient/stock`, { method: "POST", body }),
   stocks: (branchId) => request(`/kitchen/branch/${branchId}/ingredient/stock`),
-  menus: (branchId) => request(`/kitchen/branch/${branchId}/menu`),
+  menus: (branchId, params = {}) => request(`/kitchen/branch/${branchId}/menu?${new URLSearchParams(params)}`),
   createMenu: (branchId, body) => request(`/kitchen/branch/${branchId}/menu`, { method: "POST", body }),
+  orders: (branchId, params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return request(`/kitchen/order/branch/${branchId}${query ? `?${query}` : ""}`);
+  },
+  createOrder: (branchId, body) => request(`/kitchen/order/branch/${branchId}`, { method: "POST", body }),
+  staff: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return request(`/kitchen/staff${query ? `?${query}` : ""}`);
+  },
+  staffRoles: () => request("/kitchen/staff-role"),
+  staffFormOptions: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return request(`/kitchen/staff/form-options${query ? `?${query}` : ""}`);
+  },
+  createStaff: (body) => {
+    if (body instanceof FormData) {
+      return request("/kitchen/staff", { method: "POST", body });
+    }
+    const form = new FormData();
+    Object.entries(body).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        if (key === "branchIds" && Array.isArray(value)) {
+          form.append(key, JSON.stringify(value.map(Number)));
+        } else {
+          form.append(key, value);
+        }
+      }
+    });
+    return request("/kitchen/staff", { method: "POST", body: form });
+  },
+  updateStaff: (staffId, body) => {
+    if (body instanceof FormData) {
+      return request(`/kitchen/staff/${staffId}`, { method: "PUT", body });
+    }
+    const form = new FormData();
+    Object.entries(body).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        if (key === "branchIds" && Array.isArray(value)) {
+          form.append(key, JSON.stringify(value.map(Number)));
+        } else {
+          form.append(key, value);
+        }
+      }
+    });
+    return request(`/kitchen/staff/${staffId}`, { method: "PUT", body: form });
+  },
+  deleteStaff: (staffId) => request(`/kitchen/staff/${staffId}`, { method: "DELETE" }),
 };

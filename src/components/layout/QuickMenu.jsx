@@ -4,9 +4,8 @@ import { useNavigate } from "react-router-dom";
 
 const QUICK_LINKS = [
   { label: "Dashboard",         path: "/" },
-  { label: "Analytics",         path: "/analytics" },
   { label: "Order List",        path: "/orders" },
-  { label: "Category / Menu",   path: "/menu" },
+  { label: "Food Menu",         path: "/menu" },
   { label: "Add Menu",          path: "/add-menu" },
   { label: "Customer List",     path: "/customers" },
   { label: "Customer Review",   path: "/reviews" },

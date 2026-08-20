@@ -1,67 +1,133 @@
 import React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-export function Pagination({ currentPage, totalItems, pageSize, onPageChange, className = "" }) {
-  const totalPages = Math.ceil(totalItems / pageSize);
-  if (totalPages <= 1) return null;
+import { AppSelect } from "./AppSelect";
+
+export function Pagination({
+  currentPage = 1,
+  totalItems = 0,
+  pageSize = 10,
+  onPageChange,
+  pageSizeOptions = [5, 10, 20, 50],
+  onPageSizeChange,
+  className = "",
+}) {
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  if (totalItems <= 0) return null;
 
   const startItem = (currentPage - 1) * pageSize + 1;
   const endItem = Math.min(currentPage * pageSize, totalItems);
 
+  // Generate dynamic page numbers with ellipses
   const getPageNumbers = () => {
-    const pages = [];
-    const maxVisible = 5;
-    let start = Math.max(1, currentPage - Math.floor(maxVisible / 2));
-    let end = Math.min(totalPages, start + maxVisible - 1);
+    const delta = 2;
+    const range = [];
+    const rangeWithDots = [];
+    let l;
 
-    if (end - start + 1 < maxVisible) {
-      start = Math.max(1, end - maxVisible + 1);
+    for (let i = 1; i <= totalPages; i++) {
+      if (i === 1 || i === totalPages || (i >= currentPage - delta && i <= currentPage + delta)) {
+        range.push(i);
+      }
     }
 
-    for (let i = start; i <= end; i++) {
-      pages.push(i);
+    for (const i of range) {
+      if (l) {
+        if (i - l === 2) {
+          rangeWithDots.push(l + 1);
+        } else if (i - l !== 1) {
+          rangeWithDots.push("...");
+        }
+      }
+      rangeWithDots.push(i);
+      l = i;
     }
-    return pages;
+
+    return rangeWithDots;
   };
 
   return (
-    <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 py-3 border-t border-slate-100 bg-slate-50/50 ${className}`}>
-      <p className="text-xs font-normal text-slate-500">
-        Showing <span className="font-semibold text-slate-700">{startItem}</span> to{" "}
-        <span className="font-semibold text-slate-700">{endItem}</span> of{" "}
-        <span className="font-semibold text-slate-700">{totalItems}</span> entries
-      </p>
+    <div
+      className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-5 py-3.5 border-t border-slate-100 bg-slate-50/75 ${className}`}
+    >
+      {/* Left Details & Page Size Selector */}
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="text-xs font-medium text-slate-500">
+          Showing <span className="font-bold text-slate-800">{startItem}</span> to{" "}
+          <span className="font-bold text-slate-800">{endItem}</span> of{" "}
+          <span className="font-bold text-slate-800">{totalItems}</span> entries
+        </p>
 
+        {onPageSizeChange && pageSizeOptions?.length > 0 && (
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+            <span className="text-slate-400">|</span>
+            <span>Show</span>
+            <AppSelect
+              value={pageSize}
+              onChange={(val) => onPageSizeChange(Number(val))}
+              minWidth="75px"
+              options={pageSizeOptions.map((opt) => ({
+                value: String(opt),
+                label: String(opt),
+              }))}
+            />
+            <span>/ page</span>
+          </div>
+        )}
+      </div>
+
+      {/* Right Dynamic Page Controls */}
       <div className="flex items-center gap-1.5">
+        {/* Previous Page */}
         <button
           type="button"
           disabled={currentPage === 1}
           onClick={() => onPageChange(currentPage - 1)}
-          className="flex size-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white"
+          title="Previous Page"
+          className="flex size-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-2xs transition hover:bg-slate-100 hover:text-slate-900 disabled:opacity-40 disabled:hover:bg-white"
         >
           <ChevronLeft size={16} />
         </button>
 
-        {getPageNumbers().map((page) => (
-          <button
-            key={page}
-            type="button"
-            onClick={() => onPageChange(page)}
-            className={`size-8 rounded-lg text-xs font-medium transition ${
-              currentPage === page
-                ? "bg-[#8D0606] text-white shadow-xs"
-                : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            {page}
-          </button>
-        ))}
+        {/* Page Buttons & Dots */}
+        {getPageNumbers().map((item, idx) => {
+          if (item === "...") {
+            return (
+              <span
+                key={`dots-${idx}`}
+                className="flex size-8 items-center justify-center text-xs font-bold text-slate-400 select-none"
+              >
+                ...
+              </span>
+            );
+          }
 
+          const pageNum = Number(item);
+          const isCurrent = currentPage === pageNum;
+
+          return (
+            <button
+              key={pageNum}
+              type="button"
+              onClick={() => onPageChange(pageNum)}
+              className={`size-8 rounded-xl text-xs font-bold transition-all shadow-2xs ${
+                isCurrent
+                  ? "bg-gradient-to-r from-[#8D0606] to-[#a30707] text-white shadow-xs"
+                  : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+              }`}
+            >
+              {pageNum}
+            </button>
+          );
+        })}
+
+        {/* Next Page */}
         <button
           type="button"
           disabled={currentPage === totalPages}
           onClick={() => onPageChange(currentPage + 1)}
-          className="flex size-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white"
+          title="Next Page"
+          className="flex size-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-2xs transition hover:bg-slate-100 hover:text-slate-900 disabled:opacity-40 disabled:hover:bg-white"
         >
           <ChevronRight size={16} />
         </button>
