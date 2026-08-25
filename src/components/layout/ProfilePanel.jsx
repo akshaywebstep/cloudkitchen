@@ -63,6 +63,13 @@ export function ProfilePanel({ apiState, onClose, onLogout, onReset }) {
       {/* Main Action Links */}
       <div className="py-2.5 space-y-1">
         <ProfileMenuItem
+          icon={User}
+          label="My Kitchen Profile"
+          description="Update kitchen name, photo & contact"
+          onClick={() => handleNavigate("/profile")}
+        />
+
+        <ProfileMenuItem
           icon={Building2}
           label="Kitchen & Branch Setup"
           description="Manage outlets & operating hours"

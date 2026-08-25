@@ -16,6 +16,8 @@ import {
   UserCheck,
   Users,
   UtensilsCrossed,
+  ShieldCheck,
+  Trash2,
 } from "lucide-react";
 import Bell from "/assets/bell.svg";
 import MessageSquareText from "/assets/comment.svg";
@@ -30,16 +32,19 @@ export const sidebarSections = [
   {
     title: "Operations",
     items: [
-      { label: "Dashboard",       icon: LayoutDashboard, path: "/" },
-      { label: "Orders",          icon: ShoppingBag,     path: "/orders" },
-      { label: "Food Menu",       icon: UtensilsCrossed, path: "/menu" },
-      { label: "Ingredients",     icon: Boxes,           path: "/ingredients" },
+      { label: "Dashboard",        icon: LayoutDashboard, path: "/" },
+      { label: "Orders",           icon: ShoppingBag,     path: "/orders" },
+      { label: "Food Menu",        icon: UtensilsCrossed, path: "/menu" },
+      { label: "Ingredients",      icon: Boxes,           path: "/ingredients" },
+      { label: "Waste Management", icon: Trash2,          path: "/waste" },
     ],
   },
   {
     title: "Management",
     items: [
+      { label: "Profile",         icon: UserCheck,       path: "/profile" },
       { label: "Staff",           icon: Users,           path: "/staff" },
+      { label: "Role Management", icon: ShieldCheck,     path: "/roles" },
       { label: "Customers",       icon: UserCheck,       path: "/customers" },
       { label: "Branch Setup",   icon: Building2,       path: "/kitchen" },
     ],
@@ -54,11 +59,14 @@ export const sidebarSections = [
 
 // Flat list for direct iteration / backwards compatibility
 export const sidebarItems = [
-  { label: "Dashboard",       icon: LayoutDashboard, path: "/" },
-  { label: "Orders",          icon: ShoppingBag,     path: "/orders" },
-  { label: "Food Menu",       icon: UtensilsCrossed, path: "/menu" },
-  { label: "Ingredients",     icon: Boxes,           path: "/ingredients" },
+  { label: "Dashboard",        icon: LayoutDashboard, path: "/" },
+  { label: "Orders",           icon: ShoppingBag,     path: "/orders" },
+  { label: "Food Menu",        icon: UtensilsCrossed, path: "/menu" },
+  { label: "Ingredients",      icon: Boxes,           path: "/ingredients" },
+  { label: "Waste Management", icon: Trash2,          path: "/waste" },
+  { label: "Profile",          icon: UserCheck,       path: "/profile" },
   { label: "Staff",           icon: Users,           path: "/staff" },
+  { label: "Role Management", icon: ShieldCheck,     path: "/roles" },
   { label: "Customers",       icon: UserCheck,       path: "/customers" },
   { label: "Branch Setup",   icon: Building2,       path: "/kitchen" },
   { label: "Reviews",         icon: Star,            path: "/reviews" },

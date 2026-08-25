@@ -45,7 +45,7 @@ import { TimePickerInput } from "../../ui/TimePickerInput";
 import { Loader } from "../../ui/Loader";
 import { AppSelect } from "../../ui/AppSelect";
 import { Pagination } from "../../ui/Pagination";
-import { api, getApiErrorMessage } from "../../../api";
+import { api, getApiBaseUrl, getStoredToken, getApiErrorMessage } from "../../../api";
 import {
   getBranchLabel,
   hasSelectedSubscription,
@@ -286,6 +286,8 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
   const [messageType, setMessageType] = useState("info");
   const [saving, setSaving] = useState(false);
   const [locationOptions, setLocationOptions] = useState({ states: [], cities: [], loading: false });
+  const [cuisinesList, setCuisinesList] = useState([]);
+  const [loadingCuisines, setLoadingCuisines] = useState(false);
 
   const updateForm = (key) => (event) => {
     const value = event.target.value;
@@ -298,45 +300,34 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
     basic: useRef(null),
     location: useRef(null),
     manager: useRef(null),
-    operations: useRef(null),
-    delivery: useRef(null),
   };
 
-  // Refs for every validated field
+  // Refs for validated fields
   const fieldRefs = {
     name: useRef(null),
-    area: useRef(null),
-    addressLine1: useRef(null),
     cuisineIds: useRef(null),
-    contactFirstName: useRef(null),
-    contactLastName: useRef(null),
-    contactEmail: useRef(null),
-    contactPhone: useRef(null),
     countryId: useRef(null),
     stateId: useRef(null),
     cityId: useRef(null),
     pincode: useRef(null),
-    prepTime: useRef(null),
-    maxOrdersPerDay: useRef(null),
-    closingTime: useRef(null),
+    addressLine1: useRef(null),
+    contactTitle: useRef(null),
+    contactFirstName: useRef(null),
+    contactEmail: useRef(null),
+    contactPhone: useRef(null),
   };
 
   const fieldOrder = [
     "name",
     "cuisineIds",
-    "area",
+    "countryId",
+    "stateId",
+    "cityId",
+    "pincode",
     "addressLine1",
-    "closingTime",
-    "prepTime",
-    "maxOrdersPerDay",
     "contactFirstName",
-    "contactLastName",
     "contactEmail",
     "contactPhone",
-    "countryId",
-    "cityId",
-    "stateId",
-    "pincode",
   ];
 
   const handleStartCreate = () => {
@@ -433,14 +424,56 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
     }
   };
 
+  // Fetch master cuisines for selection
+  useEffect(() => {
+    let mounted = true;
+    setLoadingCuisines(true);
+
+    const requestOptions = {
+      method: "GET",
+      redirect: "follow",
+    };
+
+    fetch(`${getApiBaseUrl()}/master/cuisine?page=1&limit=10&name=&category=&status=ACTIVE`, requestOptions)
+      .then((response) => response.text())
+      .then((result) => {
+        console.log(result);
+        if (!mounted) return;
+        try {
+          const parsed = result ? JSON.parse(result) : null;
+          const list = Array.isArray(parsed?.data)
+            ? parsed.data
+            : Array.isArray(parsed?.cuisines)
+            ? parsed.cuisines
+            : Array.isArray(parsed)
+            ? parsed
+            : [];
+          setCuisinesList(list);
+        } catch (err) {
+          console.error("Failed to parse cuisines JSON:", err);
+        }
+      })
+      .catch((error) => {
+        console.error(error);
+      })
+      .finally(() => {
+        if (mounted) setLoadingCuisines(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const cuisineOptions = useMemo(() => {
-    return apiState?.cuisines?.length
-      ? apiState.cuisines.map((cuisine) => ({
+    const list = cuisinesList.length ? cuisinesList : apiState?.cuisines || [];
+    return list.length
+      ? list.map((cuisine) => ({
           value: String(cuisine.id),
           label: cuisine.name || cuisine.title || `Cuisine ${cuisine.id}`,
         }))
       : [{ value: "1", label: "Multi-Cuisine" }];
-  }, [apiState?.cuisines]);
+  }, [cuisinesList, apiState?.cuisines]);
 
   const countryOptions = useMemo(() => {
     return apiState?.countries?.length
@@ -545,11 +578,9 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
 
     if (!form.name.trim()) next.name = "Branch / kitchen name is required.";
     if (!form.cuisineIds?.length) next.cuisineIds = "Select at least one cuisine.";
-    if (!form.area.trim()) next.area = "Area / zone is required.";
     if (!form.addressLine1.trim()) next.addressLine1 = "Full street address is required.";
 
     if (!form.contactFirstName.trim()) next.contactFirstName = "Manager first name is required.";
-    if (!form.contactLastName.trim()) next.contactLastName = "Manager last name is required.";
 
     if (!form.contactEmail.trim()) next.contactEmail = "Contact email is required.";
     else if (!emailRegex.test(form.contactEmail.trim())) next.contactEmail = "Enter a valid email address.";
@@ -564,13 +595,6 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
     if (!form.pincode.trim()) next.pincode = "Pincode is required.";
     else if (!pincodeRegex.test(form.pincode.trim())) next.pincode = "Enter a valid 4-6 digit pincode.";
 
-    if (form.prepTime && Number(form.prepTime) <= 0) next.prepTime = "Prep time must be greater than 0.";
-    if (form.maxOrdersPerDay && Number(form.maxOrdersPerDay) <= 0) next.maxOrdersPerDay = "Must be greater than 0.";
-
-    if (form.openingTime && form.closingTime && form.closingTime <= form.openingTime) {
-      next.closingTime = "Closing time must be after opening time.";
-    }
-
     setErrors(next);
 
     const firstErrorKey = fieldOrder.find((key) => next[key]);
@@ -583,38 +607,6 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
       }
     }
     return Object.keys(next).length === 0;
-  };
-
-  const deleteSelectedBranch = async () => {
-    if (!selectedBranch?.id) {
-      setMessageType("error");
-      setMessage("Select a branch to delete.");
-      onToast?.({ message: "Select a branch to delete.", type: "error" });
-      return;
-    }
-    if (!window.confirm(`Are you sure you want to delete "${getBranchLabel(selectedBranch)}"? This action cannot be undone.`)) return;
-    setSaving(true);
-    setMessage("");
-    try {
-      await api.deleteBranch(selectedBranch.id);
-      const remainingBranches = branchList.filter((branch) => String(branch.id) !== String(selectedBranch.id));
-      const nextBranchId = resolveSelectedBranchId(remainingBranches, "");
-      setStoredSelectedBranchId(nextBranchId);
-      setSelectedBranchId(nextBranchId || "new");
-      await refreshKitchenData?.(undefined, undefined, nextBranchId);
-      await fetchBranches(true);
-      setMessageType("success");
-      setMessage("Branch deleted successfully.");
-      onToast?.({ message: "Branch deleted successfully.", type: "success" });
-      setActiveTab("list");
-    } catch (error) {
-      const errMsg = getApiErrorMessage(error, "Unable to delete branch");
-      setMessageType("error");
-      setMessage(errMsg);
-      onToast?.({ message: errMsg, type: "error" });
-    } finally {
-      setSaving(false);
-    }
   };
 
   const saveBranch = async () => {
@@ -641,22 +633,30 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
         setSaving(false);
         return;
       }
+
+      // Format cuisines list strictly: [{ id: 1 }, { name: "Fusion" }]
+      const formattedCuisines = (form.cuisineIds || []).map((item) => {
+        if (typeof item === "object" && item !== null) {
+          if (item.id && !isNaN(Number(item.id))) return { id: Number(item.id) };
+          if (item.name) return { name: String(item.name).trim() };
+        }
+        if (!isNaN(Number(item))) return { id: Number(item) };
+        return { name: String(item).trim() };
+      });
+
+      // Strict payload with ONLY the requested branch create fields
       const payload = {
-        name: form.name,
-        addressLine1: form.addressLine1,
-        addressLine2: form.addressLine2,
-        landmark: form.landmark,
-        area: form.area,
-        pincode: form.pincode,
+        name: form.name.trim(),
+        addressLine1: form.addressLine1.trim(),
+        pincode: form.pincode.trim(),
         countryId: Number(form.countryId),
         stateId: Number(form.stateId),
         cityId: Number(form.cityId),
-        contactTitle: "MR",
-        contactFirstName: form.contactFirstName,
-        contactLastName: form.contactLastName,
-        contactEmail: form.contactEmail,
-        contactPhone: form.contactPhone,
-        cuisines: (form.cuisineIds || []).map((id) => ({ id: Number(id) })),
+        contactTitle: (form.contactTitle || "MR").toUpperCase(),
+        contactFirstName: form.contactFirstName.trim(),
+        contactEmail: form.contactEmail.trim().toLowerCase(),
+        contactPhone: form.contactPhone.trim(),
+        cuisines: formattedCuisines.length > 0 ? formattedCuisines : [{ id: 1 }],
       };
 
       let savedBranchId = selectedBranch?.id ? String(selectedBranch.id) : "";
@@ -664,8 +664,30 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
         const updateResponse = await api.updateBranch(selectedBranch.id, payload);
         savedBranchId = updateResponse?.data?.id ? String(updateResponse.data.id) : savedBranchId;
       } else {
-        const createResponse = await api.createBranch(payload);
-        savedBranchId = createResponse?.data?.id ? String(createResponse.data.id) : "";
+        const myHeaders = new Headers();
+        myHeaders.append("Content-Type", "application/json");
+        if (apiState?.token) {
+          myHeaders.append("Authorization", `Bearer ${apiState.token}`);
+        }
+
+        const raw = JSON.stringify(payload);
+
+        const requestOptions = {
+          method: "POST",
+          headers: myHeaders,
+          body: raw,
+          redirect: "follow",
+        };
+
+        const response = await fetch(`${getApiBaseUrl()}/kitchen/branch`, requestOptions);
+        const result = await response.text();
+        console.log(result);
+
+        const parsed = result ? JSON.parse(result) : null;
+        if (!response.ok || parsed?.status === false) {
+          throw new Error(parsed?.message || `Failed to create branch (${response.status})`);
+        }
+        savedBranchId = parsed?.data?.id ? String(parsed.data.id) : "";
       }
 
       const refreshResult = await refreshKitchenData?.(undefined, undefined, savedBranchId);
@@ -850,7 +872,7 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                 minWidth="190px"
                 options={[
                   { value: "ALL", label: `All Kitchen Hubs (${branchList.length})` },
-                  ...(apiState?.cuisines || []).map((c) => ({
+                  ...(cuisinesList.length ? cuisinesList : apiState?.cuisines || []).map((c) => ({
                     value: String(c.id),
                     label: c.name || c.title,
                   })),
@@ -986,24 +1008,6 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                               >
                                 <Edit3 size={15} />
                               </button>
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  if (!window.confirm(`Are you sure you want to delete "${getBranchLabel(branch)}"?`)) return;
-                                  try {
-                                    await api.deleteBranch(branch.id);
-                                    await refreshKitchenData?.();
-                                    await fetchBranches(true);
-                                    onToast?.({ message: "Branch deleted successfully.", type: "success" });
-                                  } catch (err) {
-                                    onToast?.({ message: getApiErrorMessage(err, "Failed to delete branch"), type: "error" });
-                                  }
-                                }}
-                                title="Delete Branch"
-                                className="grid size-8 place-items-center rounded-xl bg-rose-50 text-rose-500 border border-rose-200/60 transition hover:bg-rose-100 hover:text-rose-700 shadow-2xs"
-                              >
-                                <Trash2 size={15} />
-                              </button>
                             </div>
                           </td>
                         </tr>
@@ -1114,35 +1118,21 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                 onClick={() => scrollToSection("basic")}
                 className="rounded-lg px-2.5 py-1 hover:bg-white hover:text-slate-900"
               >
-                1. Basic Info
+                1. Basic & Cuisines
               </button>
               <button
                 type="button"
                 onClick={() => scrollToSection("location")}
                 className="rounded-lg px-2.5 py-1 hover:bg-white hover:text-slate-900"
               >
-                2. Location
+                2. Location & Address
               </button>
               <button
                 type="button"
                 onClick={() => scrollToSection("manager")}
                 className="rounded-lg px-2.5 py-1 hover:bg-white hover:text-slate-900"
               >
-                3. Manager
-              </button>
-              <button
-                type="button"
-                onClick={() => scrollToSection("operations")}
-                className="rounded-lg px-2.5 py-1 hover:bg-white hover:text-slate-900"
-              >
-                4. Timings
-              </button>
-              <button
-                type="button"
-                onClick={() => scrollToSection("delivery")}
-                className="rounded-lg px-2.5 py-1 hover:bg-white hover:text-slate-900"
-              >
-                5. Status
+                3. Manager & Contact
               </button>
             </div>
           </div>
@@ -1155,7 +1145,7 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                 <FormSection
                   step="1"
                   title="Branch Identity & Cuisines"
-                  subtitle="Specify the public branch name, brand association, and culinary specialties."
+                  subtitle="Specify the branch name and assign the cuisines prepared at this outlet."
                   icon={Store}
                 >
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -1164,34 +1154,28 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                       icon={Building2}
                       label="Branch / Kitchen Name"
                       required
-                      placeholder="e.g. Royal Spice - Andheri West"
+                      placeholder="e.g. Main Branch"
                       value={form.name}
                       onChange={updateForm("name")}
                       error={errors.name}
-                      helper="Distinct name shown on customer receipts & order slips"
-                    />
-                    <TextField
-                      icon={Sparkles}
-                      label="Parent Brand"
-                      placeholder="Brand name (defaults to main kitchen)"
-                      value={form.brand}
-                      onChange={updateForm("brand")}
-                      helper="Main restaurant / cloud kitchen parent brand"
+                      helper="Name of this kitchen branch outlet"
+                      className="sm:col-span-2"
                     />
                     <SelectField
                       ref={fieldRefs.cuisineIds}
                       label="Cuisines Offered"
                       required
                       isMulti
+                      isLoading={loadingCuisines}
                       options={cuisineOptions}
                       value={cuisineOptions.filter((option) => form.cuisineIds?.includes(option.value))}
                       onChange={(selected) => {
                         setForm((f) => ({ ...f, cuisineIds: (selected || []).map((option) => option.value) }));
                         setErrors((current) => (current.cuisineIds ? { ...current, cuisineIds: undefined } : current));
                       }}
-                      placeholder="Select one or more cuisines (e.g. North Indian, Biryani)"
+                      placeholder="Select one or more cuisines (e.g. North Indian, Fusion)"
                       error={errors.cuisineIds}
-                      helper="Select food categories prepared at this specific outlet"
+                      helper="Select food cuisines prepared at this branch"
                       className="sm:col-span-2"
                     />
                   </div>
@@ -1203,7 +1187,7 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                 <FormSection
                   step="2"
                   title="Location & Physical Address"
-                  subtitle="Geographic location used for delivery dispatch calculation & customer order routing."
+                  subtitle="Geographic location and postal address for this kitchen branch."
                   icon={MapPin}
                 >
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -1252,37 +1236,20 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                       ref={fieldRefs.pincode}
                       label="Pincode"
                       required
-                      placeholder="e.g. 400053"
+                      placeholder="e.g. 201301"
                       value={form.pincode}
                       onChange={updateForm("pincode")}
                       error={errors.pincode}
-                    />
-                    <TextField
-                      ref={fieldRefs.area}
-                      icon={MapPin}
-                      label="Area / Locality / Zone"
-                      required
-                      placeholder="e.g. Lokhandwala Complex, Andheri West"
-                      value={form.area}
-                      onChange={updateForm("area")}
-                      error={errors.area}
-                      className="sm:col-span-2"
+                      className="sm:col-span-2 lg:col-span-1"
                     />
                     <TextField
                       ref={fieldRefs.addressLine1}
-                      label="Street Address (Line 1)"
+                      label="Street Address / Shop Details"
                       required
-                      placeholder="Building name, Unit/Shop number, Street name"
+                      placeholder="e.g. Shop No 12, Ground Floor"
                       value={form.addressLine1}
                       onChange={updateForm("addressLine1")}
                       error={errors.addressLine1}
-                      className="sm:col-span-2 lg:col-span-3"
-                    />
-                    <TextField
-                      label="Landmark (Optional)"
-                      placeholder="e.g. Opposite Metro Pillar 120"
-                      value={form.landmark}
-                      onChange={updateForm("landmark")}
                       className="sm:col-span-2 lg:col-span-3"
                     />
                   </div>
@@ -1293,15 +1260,26 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
               <div ref={sectionRefs.manager}>
                 <FormSection
                   step="3"
-                  title="Branch Manager & Communication"
-                  subtitle="Primary point of contact for operational queries, orders & escalations."
+                  title="Contact Person & Communication"
+                  subtitle="Primary point of contact for operational communication and dispatch."
                   icon={User}
                 >
                   <div className="grid gap-4 sm:grid-cols-2">
+                    <SelectField
+                      ref={fieldRefs.contactTitle}
+                      label="Contact Title"
+                      options={[
+                        { value: "MR", label: "MR" },
+                        { value: "MS", label: "MS" },
+                        { value: "MRS", label: "MRS" },
+                      ]}
+                      value={{ value: form.contactTitle || "MR", label: form.contactTitle || "MR" }}
+                      onChange={(option) => setForm((f) => ({ ...f, contactTitle: option?.value || "MR" }))}
+                    />
                     <TextField
                       ref={fieldRefs.contactFirstName}
                       icon={User}
-                      label="Manager First Name"
+                      label="Contact Name"
                       required
                       placeholder="e.g. Rahul"
                       value={form.contactFirstName}
@@ -1309,22 +1287,12 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                       error={errors.contactFirstName}
                     />
                     <TextField
-                      ref={fieldRefs.contactLastName}
-                      icon={User}
-                      label="Manager Last Name"
-                      required
-                      placeholder="e.g. Sharma"
-                      value={form.contactLastName}
-                      onChange={updateForm("contactLastName")}
-                      error={errors.contactLastName}
-                    />
-                    <TextField
                       ref={fieldRefs.contactEmail}
                       icon={Mail}
-                      label="Manager Email"
+                      label="Contact Email"
                       required
                       type="email"
-                      placeholder="e.g. rahul.manager@cloudkitchen.com"
+                      placeholder="e.g. rahul@example.com"
                       value={form.contactEmail}
                       onChange={updateForm("contactEmail")}
                       error={errors.contactEmail}
@@ -1332,123 +1300,13 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                     <TextField
                       ref={fieldRefs.contactPhone}
                       icon={Phone}
-                      label="Manager Contact Phone"
+                      label="Contact Phone"
                       required
-                      placeholder="10-digit mobile number (e.g. 9876543210)"
+                      placeholder="e.g. 9876543210"
                       value={form.contactPhone}
                       onChange={updateForm("contactPhone")}
                       error={errors.contactPhone}
                     />
-                  </div>
-                </FormSection>
-              </div>
-
-              {/* 4. Operations & Timings */}
-              <div ref={sectionRefs.operations}>
-                <FormSection
-                  step="4"
-                  title="Operating Hours & Capacity Limits"
-                  subtitle="Configure working hours, prep time estimates, and maximum daily order capacity."
-                  icon={Clock}
-                >
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <TimePickerInput
-                      label="Opening Time"
-                      value={form.openingTime}
-                      onChange={(val) => {
-                        setForm((f) => ({ ...f, openingTime: val }));
-                        setErrors((current) => (current.closingTime ? { ...current, closingTime: undefined } : current));
-                      }}
-                    />
-                    <TimePickerInput
-                      ref={fieldRefs.closingTime}
-                      label="Closing Time"
-                      value={form.closingTime}
-                      onChange={(val) => {
-                        setForm((f) => ({ ...f, closingTime: val }));
-                        setErrors((current) => (current.closingTime ? { ...current, closingTime: undefined } : current));
-                      }}
-                      error={errors.closingTime}
-                    />
-                    <TextField
-                      ref={fieldRefs.prepTime}
-                      icon={Clock}
-                      label="Avg Prep Time (Minutes)"
-                      placeholder="e.g. 20"
-                      type="number"
-                      min="0"
-                      value={form.prepTime}
-                      onChange={updateForm("prepTime")}
-                      error={errors.prepTime}
-                    />
-                    <TextField
-                      ref={fieldRefs.maxOrdersPerDay}
-                      icon={ShieldCheck}
-                      label="Max Daily Orders"
-                      placeholder="e.g. 250"
-                      type="number"
-                      min="0"
-                      value={form.maxOrdersPerDay}
-                      onChange={updateForm("maxOrdersPerDay")}
-                      error={errors.maxOrdersPerDay}
-                    />
-                  </div>
-                </FormSection>
-              </div>
-
-              {/* 5. Live Status & Online Delivery */}
-              <div ref={sectionRefs.delivery}>
-                <FormSection
-                  step="5"
-                  title="Live Status & Aggregator Channels"
-                  subtitle="Control live availability and enable third-party delivery channels."
-                  icon={Globe}
-                >
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <StatusInput
-                      checked={form.kitchenActive}
-                      onChange={(val) => setForm((f) => ({ ...f, kitchenActive: val }))}
-                      label="Kitchen Master Active Status"
-                      description="Controls whether this branch is active across all operations"
-                      activeLabel="ONLINE"
-                      inactiveLabel="OFFLINE"
-                      icon={Power}
-                    />
-                    <StatusInput
-                      checked={form.acceptingOrders}
-                      onChange={(val) => setForm((f) => ({ ...f, acceptingOrders: val }))}
-                      label="Accepting Orders Online"
-                      description="Toggles live order acceptance for online customers"
-                      activeLabel="ACCEPTING"
-                      inactiveLabel="PAUSED"
-                      icon={Radio}
-                    />
-                  </div>
-
-                  <div className="mt-6 pt-5 border-t border-slate-100">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-                      Aggregator Platform Integrations
-                    </h4>
-                    <div className="flex flex-wrap gap-3.5 text-sm font-semibold text-slate-700">
-                      <label className="flex items-center gap-2.5 cursor-pointer select-none rounded-xl border border-slate-200/90 bg-slate-50/60 px-4 py-2.5 hover:bg-slate-100/80 transition shadow-2xs">
-                        <input
-                          type="checkbox"
-                          checked={form.swiggyEnabled}
-                          onChange={(e) => setForm((f) => ({ ...f, swiggyEnabled: e.target.checked }))}
-                          className="size-4 rounded accent-[#8D0606]"
-                        />
-                        <span>Swiggy Aggregator Link</span>
-                      </label>
-                      <label className="flex items-center gap-2.5 cursor-pointer select-none rounded-xl border border-slate-200/90 bg-slate-50/60 px-4 py-2.5 hover:bg-slate-100/80 transition shadow-2xs">
-                        <input
-                          type="checkbox"
-                          checked={form.zomatoEnabled}
-                          onChange={(e) => setForm((f) => ({ ...f, zomatoEnabled: e.target.checked }))}
-                          className="size-4 rounded accent-[#8D0606]"
-                        />
-                        <span>Zomato Aggregator Link</span>
-                      </label>
-                    </div>
                   </div>
                 </FormSection>
               </div>
@@ -1461,77 +1319,63 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                   <div className="flex items-center gap-2">
                     <Eye size={16} className="text-[#8D0606]" />
                     <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                      Live Card Preview
+                      Live Branch Preview
                     </h3>
                   </div>
                   <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-extrabold text-slate-500">
-                    Real-time
+                    Live
                   </span>
                 </div>
 
-                {/* Preview Mock Card */}
+                {/* Preview Card */}
                 <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/50 p-4 shadow-xs">
                   <div className="flex items-start gap-3">
-                    <div
-                      className={`grid size-10 shrink-0 place-items-center rounded-xl font-bold text-sm ${
-                        form.kitchenActive
-                          ? "bg-rose-50 text-[#8D0606] border border-rose-100"
-                          : "bg-slate-200 text-slate-500"
-                      }`}
-                    >
+                    <div className="grid size-10 shrink-0 place-items-center rounded-xl font-bold text-sm bg-rose-50 text-[#8D0606] border border-rose-100">
                       <Store size={18} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <h4 className="text-sm font-extrabold text-slate-900 truncate">
-                        {form.name || "Branch Name"}
+                        {form.name || "Main Branch"}
                       </h4>
                       <p className="text-xs text-slate-500 font-medium truncate">
-                        {form.area || "Zone / Area"}
+                        {form.pincode ? `PIN: ${form.pincode}` : "Pincode"}
                       </p>
                     </div>
                   </div>
 
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
-                        form.kitchenActive
-                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                          : "bg-slate-100 text-slate-600 border border-slate-200"
-                      }`}
-                    >
-                      {form.kitchenActive ? "ONLINE" : "OFFLINE"}
-                    </span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
-                        form.acceptingOrders
-                          ? "bg-sky-50 text-sky-700 border border-sky-200"
-                          : "bg-amber-50 text-amber-700 border border-amber-200"
-                      }`}
-                    >
-                      {form.acceptingOrders ? "Accepting Orders" : "Paused"}
-                    </span>
-                  </div>
-
-                  <div className="mt-3 space-y-1.5 rounded-lg bg-white p-2.5 text-[11px] text-slate-600 border border-slate-100">
+                  <div className="mt-3 space-y-1.5 rounded-lg bg-white p-3 text-[11px] text-slate-600 border border-slate-100">
                     <div className="flex items-center gap-1.5 truncate">
-                      <User size={12} className="text-slate-400 shrink-0" />
-                      <span className="font-semibold text-slate-700 truncate">
-                        {[form.contactFirstName, form.contactLastName].filter(Boolean).join(" ") || "Manager Name"}
+                      <User size={12} className="text-[#8D0606] shrink-0" />
+                      <span className="font-bold text-slate-800 truncate">
+                        {form.contactTitle || "MR"} {form.contactFirstName || "Contact Person"}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <Clock size={12} className="text-slate-400 shrink-0" />
-                      <span className="font-medium text-slate-600">
-                        {form.openingTime || "09:00"} - {form.closingTime || "23:00"} (~{form.prepTime || 20}m)
+                    <div className="flex items-center gap-1.5 truncate">
+                      <Phone size={12} className="text-slate-400 shrink-0" />
+                      <span className="font-semibold text-slate-600">
+                        {form.contactPhone || "9876543210"}
                       </span>
                     </div>
+                    <div className="flex items-center gap-1.5 truncate">
+                      <Mail size={12} className="text-slate-400 shrink-0" />
+                      <span className="font-medium text-slate-500 truncate">
+                        {form.contactEmail || "contact@example.com"}
+                      </span>
+                    </div>
+                    {form.addressLine1 && (
+                      <div className="flex items-start gap-1.5 pt-1 border-t border-slate-100">
+                        <MapPin size={12} className="text-slate-400 shrink-0 mt-0.5" />
+                        <span className="font-medium text-slate-600 line-clamp-2">
+                          {form.addressLine1}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {form.cuisineIds?.length > 0 && (
                     <div className="mt-2.5 flex flex-wrap gap-1">
                       {cuisineOptions
                         .filter((c) => form.cuisineIds.includes(c.value))
-                        .slice(0, 3)
                         .map((c) => (
                           <span
                             key={c.value}
@@ -1545,9 +1389,9 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                 </div>
 
                 <div className="mt-4 rounded-xl bg-amber-50/70 p-3 text-[11px] text-amber-800 border border-amber-200/60">
-                  <p className="font-bold">✨ Quick Tip:</p>
+                  <p className="font-bold">✨ Quick Notice:</p>
                   <p className="mt-0.5 text-amber-700">
-                    Ensure the manager phone number is reachable for delivery riders and aggregator customer support.
+                    Verify all 11 fields before creating. The branch will be instantly mapped to your cloud kitchen network.
                   </p>
                 </div>
               </div>
@@ -1582,18 +1426,6 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
             </div>
 
             <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-              {isEditing && (
-                <button
-                  type="button"
-                  disabled={saving}
-                  onClick={deleteSelectedBranch}
-                  className="flex h-11 items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-4 text-xs font-bold text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
-                >
-                  <Trash2 size={15} />
-                  <span>Delete Branch</span>
-                </button>
-              )}
-
               <button
                 type="button"
                 disabled={saving}

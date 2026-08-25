@@ -111,7 +111,7 @@ export const api = {
   countries: (params = {}) => request(`/master/country?${new URLSearchParams({ limit: "250", ...params })}`, { token: "" }),
   states: (params = {}) => request(`/master/state?${new URLSearchParams({ limit: "500", ...params })}`, { token: "" }),
   cities: (params = {}) => request(`/master/city?${new URLSearchParams({ limit: "500", ...params })}`, { token: "" }),
-  cuisines: (params = {}) => request(`/master/cuisine?${new URLSearchParams({ page: "1", limit: "20", status: "ACTIVE", ...params })}`, { token: "" }),
+  cuisines: (params = {}) => request(`/master/cuisine?${new URLSearchParams({ page: "1", limit: "10", name: "", category: "", status: "ACTIVE", ...params })}`, { token: "" }),
   ingredients: (params = {}) => request(`/master/ingredient?${new URLSearchParams({ page: "1", limit: "20", status: "ACTIVE", ...params })}`, { token: "" }),
   branches: (params = {}) => request(`/kitchen/branch?${new URLSearchParams(params)}`),
   branch: (branchId) => request(`/kitchen/branch/${branchId}`),
@@ -131,11 +131,22 @@ export const api = {
     return request(`/kitchen/order/branch/${branchId}${query ? `?${query}` : ""}`);
   },
   createOrder: (branchId, body) => request(`/kitchen/order/branch/${branchId}`, { method: "POST", body }),
+  customers: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return request(`/kitchen/customer${query ? `?${query}` : ""}`);
+  },
   staff: (params = {}) => {
     const query = new URLSearchParams(params).toString();
     return request(`/kitchen/staff${query ? `?${query}` : ""}`);
   },
-  staffRoles: () => request("/kitchen/staff-role"),
+  staffRoles: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return request(`/kitchen/staff-role${query ? `?${query}` : ""}`);
+  },
+  createStaffRole: (body) => request("/kitchen//role", { method: "POST", body }),
+  updateStaffRole: (roleId, body) => request(`/kitchen/staff-role/role/${roleId}`, { method: "PUT", body }),
+  updateRolePermissions: (roleId, body) => request(`/kitchen/staff-role/role/${roleId}/permissions`, { method: "PUT", body }),
+  deleteStaffRole: (roleId) => request(`/kitchen/staff-role/${roleId}`, { method: "DELETE" }),
   staffFormOptions: (params = {}) => {
     const query = new URLSearchParams(params).toString();
     return request(`/kitchen/staff/form-options${query ? `?${query}` : ""}`);
@@ -173,4 +184,28 @@ export const api = {
     return request(`/kitchen/staff/${staffId}`, { method: "PUT", body: form });
   },
   deleteStaff: (staffId) => request(`/kitchen/staff/${staffId}`, { method: "DELETE" }),
+  dashboardStats: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return request(`/kitchen/dashboard/stats${query ? `?${query}` : ""}`);
+  },
+  getProfile: () => request("/kitchen/auth/profile"),
+  updateProfile: (body) => {
+    if (body instanceof FormData) {
+      return request("/kitchen/auth/profile", { method: "PUT", body });
+    }
+    const form = new FormData();
+    Object.entries(body).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        form.append(key, value);
+      }
+    });
+    return request("/kitchen/auth/profile", { method: "PUT", body: form });
+  },
+  wasteLogs: (branchId = 2, params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return request(`/kitchen/branch/${branchId}/waste${query ? `?${query}` : ""}`);
+  },
+  createWasteLog: (branchId = 2, body) => request(`/kitchen/branch/${branchId}/waste`, { method: "POST", body }),
+  updateWasteLog: (branchId = 2, id, body) => request(`/kitchen/branch/${branchId}/waste/${id}`, { method: "PUT", body }),
+  deleteWasteLog: (branchId = 2, id) => request(`/kitchen/branch/${branchId}/waste/${id}`, { method: "DELETE" }),
 };

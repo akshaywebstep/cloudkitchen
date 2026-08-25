@@ -30,6 +30,7 @@ const PATH_TITLES = {
   "/kitchen": "Add / Edit Branch Kitchen",
   "/add-menu": "Add Menu Item",
   "/staff": "Staff Management",
+  "/roles": "Role Management",
 };
 
 export function Topbar({ apiState, onLogout, onToast, onLogin, refreshKitchenData, onBranchChange, onToggleSidebar }) {

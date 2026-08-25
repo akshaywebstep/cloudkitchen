@@ -31,6 +31,7 @@ import { Loader } from "../../ui/Loader";
 import { Pagination } from "../../ui/Pagination";
 import { PageHeader } from "../../ui/PageHeader";
 import { AppSelect } from "../../ui/AppSelect";
+import { resolveSelectedBranchId } from "../../../utils/helpers";
 
 export function OrderListPage({ apiState, onToast }) {
   const [orders, setOrders] = useState([]);
@@ -44,15 +45,9 @@ export function OrderListPage({ apiState, onToast }) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedOrderDetail, setSelectedOrderDetail] = useState(null);
 
-  // Active branch ID
   const activeBranchId = useMemo(() => {
-    return (
-      apiState?.selectedBranchId ||
-      apiState?.kitchen?.branches?.[0]?.id ||
-      apiState?.branches?.[0]?.id ||
-      2
-    );
-  }, [apiState?.selectedBranchId, apiState?.kitchen?.branches, apiState?.branches]);
+    return resolveSelectedBranchId(apiState?.branches || [], apiState?.selectedBranchId);
+  }, [apiState?.selectedBranchId, apiState?.branches]);
 
   const [currentBranchId, setCurrentBranchId] = useState(activeBranchId);
 
@@ -490,7 +485,7 @@ function CreateOrderModal({ branchId, branches, menus, onClose, onSuccess, onToa
     };
   }, []);
 
-  const [selectedBranch, setSelectedBranch] = useState(branchId || 2);
+  const [selectedBranch, setSelectedBranch] = useState(branchId || branches?.[0]?.id || "");
   const [customer, setCustomer] = useState({
     firstName: "",
     lastName: "",
@@ -516,22 +511,29 @@ function CreateOrderModal({ branchId, branches, menus, onClose, onSuccess, onToa
     phoneNumber: "",
   });
 
-  // Selected Order Items: [{ menuItemId: 1, quantity: 2, price: 299, name: "Veg." }]
+  // Selected Order Items
   const [orderItems, setOrderItems] = useState(() => {
     if (menus.length > 0) {
-      return [{ menuItemId: menus[0].id, quantity: 1, price: Number(menus[0].price) || 299, name: menus[0].name }];
+      return [{ menuItemId: menus[0].id, quantity: 1, price: Number(menus[0].price) || 0, name: menus[0].name }];
     }
-    return [{ menuItemId: 1, quantity: 2, price: 299, name: "Veg. (Special Item)" }];
+    return [];
   });
+
+  useEffect(() => {
+    if (menus.length > 0 && orderItems.length === 0) {
+      setOrderItems([{ menuItemId: menus[0].id, quantity: 1, price: Number(menus[0].price) || 0, name: menus[0].name }]);
+    }
+  }, [menus]);
 
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
 
   // Add Item to order
   const addItem = () => {
-    const defaultId = menus[0]?.id || 1;
-    const defaultPrice = Number(menus[0]?.price) || 299;
-    const defaultName = menus[0]?.name || "Veg. Item";
+    if (!menus.length) return;
+    const defaultId = menus[0]?.id;
+    const defaultPrice = Number(menus[0]?.price) || 0;
+    const defaultName = menus[0]?.name || "Menu Item";
     setOrderItems((prev) => [...prev, { menuItemId: defaultId, quantity: 1, price: defaultPrice, name: defaultName }]);
   };
 

@@ -22,8 +22,18 @@ import {
   Filter,
   Edit2,
   Edit,
+  CheckSquare,
+  Square,
+  Shield,
+  Check,
+  UtensilsCrossed,
+  Boxes,
+  ShoppingBag,
+  SlidersHorizontal,
+  Lock,
+  Unlock,
 } from "lucide-react";
-import { api, getApiErrorMessage } from "../../../api";
+import { api, getApiBaseUrl, getStoredToken, getApiErrorMessage } from "../../../api";
 import { resolveSelectedBranchId } from "../../../utils/helpers";
 import { Loader } from "../../ui/Loader";
 import { Pagination } from "../../ui/Pagination";
@@ -44,6 +54,7 @@ export function StaffListPage({ apiState, onToast }) {
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [formModalStaff, setFormModalStaff] = useState(null); // null for create, staff object for edit
   const [selectedStaffDetail, setSelectedStaffDetail] = useState(null);
+  const [selectedPermissionsStaff, setSelectedPermissionsStaff] = useState(null);
 
   const fetchStaffData = async (isSilent = false) => {
     if (!isSilent) setLoading(true);
@@ -380,12 +391,27 @@ export function StaffListPage({ apiState, onToast }) {
                         </div>
                       </td>
 
-                      {/* Role */}
+                      {/* Role & Permissions */}
                       <td className="px-6 py-4">
-                        <span className="inline-flex items-center gap-1.5 rounded-lg border border-rose-100 bg-[#fff5f5] px-2.5 py-1 text-xs font-bold text-[#8D0606]">
-                         
-                          <span className="truncate text-xs">{roleName}</span>
-                        </span>
+                        <div className="space-y-1.5">
+                          <span className="inline-flex items-center gap-1.5 rounded-lg border border-rose-100 bg-[#fff5f5] px-2.5 py-1 text-xs font-bold text-[#8D0606]">
+                            <span className="truncate text-xs">{roleName}</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedPermissionsStaff(staff);
+                            }}
+                            className="flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-[#8D0606] transition group"
+                            title="View & Edit Staff Permissions"
+                          >
+                            <ShieldCheck size={12} className="text-[#8D0606] group-hover:scale-110 transition" />
+                            <span className="underline decoration-slate-300 group-hover:decoration-[#8D0606]">
+                              {staff.permissions?.assignedCount ?? staff.permissions?.assignedPermissions?.length ?? 16} Permissions
+                            </span>
+                          </button>
+                        </div>
                       </td>
 
                       {/* Branches */}
@@ -440,6 +466,19 @@ export function StaffListPage({ apiState, onToast }) {
                       {/* Action */}
                       <td className="px-6 py-4 text-right">
                         <div className="inline-flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedPermissionsStaff(staff);
+                            }}
+                            title="View & Update Permissions"
+                            className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50/70 px-2.5 py-1.5 text-xs font-semibold text-[#8D0606] transition hover:bg-rose-100 hover:border-[#8D0606]"
+                          >
+                            <ShieldCheck size={13} />
+                            <span>Permissions</span>
+                          </button>
+
                           <button
                             type="button"
                             onClick={(e) => {
@@ -553,7 +592,21 @@ export function StaffListPage({ apiState, onToast }) {
             setFormModalStaff(staff);
             setIsFormModalOpen(true);
           }}
+          onManagePermissions={(staff) => {
+            setSelectedStaffDetail(null);
+            setSelectedPermissionsStaff(staff);
+          }}
           onClose={() => setSelectedStaffDetail(null)}
+        />
+      )}
+
+      {/* Staff Permissions Modal (Rendered via React Portal onto document.body) */}
+      {selectedPermissionsStaff && (
+        <StaffPermissionsModal
+          staff={selectedPermissionsStaff}
+          onClose={() => setSelectedPermissionsStaff(null)}
+          onSuccess={() => fetchStaffData(true)}
+          onToast={onToast}
         />
       )}
     </div>
@@ -1060,7 +1113,7 @@ function StaffFormModal({ staff, roles, branches, activeBranchId, onClose, onSuc
 // ---------------------------------------------------------------------------
 // Staff Detail Drawer / Modal (Portal-mounted)
 // ---------------------------------------------------------------------------
-function StaffDetailModal({ staff, onEdit, onClose }) {
+function StaffDetailModal({ staff, onEdit, onManagePermissions, onClose }) {
   // Body scroll lock
   useEffect(() => {
     const originalOverflow = document.body.style.overflow;
@@ -1076,6 +1129,8 @@ function StaffDetailModal({ staff, onEdit, onClose }) {
   const branches = staff.branchAccess || [];
   const initials = `${(staff.firstName?.[0] || "").toUpperCase()}${(staff.lastName?.[0] || "").toUpperCase()}` || "ST";
   const isActive = (staff.status || "ACTIVE").toUpperCase() === "ACTIVE";
+  const assignedCount = staff.permissions?.assignedCount ?? staff.permissions?.assignedPermissions?.length ?? 16;
+  const totalCount = staff.permissions?.totalPermissionsCount ?? 16;
 
   return createPortal(
     <div
@@ -1139,6 +1194,31 @@ function StaffDetailModal({ staff, onEdit, onClose }) {
             </div>
           </div>
 
+          {/* Permissions Banner */}
+          <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="grid size-10 place-items-center rounded-xl bg-white text-[#8D0606] border border-rose-100 shadow-2xs">
+                <ShieldCheck size={20} />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  Staff Role & Permissions
+                </span>
+                <p className="text-xs font-bold text-slate-900 mt-0.5">
+                  {assignedCount} of {totalCount} Operational Permissions
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onManagePermissions?.(staff)}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#8D0606] px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-[#7a0505] transition"
+            >
+              <ShieldCheck size={13} />
+              <span>Manage</span>
+            </button>
+          </div>
+
           <div className="rounded-2xl border border-slate-100 bg-slate-50/75 p-3.5">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
               Assigned Kitchen Branches ({branches.length})
@@ -1176,17 +1256,361 @@ function StaffDetailModal({ staff, onEdit, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 rounded-xl bg-slate-200/80 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-300 transition"
+            className="rounded-xl bg-slate-200/80 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-300 transition"
           >
             Close
           </button>
           <button
             type="button"
+            onClick={() => onManagePermissions?.(staff)}
+            className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-bold text-[#8D0606] hover:bg-rose-100 transition"
+          >
+            <ShieldCheck size={14} />
+            <span>Permissions</span>
+          </button>
+          <button
+            type="button"
             onClick={() => onEdit?.(staff)}
-            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#8D0606] py-2.5 text-xs font-bold text-white shadow-xs hover:bg-[#7a0505] transition"
+            className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-[#8D0606] px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-[#7a0505] transition"
           >
             <Edit2 size={14} />
             <span>Edit Staff</span>
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Staff Permissions View & Update Modal Component (Portal-mounted)
+// ---------------------------------------------------------------------------
+function StaffPermissionsModal({ staff, onClose, onSuccess, onToast }) {
+  // Body scroll lock
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow || "unset";
+    };
+  }, []);
+
+  const [saving, setSaving] = useState(false);
+
+  // Extract assigned and unassigned permissions from staff response
+  const assignedList = useMemo(() => {
+    return Array.isArray(staff?.permissions?.assignedPermissions)
+      ? staff.permissions.assignedPermissions
+      : [];
+  }, [staff]);
+
+  const unassignedList = useMemo(() => {
+    return Array.isArray(staff?.permissions?.unassignedPermissions)
+      ? staff.permissions.unassignedPermissions
+      : [];
+  }, [staff]);
+
+  // Combine all permissions uniquely
+  const allPermissions = useMemo(() => {
+    const map = new Map();
+    assignedList.forEach((p) => {
+      if (p?.id) map.set(p.id, { ...p, isInitiallyAssigned: true });
+    });
+    unassignedList.forEach((p) => {
+      if (p?.id && !map.has(p.id)) map.set(p.id, { ...p, isInitiallyAssigned: false });
+    });
+
+    // Standard default template if empty
+    if (map.size === 0) {
+      const defaultModules = ["branch", "menu", "ingredient", "order"];
+      const defaultActions = ["CREATE", "VIEW", "UPDATE", "DELETE"];
+      let dummyId = 35;
+      defaultModules.forEach((mod) => {
+        defaultActions.forEach((act) => {
+          map.set(dummyId, {
+            id: dummyId,
+            panel: "KITCHEN",
+            module: mod,
+            action: act,
+            status: "ACTIVE",
+            isInitiallyAssigned: true,
+          });
+          dummyId++;
+        });
+      });
+    }
+
+    return Array.from(map.values());
+  }, [assignedList, unassignedList]);
+
+  // Selected permission IDs: initially all assigned permissions are selected
+  const [selectedIds, setSelectedIds] = useState(() => {
+    const initialChecked = new Set();
+    assignedList.forEach((p) => {
+      if (p?.id) initialChecked.add(p.id);
+    });
+    if (initialChecked.size === 0 && allPermissions.length > 0) {
+      allPermissions.forEach((p) => initialChecked.add(p.id));
+    }
+    return initialChecked;
+  });
+
+  const togglePermission = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    const next = new Set();
+    allPermissions.forEach((p) => next.add(p.id));
+    setSelectedIds(next);
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedIds(new Set());
+  };
+
+  const toggleModulePermissions = (perms) => {
+    const allSelected = perms.every((p) => selectedIds.has(p.id));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        perms.forEach((p) => next.delete(p.id));
+      } else {
+        perms.forEach((p) => next.add(p.id));
+      }
+      return next;
+    });
+  };
+
+  // Group permissions by module
+  const groupedPermissions = useMemo(() => {
+    const groups = {};
+    allPermissions.forEach((p) => {
+      const mod = (p.module || "General").toLowerCase();
+      if (!groups[mod]) groups[mod] = [];
+      groups[mod].push(p);
+    });
+    return groups;
+  }, [allPermissions]);
+
+  const handleSavePermissions = async () => {
+    const roleId = staff.roleId || staff.role?.id || staff.role_id;
+    if (!roleId) {
+      onToast?.({ message: "Role ID not found for this staff member.", type: "error" });
+      return;
+    }
+    setSaving(true);
+
+    try {
+      const myHeaders = new Headers();
+      myHeaders.append("Content-Type", "application/json");
+      const token = getStoredToken();
+      if (token) myHeaders.append("Authorization", `Bearer ${token}`);
+
+      const raw = JSON.stringify({
+        permissionIds: Array.from(selectedIds).map(String),
+      });
+
+      const requestOptions = {
+        method: "PUT",
+        headers: myHeaders,
+        body: raw,
+        redirect: "follow",
+      };
+
+      const response = await fetch(
+        `${getApiBaseUrl()}/kitchen/staff-role/role/${roleId}/permissions`,
+        requestOptions
+      );
+
+      const resultText = await response.text();
+      console.log("Update permissions result:", resultText);
+
+      let parsedResult;
+      try {
+        parsedResult = JSON.parse(resultText);
+      } catch (_) {}
+
+      if (!response.ok || (parsedResult && parsedResult.status === false)) {
+        throw new Error(
+          parsedResult?.message ||
+            `Failed to update permissions (${response.status})`
+        );
+      }
+
+      const successMsg = `Permissions successfully updated for ${staff.role?.name || "Role"}!`;
+      onToast?.({ message: successMsg, type: "success" });
+      onSuccess?.();
+      onClose();
+    } catch (error) {
+      console.error("Update permissions error:", error);
+      const msg = getApiErrorMessage(error, "Failed to update permissions");
+      onToast?.({ message: msg, type: "error" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const titleStr = staff.title ? `${staff.title}. ` : "";
+  const fullName =
+    `${titleStr}${staff.firstName || ""} ${staff.lastName || ""}`.trim() ||
+    "Staff Member";
+  const roleName = staff.role?.name || "Kitchen Staff Manager";
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-900/50 p-4 sm:p-6 backdrop-blur-xs flex min-h-screen items-center justify-center animate-in fade-in duration-150"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-2xl my-auto flex max-h-[90vh] flex-col rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Clean Header */}
+        <div className="shrink-0 flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-white">
+          <div className="flex items-center gap-3">
+            <div className="grid size-10 place-items-center rounded-xl bg-rose-50 text-[#8D0606] border border-rose-100 shadow-2xs">
+              <ShieldCheck size={20} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-slate-900">Manage Permissions</h3>
+                <span className="rounded-full bg-rose-50 border border-rose-100 px-2 py-0.5 text-[11px] font-bold text-[#8D0606]">
+                  {selectedIds.size}/{allPermissions.length} Enabled
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 font-medium">
+                {fullName} • <span className="font-semibold text-slate-700">{roleName}</span>
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="grid size-8 place-items-center rounded-xl border border-slate-200 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition disabled:opacity-50"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Quick Bulk Actions Bar */}
+        <div className="shrink-0 flex items-center justify-between border-b border-slate-100 bg-slate-50/75 px-6 py-2.5">
+          <span className="text-xs font-semibold text-slate-500">
+            Configure access per operational module:
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleSelectAll}
+              className="rounded-lg bg-white border border-slate-200 px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-100 transition shadow-2xs"
+            >
+              Select All
+            </button>
+            <button
+              type="button"
+              onClick={handleDeselectAll}
+              className="rounded-lg bg-white border border-slate-200 px-2.5 py-1 text-xs font-bold text-slate-600 hover:bg-slate-100 transition shadow-2xs"
+            >
+              Deselect All
+            </button>
+          </div>
+        </div>
+
+        {/* Clean Permissions Matrix List */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {Object.entries(groupedPermissions).map(([modName, perms]) => {
+            const isAllSelected = perms.every((p) => selectedIds.has(p.id));
+            const selectedCount = perms.filter((p) => selectedIds.has(p.id)).length;
+
+            return (
+              <div
+                key={modName}
+                className="rounded-2xl border border-slate-200 bg-white p-4 transition shadow-2xs hover:border-slate-300"
+              >
+                {/* Module Title & Module Toggle */}
+                <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs sm:text-sm font-bold text-slate-800 uppercase tracking-wide">
+                      {modName} Module
+                    </h4>
+                    <span className="text-[11px] font-semibold text-slate-400">
+                      ({selectedCount}/{perms.length})
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => toggleModulePermissions(perms)}
+                    className="text-xs font-bold text-[#8D0606] hover:underline"
+                  >
+                    {isAllSelected ? "Deselect All" : "Select All"}
+                  </button>
+                </div>
+
+                {/* Permissions Checkboxes Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {perms.map((p) => {
+                    const isChecked = selectedIds.has(p.id);
+                    return (
+                      <label
+                        key={p.id}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          togglePermission(p.id);
+                        }}
+                        className={`flex items-center gap-2.5 rounded-xl border px-3 py-2.5 cursor-pointer transition select-none ${
+                          isChecked
+                            ? "bg-rose-50/50 border-[#8D0606]/40 text-[#8D0606] font-bold"
+                            : "bg-slate-50/60 border-slate-200 text-slate-600 font-medium hover:bg-slate-100 hover:border-slate-300"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {}}
+                          className="size-4 rounded accent-[#8D0606] cursor-pointer"
+                        />
+                        <span className="text-xs uppercase tracking-wider">{p.action}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Simple Footer */}
+        <div className="shrink-0 flex items-center justify-between gap-3 px-6 py-4 bg-slate-50/80 border-t border-slate-100">
+          <button
+            type="button"
+            disabled={saving}
+            onClick={onClose}
+            className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={handleSavePermissions}
+            className="flex items-center justify-center gap-2 rounded-xl bg-[#8D0606] px-6 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-[#7a0505] active:scale-98 transition disabled:opacity-60"
+          >
+            {saving ? (
+              <Loader variant="button" text="Updating..." />
+            ) : (
+              <>
+                <CheckCircle2 size={15} />
+                <span>Update Permissions</span>
+              </>
+            )}
           </button>
         </div>
       </div>

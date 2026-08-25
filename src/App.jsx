@@ -34,6 +34,9 @@ import { CustomerReviewPage } from "./components/desktop/pages/CustomerReviewPag
 import { KitchenFormPage } from "./components/desktop/pages/KitchenFormPage";
 import { IngredientSetupPage } from "./components/desktop/pages/IngredientSetupPage";
 import { StaffListPage } from "./components/desktop/pages/StaffListPage";
+import { RoleListPage } from "./components/desktop/pages/RoleListPage";
+import { ProfilePage } from "./components/desktop/pages/ProfilePage";
+import { WasteManagementPage } from "./components/desktop/pages/WasteManagementPage";
 
 // Mobile app
 import { MobileApp } from "./components/mobile/MobileApp";
@@ -74,6 +77,8 @@ export default function App() {
     selectedPlan: null,
     loading: true,
   });
+
+  console.log("App.jsx: apiState", apiState);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const triggerToast = (payload) => {
     if (typeof payload === "string") {
@@ -104,27 +109,10 @@ export default function App() {
       const branches = Array.isArray(branchesResponse?.data) ? branchesResponse.data : [];
       const selectedBranchId = resolveSelectedBranchId(branches, branchIdOverride || apiState.selectedBranchId || getStoredSelectedBranchId());
       setStoredSelectedBranchId(selectedBranchId);
-      let menus = [];
-      let branchIngredients = [];
-      let stocks = [];
-      if (selectedBranchId) {
-        try {
-          const menuResponse = await api.menus(selectedBranchId);
-          menus = Array.isArray(menuResponse?.data) ? menuResponse.data : [];
-        } catch (_) { menus = []; }
-        try {
-          const ingredientResponse = await api.branchIngredients(selectedBranchId);
-          branchIngredients = Array.isArray(ingredientResponse?.data) ? ingredientResponse.data : [];
-        } catch (_) { branchIngredients = []; }
-        try {
-          const stockResponse = await api.stocks(selectedBranchId);
-          stocks = Array.isArray(stockResponse?.data) ? stockResponse.data : [];
-        } catch (_) { stocks = []; }
-      }
       const selectedPlan = hasActiveKitchenSubscription(kitchen)
         ? apiState.selectedPlan
         : apiState.selectedPlan || { alreadyActive: true, confirmedActive: true, name: "Active Subscription" };
-      updateApiState({ branches, menus, branchIngredients, stocks, selectedBranchId, selectedPlan });
+      updateApiState({ branches, selectedBranchId, selectedPlan });
       return { subscriptionUnlocked: true, branches };
     } catch (error) {
       const message = getApiErrorMessage(error, "Kitchen APIs need login/onboarding/subscription");
@@ -133,7 +121,7 @@ export default function App() {
         : message.toLowerCase().includes("subscription")
           ? "Select a subscription plan to enable branch APIs."
           : message;
-      updateApiState({ branches: [], menus: [], branchIngredients: [], stocks: [], selectedBranchId: "", message: setupMessage });
+      updateApiState({ branches: [], selectedBranchId: "", message: setupMessage });
       setStoredSelectedBranchId("");
       return { subscriptionUnlocked: false, message: setupMessage };
     }
@@ -143,20 +131,6 @@ export default function App() {
     let mounted = true;
     async function boot() {
       try {
-        await api.health();
-        const [cuisineResponse, ingredientResponse, planResponse, countryResponse] = await Promise.allSettled([
-          api.cuisines(),
-          api.ingredients(),
-          api.plans(),
-          api.countries(),
-        ]);
-        if (!mounted) return;
-
-        const cuisines = cuisineResponse.status === "fulfilled" && Array.isArray(cuisineResponse.value?.data) ? cuisineResponse.value.data : [];
-        const ingredients = ingredientResponse.status === "fulfilled" && Array.isArray(ingredientResponse.value?.data) ? ingredientResponse.value.data : [];
-        const plans = planResponse.status === "fulfilled" && Array.isArray(planResponse.value?.data) ? planResponse.value.data : [];
-        const countries = countryResponse.status === "fulfilled" && Array.isArray(countryResponse.value?.data) ? countryResponse.value.data : [];
-
         const token = getStoredToken();
         let verifiedKitchen = null;
 
@@ -177,10 +151,6 @@ export default function App() {
           online: true,
           token: verifiedKitchen ? token : "",
           kitchen: verifiedKitchen,
-          cuisines,
-          ingredients,
-          plans,
-          countries,
           message: "API connected",
         });
 
@@ -409,9 +379,10 @@ export default function App() {
               <Route path="/orders" element={<OrderListPage apiState={apiState} onToast={triggerToast} />} />
               <Route path="/customers" element={<CustomerListPage />} />
               <Route path="/staff" element={<StaffListPage apiState={apiState} onToast={triggerToast} />} />
+              <Route path="/roles" element={<RoleListPage apiState={apiState} onToast={triggerToast} />} />
               <Route path="/menu" element={<CategoryPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
               <Route path="/add-menu" element={<AddMenuPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
-              <Route path="/reviews" element={<CustomerReviewPage />} />
+              <Route path="/reviews" element={<CustomerReviewPage apiState={apiState} />} />
               <Route path="/kitchen" element={<KitchenFormPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
               <Route
                 path="/ingredients"
@@ -420,6 +391,25 @@ export default function App() {
                     apiState={apiState}
                     refreshKitchenData={refreshKitchenData}
                     selectedPlan={apiState.selectedPlan || getKitchenSubscription(apiState.kitchen)}
+                    onToast={triggerToast}
+                  />
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <ProfilePage
+                    apiState={apiState}
+                    refreshKitchenData={refreshKitchenData}
+                    onToast={triggerToast}
+                  />
+                }
+              />
+              <Route
+                path="/waste"
+                element={
+                  <WasteManagementPage
+                    apiState={apiState}
                     onToast={triggerToast}
                   />
                 }

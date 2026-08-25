@@ -189,7 +189,11 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
   // Stock update modal state
   const [stockModalOpen, setStockModalOpen] = useState(false);
   const [stockItem, setStockItem] = useState(null);
+  const [stockMode, setStockMode] = useState("update"); // "update" | "create"
+  const [currentStockId, setCurrentStockId] = useState(null);
+  const [availableStockBatches, setAvailableStockBatches] = useState([]);
   const [stockValue, setStockValue] = useState("");
+  const [alertQuantity, setAlertQuantity] = useState("");
   const [expireDate, setExpireDate] = useState("");
   const [stockSaving, setStockSaving] = useState(false);
   const [stockError, setStockError] = useState("");
@@ -331,53 +335,80 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
     return ids;
   }, [apiState?.branchIngredients, inventoryList]);
 
-  // Helper to extract primitive stock number and expiry date safely from item/stock object or array
+  // Helper to extract primitive stock number, stockId, and expiry date safely from item/stock object or array
   const extractStockInfo = useCallback((item, matchingStock) => {
     let stockVal = "";
     let expireVal = "";
+    let extractedStockId = null;
+    let stocksList = [];
 
-    // 1. Check if item.stock is an Array (e.g. item.stock = [{ quantity: 20, expiryDate: null, ... }])
-    if (Array.isArray(item?.stock)) {
+    // 1. Check if item.stocks is an Array (e.g. item.stocks = [{ id: 28, stock: 20, expireAt: "...", alertQuantity: 5 }])
+    if (Array.isArray(item?.stocks) && item.stocks.length > 0) {
+      stocksList = item.stocks;
+      const primaryStock = item.stocks[0];
+      stockVal = item.stocks.reduce((acc, s) => acc + (Number(s?.stock ?? s?.quantity) || 0), 0);
+      expireVal = primaryStock?.expireAt ?? primaryStock?.expiryDate ?? "";
+      extractedStockId = primaryStock?.id ?? primaryStock?.stockId ?? null;
+    }
+    // 2. Check if item.stock is an Array
+    else if (Array.isArray(item?.stock)) {
       if (item.stock.length > 0) {
+        stocksList = item.stock;
+        const primaryStock = item.stock[0];
         const totalQty = item.stock.reduce((acc, s) => acc + (Number(s?.quantity ?? s?.stock) || 0), 0);
         stockVal = totalQty;
-        expireVal = item.stock[0]?.expiryDate ?? item.stock[0]?.expireAt ?? "";
+        expireVal = primaryStock?.expiryDate ?? primaryStock?.expireAt ?? "";
+        extractedStockId = primaryStock?.id ?? primaryStock?.stockId ?? null;
       } else {
         stockVal = 0;
       }
     }
-    // 2. Check if item.stock is an object
+    // 3. Check if item.stock is an object
     else if (item?.stock !== undefined && item?.stock !== null && typeof item.stock === "object") {
       stockVal = item.stock.quantity ?? item.stock.stock ?? item.stock.count ?? 0;
       expireVal = item.stock.expiryDate ?? item.stock.expireAt ?? "";
+      extractedStockId = item.stock.id ?? item.stock.stockId ?? null;
+      stocksList = [item.stock];
     }
-    // 3. Check if item.stock is a primitive number/string
+    // 4. Check if item.stock is a primitive number/string
     else if (item?.stock !== undefined && item?.stock !== null) {
       stockVal = item.stock;
     }
-    // 4. Fallback to item.currentStock
+    // 5. Fallback to item.currentStock
     else if (item?.currentStock !== undefined && item?.currentStock !== null) {
-      if (Array.isArray(item.currentStock)) {
+      if (Array.isArray(item.currentStock) && item.currentStock.length > 0) {
+        stocksList = item.currentStock;
         stockVal = item.currentStock.reduce((acc, s) => acc + (Number(s?.quantity ?? s?.stock) || 0), 0);
         expireVal = item.currentStock[0]?.expiryDate ?? item.currentStock[0]?.expireAt ?? "";
+        extractedStockId = item.currentStock[0]?.id ?? item.currentStock[0]?.stockId ?? null;
       } else if (typeof item.currentStock === "object") {
         stockVal = item.currentStock.quantity ?? item.currentStock.stock ?? 0;
         expireVal = item.currentStock.expiryDate ?? item.currentStock.expireAt ?? "";
+        extractedStockId = item.currentStock.id ?? item.currentStock.stockId ?? null;
+        stocksList = [item.currentStock];
       } else {
         stockVal = item.currentStock;
       }
     }
-    // 5. Fallback to matchingStock from separate stocks API
+    // 6. Fallback to matchingStock from separate stocks API
     else if (matchingStock) {
-      if (Array.isArray(matchingStock)) {
+      if (Array.isArray(matchingStock) && matchingStock.length > 0) {
+        stocksList = matchingStock;
         stockVal = matchingStock.reduce((acc, s) => acc + (Number(s?.quantity ?? s?.stock) || 0), 0);
         expireVal = matchingStock[0]?.expiryDate ?? matchingStock[0]?.expireAt ?? "";
+        extractedStockId = matchingStock[0]?.id ?? matchingStock[0]?.stockId ?? null;
       } else if (typeof matchingStock === "object") {
         stockVal = matchingStock.quantity ?? matchingStock.stock ?? matchingStock.count ?? 0;
         expireVal = matchingStock.expiryDate ?? matchingStock.expireAt ?? "";
+        extractedStockId = matchingStock.id ?? matchingStock.stockId ?? null;
+        stocksList = [matchingStock];
       } else {
         stockVal = matchingStock;
       }
+    }
+
+    if (!extractedStockId) {
+      extractedStockId = item?.stockId ?? item?.stock_id ?? (typeof matchingStock === "object" ? matchingStock?.id ?? matchingStock?.stockId : null);
     }
 
     if (item?.expireAt && !expireVal) {
@@ -387,9 +418,20 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
       expireVal = item.expiryDate;
     }
 
+    const alertQuantityVal =
+      item?.alertQuantity ??
+      item?.ingredient?.alertQuantity ??
+      (typeof matchingStock === "object" ? matchingStock?.alertQuantity : "") ??
+      (Array.isArray(item?.stocks) && item.stocks[0]?.alertQuantity) ??
+      item?.minStock ??
+      "";
+
     return {
       stock: stockVal !== "" && !isNaN(Number(stockVal)) ? Number(stockVal) : (stockVal === 0 ? 0 : stockVal || 0),
       expireAt: expireVal || "",
+      alertQuantity: alertQuantityVal !== "" && !isNaN(Number(alertQuantityVal)) ? Number(alertQuantityVal) : alertQuantityVal || "",
+      stockId: extractedStockId ? Number(extractedStockId) : null,
+      stocksList,
     };
   }, []);
 
@@ -569,41 +611,17 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
     setMessage("");
   };
 
-  const removeInventoryItem = async (item) => {
-    if (!activeBranchId || !item?.id) return;
-    const label = item.ingredient?.name || item.name || "ingredient";
-    if (!window.confirm(`Remove ${label} from this branch inventory?`)) return;
-    setSaving(true);
-    setMessage("");
-    try {
-      await api.deleteBranchIngredient(activeBranchId, item.id);
-      if (editingInventory && String(editingInventory.id) === String(item.id)) {
-        cancelEditInventory();
-      }
-
-      // Instant list API re-fetch
-      await fetchBranchInventory(activeBranchId, inventoryPage, inventoryLimit, inventorySearch);
-      refreshKitchenData?.(undefined, undefined, activeBranchId);
-
-      const successMsg = `${label} removed from branch inventory.`;
-      setMessageType("success");
-      setMessage(successMsg);
-      onToast?.({ message: successMsg, type: "success" });
-    } catch (error) {
-      const errMsg = getApiErrorMessage(error, "Unable to remove ingredient");
-      setMessageType("error");
-      setMessage(errMsg);
-      onToast?.({ message: errMsg, type: "error" });
-    } finally {
-      setSaving(false);
-    }
-  };
-
   // Stock Modal handlers
   const openStockModal = (item) => {
     const targetId = String(item.ingredientId || item.ingredient?.id || item.id);
     const matchingStock = stockLookupMap.get(targetId);
-    const { stock, expireAt } = extractStockInfo(item, matchingStock);
+    const {
+      stock,
+      expireAt,
+      alertQuantity: initialAlertQuantity,
+      stockId: extractedStockId,
+      stocksList,
+    } = extractStockInfo(item, matchingStock);
 
     let initialExpireDate = "";
     if (expireAt) {
@@ -616,7 +634,22 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
     }
 
     setStockItem(item);
+    setAvailableStockBatches(stocksList || []);
+
+    if (extractedStockId) {
+      setStockMode("update");
+      setCurrentStockId(extractedStockId);
+    } else {
+      setStockMode("create");
+      setCurrentStockId(null);
+    }
+
     setStockValue(stock !== "" && stock !== undefined && stock !== null ? String(stock) : "0");
+    setAlertQuantity(
+      initialAlertQuantity !== "" && initialAlertQuantity !== undefined && initialAlertQuantity !== null
+        ? String(initialAlertQuantity)
+        : ""
+    );
     setExpireDate(initialExpireDate);
     setStockError("");
     setStockModalOpen(true);
@@ -626,84 +659,102 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
     if (stockSaving) return;
     setStockModalOpen(false);
     setStockItem(null);
+    setStockMode("update");
+    setCurrentStockId(null);
+    setAvailableStockBatches([]);
     setStockValue("");
+    setAlertQuantity("");
     setExpireDate("");
     setStockError("");
   };
 
-const handleStockSubmit = async (e) => {
-  e.preventDefault();
-  if (!stockItem || !activeBranchId) return;
+  const handleStockSubmit = async (e) => {
+    e.preventDefault();
+    if (!stockItem || !activeBranchId) return;
 
-  if (
-    stockValue === "" ||
-    isNaN(Number(stockValue)) ||
-    Number(stockValue) < 0
-  ) {
-    setStockError("Please enter a valid stock quantity (0 or greater).");
-    return;
-  }
-
-  setStockSaving(true);
-  setStockError("");
-
-  try {
-    const ingredientId = Number(
-      stockItem.ingredientId ||
-      stockItem.ingredient?.id ||
-      stockItem.id
-    );
-
-    let expireAtISO;
-
-    if (expireDate) {
-      const d = new Date(expireDate);
-
-      if (!isNaN(d.getTime())) {
-        expireAtISO = d.toISOString();
-      }
+    if (
+      stockValue === "" ||
+      isNaN(Number(stockValue)) ||
+      Number(stockValue) < 0
+    ) {
+      setStockError("Please enter a valid stock quantity (0 or greater).");
+      return;
     }
 
-    const payload = {
-      stocks: [
-        {
-          id: ingredientId,
-          stock: Number(stockValue),
-          ...(expireAtISO ? { expireAt: expireAtISO } : {}),
-        },
-      ],
-    };
+    if (
+      alertQuantity === "" ||
+      isNaN(Number(alertQuantity)) ||
+      Number(alertQuantity) < 0
+    ) {
+      setStockError("Please enter a valid alert quantity (0 or greater).");
+      return;
+    }
 
-    await api.createStock(activeBranchId, payload);
+    setStockSaving(true);
+    setStockError("");
 
-    const label =
-      stockItem.ingredient?.name ||
-      stockItem.name ||
-      `Ingredient #${ingredientId}`;
+    try {
+      const ingredientId = Number(
+        stockItem.id ||
+        stockItem.ingredientId ||
+        stockItem.ingredient?.id
+      );
 
-    const successMsg = `Stock updated successfully for ${label}!`;
-    setMessageType("success");
-    setMessage(successMsg);
-    onToast?.({ message: successMsg, type: "success" });
+      let expireAtISO;
+      if (expireDate) {
+        const d = new Date(expireDate);
+        if (!isNaN(d.getTime())) {
+          expireAtISO = d.toISOString();
+        }
+      }
 
-    closeStockModal();
+      // If stockMode === "update" and currentStockId exists -> include stockId
+      // If stockMode === "create" -> omit stockId (New stock batch creation)
+      const stockEntry = {
+        id: ingredientId,
+        ...(stockMode === "update" && currentStockId ? { stockId: Number(currentStockId) } : {}),
+        stock: Number(stockValue),
+        alertQuantity: Number(alertQuantity),
+        ...(expireAtISO ? { expireAt: expireAtISO } : {}),
+      };
 
-    // Instant parallel re-fetch of branch ingredients and global state
-    await Promise.allSettled([
-      fetchBranchInventory(activeBranchId, inventoryPage, inventoryLimit, inventorySearch),
-      refreshKitchenData?.(undefined, undefined, activeBranchId),
-    ]);
-  } catch (error) {
-    const errMsg = getApiErrorMessage(
-      error,
-      "Failed to update ingredient stock"
-    );
-    setStockError(errMsg);
-    onToast?.({ message: errMsg, type: "error" });
-  } finally {
-    setStockSaving(false);
-  }
-};
+      const payload = {
+        stocks: [stockEntry],
+      };
+
+      console.log("Submitting stock payload:", JSON.stringify(payload, null, 2));
+
+      await api.createStock(activeBranchId, payload);
+
+      const label =
+        stockItem.ingredient?.name ||
+        stockItem.name ||
+        `Ingredient #${ingredientId}`;
+
+      const actionText = stockMode === "update" && currentStockId ? "updated" : "recorded";
+      const successMsg = `Stock ${actionText} successfully for ${label}!`;
+      setMessageType("success");
+      setMessage(successMsg);
+      onToast?.({ message: successMsg, type: "success" });
+
+      closeStockModal();
+
+      // Instant parallel re-fetch of branch ingredients and global state
+      await Promise.allSettled([
+        fetchBranchInventory(activeBranchId, inventoryPage, inventoryLimit, inventorySearch),
+        refreshKitchenData?.(undefined, undefined, activeBranchId),
+      ]);
+    } catch (error) {
+      const errMsg = getApiErrorMessage(
+        error,
+        "Failed to update ingredient stock"
+      );
+      setStockError(errMsg);
+      onToast?.({ message: errMsg, type: "error" });
+    } finally {
+      setStockSaving(false);
+    }
+  };
 
   const validateCustomForm = () => {
     const next = {};
@@ -1426,7 +1477,7 @@ const handleStockSubmit = async (e) => {
           ) : inventoryViewMode === "table" ? (
             /* Table View */
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[680px] text-left border-collapse">
+              <table className="w-full min-w-[780px] text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/50 text-[11px] font-bold uppercase tracking-wider text-slate-400">
                     <th className="pl-5 pr-3 py-3.5">#</th>
@@ -1434,6 +1485,7 @@ const handleStockSubmit = async (e) => {
                     <th className="px-4 py-3.5">CATEGORY</th>
                     <th className="px-4 py-3.5">UNIT</th>
                     <th className="px-4 py-3.5">STOCK COUNT</th>
+                    <th className="px-4 py-3.5">ALERT QTY</th>
                     <th className="px-4 py-3.5">STATUS</th>
                     <th className="pl-3 pr-5 py-3.5 text-right">ACTIONS</th>
                   </tr>
@@ -1447,7 +1499,8 @@ const handleStockSubmit = async (e) => {
                     const itemImg = item.ingredient?.image || item.image;
                     const itemCode = item.ingredientId || item.ingredient?.id || item.id;
                     const matchingStock = stockLookupMap.get(String(itemCode));
-                    const { stock: currentStockVal } = extractStockInfo(item, matchingStock);
+                    const { stock: currentStockVal, alertQuantity: currentAlertVal } = extractStockInfo(item, matchingStock);
+                    const isLowStock = currentAlertVal !== "" && currentAlertVal !== undefined && Number(currentStockVal) <= Number(currentAlertVal);
                     const avatarStyle = getIngredientAvatarStyle(itemName);
                     const itemIndex = (Number(inventoryMeta.page || inventoryPage) - 1) * Number(inventoryMeta.limit || inventoryLimit) + idx + 1;
 
@@ -1500,11 +1553,34 @@ const handleStockSubmit = async (e) => {
                           </span>
                         </td>
                         <td className="px-4 py-3.5">
-                          <div className="inline-flex items-center gap-1.5 rounded-xl bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-800 border border-slate-200 shadow-2xs">
-                            <Boxes size={13} className="text-amber-600 shrink-0" />
+                          <div
+                            className={`inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-bold border shadow-2xs ${
+                              isLowStock
+                                ? "bg-rose-50 text-rose-700 border-rose-200"
+                                : "bg-slate-50 text-slate-800 border-slate-200"
+                            }`}
+                          >
+                            <Boxes size={13} className={isLowStock ? "text-rose-600 shrink-0" : "text-amber-600 shrink-0"} />
                             <span>{currentStockVal !== undefined && currentStockVal !== null && currentStockVal !== "" ? String(currentStockVal) : "0"}</span>
                             <span className="text-[10px] font-bold text-slate-400 uppercase">{item.unit || "KG"}</span>
                           </div>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          {currentAlertVal !== "" && currentAlertVal !== undefined && currentAlertVal !== null ? (
+                            <div
+                              className={`inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-bold border shadow-2xs ${
+                                isLowStock
+                                  ? "bg-rose-100/80 text-rose-800 border-rose-300"
+                                  : "bg-amber-50 text-amber-800 border-amber-200/80"
+                              }`}
+                            >
+                              <AlertCircle size={12} className={isLowStock ? "text-rose-600 shrink-0" : "text-amber-600 shrink-0"} />
+                              <span>{String(currentAlertVal)}</span>
+                              <span className="text-[10px] font-bold text-slate-400 uppercase">{item.unit || "UNIT"}</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 font-semibold text-xs">—</span>
+                          )}
                         </td>
                         <td className="px-4 py-3.5">
                           <span
@@ -1543,16 +1619,6 @@ const handleStockSubmit = async (e) => {
                                 <Pencil size={12.5} />
                               </button>
                             )}
-                            {/* Redesigned Delete Button */}
-                            <button
-                              className="grid size-8 place-items-center rounded-xl border border-slate-200 bg-white text-slate-400 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600 transition shadow-2xs disabled:opacity-50"
-                              disabled={saving || stockSaving}
-                              onClick={() => removeInventoryItem(item)}
-                              type="button"
-                              title="Delete from branch"
-                            >
-                              <Trash2 size={13.5} />
-                            </button>
                           </div>
                         </td>
                       </tr>
@@ -1585,7 +1651,8 @@ const handleStockSubmit = async (e) => {
                   const itemImg = item.ingredient?.image || item.image;
                   const itemCode = item.ingredientId || item.ingredient?.id || item.id;
                   const matchingStock = stockLookupMap.get(String(itemCode));
-                  const { stock: currentStockVal } = extractStockInfo(item, matchingStock);
+                  const { stock: currentStockVal, alertQuantity: currentAlertVal } = extractStockInfo(item, matchingStock);
+                  const isLowStock = currentAlertVal !== "" && Number(currentStockVal) <= Number(currentAlertVal);
                   const avatarStyle = getIngredientAvatarStyle(itemName);
                   const itemIndex = (Number(inventoryMeta.page || inventoryPage) - 1) * Number(inventoryMeta.limit || inventoryLimit) + idx + 1;
 
@@ -1634,13 +1701,20 @@ const handleStockSubmit = async (e) => {
                         </div>
 
                         {/* Stock Count Banner */}
-                        <div className="mt-3 rounded-xl bg-slate-50 border border-slate-100 p-2.5 flex items-center justify-between">
+                        <div className={`mt-3 rounded-xl border p-2.5 flex items-center justify-between ${isLowStock ? "bg-rose-50/80 border-rose-200" : "bg-slate-50 border-slate-100"}`}>
                           <span className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
-                            <Boxes size={13} className="text-slate-400" /> Stock Count:
+                            <Boxes size={13} className={isLowStock ? "text-rose-600" : "text-slate-400"} /> Stock Count:
                           </span>
-                          <span className="text-xs font-bold text-slate-900 bg-white px-2 py-0.5 rounded-lg border border-slate-200 shadow-2xs">
-                            {currentStockVal !== undefined && currentStockVal !== null && currentStockVal !== "" ? String(currentStockVal) : "0"} {item.unit || "KG"}
-                          </span>
+                          <div className="text-right">
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-lg border shadow-2xs ${isLowStock ? "bg-rose-100 text-rose-800 border-rose-300" : "bg-white text-slate-900 border-slate-200"}`}>
+                              {currentStockVal !== undefined && currentStockVal !== null && currentStockVal !== "" ? String(currentStockVal) : "0"} {item.unit || "KG"}
+                            </span>
+                            {currentAlertVal !== "" && currentAlertVal !== undefined && (
+                              <span className={`block text-[10px] mt-0.5 ${isLowStock ? "text-rose-600 font-bold" : "text-slate-400 font-medium"}`}>
+                                Alert: ≤{currentAlertVal}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -1667,14 +1741,6 @@ const handleStockSubmit = async (e) => {
                               <Pencil size={12} />
                             </button>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => removeInventoryItem(item)}
-                            className="grid size-8 place-items-center rounded-xl border border-slate-200 bg-white text-slate-400 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600 transition shadow-2xs"
-                            title="Delete from branch"
-                          >
-                            <Trash2 size={13} />
-                          </button>
                         </div>
                       </div>
                     </div>
@@ -1781,6 +1847,59 @@ const handleStockSubmit = async (e) => {
                 </div>
               </div>
 
+              {/* Stock Batch Mode Selector (Update vs New Batch) */}
+              <div className="mb-4 rounded-2xl bg-slate-50 p-2.5 border border-slate-200/80">
+                <div className="flex items-center gap-2">
+                  {currentStockId ? (
+                    <button
+                      type="button"
+                      onClick={() => setStockMode("update")}
+                      className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 px-2.5 text-xs font-bold transition ${
+                        stockMode === "update"
+                          ? "bg-[#8D0606] text-white shadow-2xs"
+                          : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
+                      }`}
+                    >
+                      <Layers size={13} />
+                      <span>Update Batch #{currentStockId}</span>
+                    </button>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStockMode("create");
+                      setStockValue("");
+                      setExpireDate("");
+                    }}
+                    className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 px-2.5 text-xs font-bold transition ${
+                      stockMode === "create" || !currentStockId
+                        ? "bg-[#8D0606] text-white shadow-2xs"
+                        : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
+                    }`}
+                  >
+                    <Plus size={14} />
+                    <span>+ New Stock Batch</span>
+                  </button>
+                </div>
+
+                <div className="mt-1.5 flex items-center justify-between px-1 text-[10.5px] font-semibold text-slate-500">
+                  <span>
+                    Mode:{" "}
+                    <strong className={stockMode === "update" && currentStockId ? "text-[#8D0606]" : "text-emerald-700"}>
+                      {stockMode === "update" && currentStockId
+                        ? `Update Existing (stockId: ${currentStockId})`
+                        : "Create New Batch (no stockId)"}
+                    </strong>
+                  </span>
+                  {availableStockBatches.length > 0 && (
+                    <span className="text-slate-400">
+                      {availableStockBatches.length} batch{availableStockBatches.length > 1 ? "es" : ""} on record
+                    </span>
+                  )}
+                </div>
+              </div>
+
               {/* Stock Form */}
               <form onSubmit={handleStockSubmit} className="space-y-4" noValidate>
                 {/* Stock Quantity Input with Quick Presets */}
@@ -1825,6 +1944,37 @@ const handleStockSubmit = async (e) => {
                       {stockItem.unit || "UNIT"}
                     </span>
                   </div>
+                </div>
+
+                {/* Alert Quantity (Low Stock Alert) Input */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">
+                      Alert Quantity <span className="text-rose-600">*</span>
+                    </label>
+                  </div>
+                  <div className="relative flex items-center">
+                    <AlertCircle className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      required
+                      placeholder="e.g. 10 (triggers low stock notification)"
+                      value={alertQuantity}
+                      onChange={(e) => {
+                        setAlertQuantity(e.target.value);
+                        setStockError("");
+                      }}
+                      className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-16 text-sm font-bold text-slate-800 outline-none transition focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500 uppercase">
+                      {stockItem.unit || "UNIT"}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    Threshold to trigger low stock warnings and dashboard alerts.
+                  </p>
                 </div>
 
                 {/* Expiry Date Input */}
@@ -1872,11 +2022,15 @@ const handleStockSubmit = async (e) => {
                     className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#8D0606] to-[#b80808] text-xs font-bold text-white shadow-xs transition hover:from-[#7a0505] hover:to-[#a10707] active:scale-98 disabled:opacity-60"
                   >
                     {stockSaving ? (
-                      <Loader variant="button" text="Updating..." />
+                      <Loader variant="button" text="Processing..." />
                     ) : (
                       <>
                         <Save size={15} />
-                        <span>Save Stock</span>
+                        <span>
+                          {stockMode === "update" && currentStockId
+                            ? `Update Batch #${currentStockId}`
+                            : "Create Stock Batch"}
+                        </span>
                       </>
                     )}
                   </button>

@@ -14,144 +14,111 @@ import {
   X,
   UserCheck,
 } from "lucide-react";
-import { api, getApiErrorMessage } from "../../../api";
+import { getApiBaseUrl, getStoredToken, getApiErrorMessage } from "../../../api";
 import { Pagination } from "../../ui/Pagination";
 import { Loader } from "../../ui/Loader";
 import { PageHeader } from "../../ui/PageHeader";
 
-export function CustomerListPage({ apiState }) {
+export function CustomerListPage({ apiState, onToast }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(8);
-  const [orders, setOrders] = useState([]);
+  const [customersData, setCustomersData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const activeBranchId = useMemo(() => {
-    return (
-      apiState?.selectedBranchId ||
-      apiState?.kitchen?.branches?.[0]?.id ||
-      apiState?.branches?.[0]?.id ||
-      2
-    );
-  }, [apiState?.selectedBranchId, apiState?.kitchen?.branches, apiState?.branches]);
+  const fetchCustomers = (isSilent = false) => {
+    if (!isSilent) setLoading(true);
+    else setRefreshing(true);
 
-  useEffect(() => {
-    const fetchCustomersFromOrders = async () => {
-      if (!activeBranchId) {
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      try {
-        const res = await api.orders(activeBranchId);
-        const ordersData = Array.isArray(res?.data) ? res.data : [];
-        setOrders(ordersData);
-      } catch (err) {
-        console.error("Failed to load customer orders:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCustomersFromOrders();
-  }, [activeBranchId, apiState?.token]);
-
-  // Aggregate customers from orders
-  const customers = useMemo(() => {
-    const map = new Map();
-
-    orders.forEach((order) => {
-      const c = order.customer;
-      if (!c) return;
-
-      const customerKey = `${c.firstName || ""}_${c.lastName || ""}_${c.addresses?.[0]?.phoneNumber || ""}`.trim() || `Customer_${c.id || order.id}`;
-      const addr = c.addresses?.[0] || {};
-      const amount = Number(order.totalAmount) || 0;
-
-      if (!map.has(customerKey)) {
-        map.set(customerKey, {
-          id: c.id || order.id,
-          firstName: c.firstName || "Walk-in",
-          lastName: c.lastName || "Customer",
-          gender: c.gender || "Male",
-          phone: addr.phoneNumber || "—",
-          email: `${(c.firstName || "user").toLowerCase()}.${(c.lastName || "customer").toLowerCase()}@example.com`,
-          address: addr.address1 || "Local Area",
-          pincode: addr.pincode || "201301",
-          totalOrders: 1,
-          totalSpent: amount,
-          lastOrderDate: order.createdAt,
-        });
-      } else {
-        const existing = map.get(customerKey);
-        existing.totalOrders += 1;
-        existing.totalSpent += amount;
-        if (new Date(order.createdAt) > new Date(existing.lastOrderDate)) {
-          existing.lastOrderDate = order.createdAt;
-        }
-      }
-    });
-
-    // Default fallback demo customers if no live orders exist yet
-    if (map.size === 0) {
-      return [
-        {
-          id: 1,
-          firstName: "Rahul",
-          lastName: "Sharma",
-          gender: "Male",
-          phone: "7876060984",
-          email: "rahul.sharma@gmail.com",
-          address: "123 MG Road, Sector 15",
-          pincode: "201301",
-          totalOrders: 6,
-          totalSpent: 3588,
-          lastOrderDate: "2026-08-18T10:18:39.091Z",
-        },
-        {
-          id: 2,
-          firstName: "Priya",
-          lastName: "Patel",
-          gender: "Female",
-          phone: "9876543210",
-          email: "priya.patel@gmail.com",
-          address: "45 Park Avenue, Block C",
-          pincode: "201302",
-          totalOrders: 4,
-          totalSpent: 2190,
-          lastOrderDate: "2026-08-17T14:30:00.000Z",
-        },
-        {
-          id: 3,
-          firstName: "Amit",
-          lastName: "Verma",
-          gender: "Male",
-          phone: "8876543211",
-          email: "amit.verma@gmail.com",
-          address: "88 Cyber City, Phase 2",
-          pincode: "201303",
-          totalOrders: 3,
-          totalSpent: 1650,
-          lastOrderDate: "2026-08-16T19:20:00.000Z",
-        },
-      ];
+    const token = apiState?.token || getStoredToken();
+    const headers = new Headers();
+    if (token) {
+      headers.set("Authorization", `Bearer ${token}`);
     }
 
-    return Array.from(map.values());
-  }, [orders]);
+    const requestOptions = {
+      method: "GET",
+      headers,
+      redirect: "follow",
+    };
+
+    fetch(`${getApiBaseUrl()}/kitchen/customer`, requestOptions)
+      .then((response) => response.text())
+      .then((result) => {
+        console.log(result);
+        try {
+          const parsed = result ? JSON.parse(result) : null;
+          const list = Array.isArray(parsed?.data)
+            ? parsed.data
+            : Array.isArray(parsed?.customers)
+            ? parsed.customers
+            : Array.isArray(parsed)
+            ? parsed
+            : [];
+          setCustomersData(list);
+        } catch (e) {
+          console.error("Failed to parse customers JSON:", e);
+        }
+      })
+      .catch((error) => {
+        console.error(error);
+        const msg = getApiErrorMessage(error, "Failed to load customers list");
+        onToast?.({ message: msg, type: "error" });
+      })
+      .finally(() => {
+        setLoading(false);
+        setRefreshing(false);
+      });
+  };
+
+  useEffect(() => {
+    fetchCustomers();
+  }, [apiState?.token]);
+
+  // Normalized customer records
+  const customers = useMemo(() => {
+    return customersData.map((c, index) => {
+      const firstName = c.firstName || c.name?.split(" ")?.[0] || "Customer";
+      const lastName = c.lastName || c.name?.split(" ")?.slice(1)?.join(" ") || `#${c.id || index + 1}`;
+      const fullName = c.name || `${firstName} ${lastName}`.trim();
+      const phone = c.phone || c.phoneNumber || c.addresses?.[0]?.phoneNumber || "—";
+      const email = c.email || `${firstName.toLowerCase()}@example.com`;
+      const gender = c.gender || "Customer";
+      const addrObj = c.addresses?.[0] || {};
+      const address = c.address || addrObj.address1 || addrObj.address || "Local Area";
+      const pincode = c.pincode || addrObj.pincode || "";
+      const totalOrders = Number(c.totalOrders ?? c.ordersCount ?? c.orders?.length ?? 1);
+      const totalSpent = Number(c.totalSpent ?? c.totalAmount ?? c.lifetimeSpent ?? 0);
+      const lastOrderDate = c.lastOrderDate || c.updatedAt || c.createdAt;
+
+      return {
+        id: c.id || index + 1,
+        firstName,
+        lastName,
+        fullName,
+        phone,
+        email,
+        gender,
+        address,
+        pincode,
+        totalOrders,
+        totalSpent,
+        lastOrderDate,
+      };
+    });
+  }, [customersData]);
 
   // Filter by search
   const filteredCustomers = useMemo(() => {
     if (!searchQuery.trim()) return customers;
     const q = searchQuery.toLowerCase().trim();
     return customers.filter((c) => {
-      const fullName = `${c.firstName} ${c.lastName}`.toLowerCase();
-      return (
-        fullName.includes(q) ||
-        c.phone.toLowerCase().includes(q) ||
-        c.email.toLowerCase().includes(q) ||
-        c.address.toLowerCase().includes(q)
-      );
+      const nameMatch = c.fullName.toLowerCase().includes(q);
+      const phoneMatch = c.phone.toLowerCase().includes(q);
+      const emailMatch = c.email.toLowerCase().includes(q);
+      const addressMatch = c.address.toLowerCase().includes(q);
+      return nameMatch || phoneMatch || emailMatch || addressMatch;
     });
   }, [customers, searchQuery]);
 
@@ -160,18 +127,26 @@ export function CustomerListPage({ apiState }) {
     return filteredCustomers.slice(start, start + pageSize);
   }, [filteredCustomers, currentPage, pageSize]);
 
-  const totalRevenue = useMemo(() => {
-    return customers.reduce((sum, c) => sum + c.totalSpent, 0);
-  }, [customers]);
-
   return (
-    <div className="mx-auto  space-y-6 pb-12">
+    <div className="mx-auto space-y-6 pb-12">
       {/* Header Banner matching Reference */}
       <PageHeader
         badge="Customer Network"
         activeBadge={`${customers.length} Registered Customers`}
         title="Customer Profiles"
         subtitle="Manage customer contact information, order histories, and lifetime spending records."
+        actions={
+          <button
+            type="button"
+            onClick={() => fetchCustomers(true)}
+            disabled={refreshing || loading}
+            className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 transition active:scale-95 disabled:opacity-50"
+            title="Refresh Customers"
+          >
+            <RefreshCw size={14} className={refreshing ? "animate-spin text-[#8D0606]" : ""} />
+            <span>Refresh</span>
+          </button>
+        }
       />
 
       {/* Search Bar */}
@@ -180,7 +155,7 @@ export function CustomerListPage({ apiState }) {
           <Search className="absolute left-3.5 top-3 text-slate-400" size={17} />
           <input
             type="text"
-            placeholder="Search customer by name, phone, or address..."
+            placeholder="Search customer by name, phone, email, or address..."
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
@@ -198,13 +173,26 @@ export function CustomerListPage({ apiState }) {
             </button>
           )}
         </div>
+
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearchQuery("");
+              setCurrentPage(1);
+            }}
+            className="rounded-xl bg-rose-50 px-3.5 py-2 text-xs font-bold text-[#8D0606] hover:bg-rose-100 transition"
+          >
+            Reset Search
+          </button>
+        )}
       </div>
 
       {/* Customer Table */}
       <div className="overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm">
         {loading ? (
           <div className="py-20">
-            <Loader variant="page" text="Loading customer records..." />
+            <Loader variant="page" text="Loading customer records from server..." />
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -214,6 +202,7 @@ export function CustomerListPage({ apiState }) {
                   <th className="pl-5 pr-2 py-4 w-12 text-slate-400">#</th>
                   <th className="px-5 py-4">Customer Name</th>
                   <th className="px-5 py-4">Contact Phone</th>
+                  <th className="px-5 py-4">Email Address</th>
                   <th className="px-5 py-4">Delivery Address</th>
                   <th className="px-5 py-4">Total Orders</th>
                   <th className="px-5 py-4">Lifetime Spend</th>
@@ -223,7 +212,6 @@ export function CustomerListPage({ apiState }) {
               <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
                 {paginatedCustomers.map((c, idx) => {
                   const itemIndex = (currentPage - 1) * pageSize + idx + 1;
-                  const fullName = `${c.firstName} ${c.lastName}`;
                   const formattedDate = c.lastOrderDate
                     ? new Date(c.lastOrderDate).toLocaleDateString("en-US", {
                         day: "2-digit",
@@ -233,7 +221,7 @@ export function CustomerListPage({ apiState }) {
                     : "—";
 
                   return (
-                    <tr key={idx} className="hover:bg-slate-50/80 transition">
+                    <tr key={c.id || idx} className="hover:bg-slate-50/80 transition">
                       <td className="pl-5 pr-2 py-4 font-bold text-xs text-[#8D0606] whitespace-nowrap">
                         #{itemIndex}
                       </td>
@@ -243,7 +231,7 @@ export function CustomerListPage({ apiState }) {
                             {c.firstName.charAt(0)}
                           </div>
                           <div>
-                            <p className="font-bold text-slate-900 whitespace-nowrap">{fullName}</p>
+                            <p className="font-bold text-slate-900 whitespace-nowrap">{c.fullName}</p>
                             <span className="text-[10px] font-semibold text-slate-400">
                               {c.gender}
                             </span>
@@ -259,7 +247,14 @@ export function CustomerListPage({ apiState }) {
                       </td>
 
                       <td className="px-5 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5 text-slate-600 max-w-[280px]">
+                        <div className="flex items-center gap-1.5 text-slate-600 max-w-[200px]">
+                          <Mail size={13} className="text-slate-400 shrink-0" />
+                          <span className="truncate" title={c.email}>{c.email}</span>
+                        </div>
+                      </td>
+
+                      <td className="px-5 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5 text-slate-600 max-w-[250px]">
                           <MapPin size={13} className="text-slate-400 shrink-0" />
                           <span className="truncate" title={c.address}>
                             {c.address} {c.pincode ? `(${c.pincode})` : ""}
