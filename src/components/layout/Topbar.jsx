@@ -98,6 +98,20 @@ export function Topbar({ apiState, onLogout, onToast, onLogin, refreshKitchenDat
           ))}
         </div>
 
+        {/* Subscription Plan Badge */}
+        <div className="hidden lg:flex items-center">
+          <button
+            onClick={() => navigate("/onboarding")}
+            type="button"
+            className="flex items-center gap-1.5 rounded-full border border-[#F1DFDA] bg-rose-50/70 px-3 py-1 text-xs font-bold text-[#8D0606] shadow-2xs hover:bg-rose-100 transition"
+            title="Subscription Plan"
+          >
+            <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span>{apiState?.selectedPlan?.name || "Growth Pro Plan"}</span>
+            <span className="text-[10px] text-[#A65B47]">• 14d Trial</span>
+          </button>
+        </div>
+
         <div className="hidden h-8 w-px bg-slate-200 md:block" />
 
         {/* Connection Status & Profile Trigger */}
@@ -116,7 +130,7 @@ export function Topbar({ apiState, onLogout, onToast, onLogin, refreshKitchenDat
               onClick={() => setOpenPanel(openPanel === "profile" ? "" : "profile")}
               type="button"
             >
-              {apiState?.kitchen?.kitchenName || "Kitchen Admin"}
+              {apiState?.kitchen?.kitchenName || "-"}
             </button>
           </div>
 

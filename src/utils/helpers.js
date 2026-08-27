@@ -111,19 +111,157 @@ export function getRequiredSetupStep(apiState) {
   return "";
 }
 
+export const STANDARD_PLANS = [
+  {
+    id: 1,
+    numericId: 1,
+    slug: "starter",
+    name: "Starter",
+    title: "Starter Plan",
+    tagline: "Essential tools for single-location cloud kitchens and food startups.",
+    description: "Best for Single Outlet Cloud Kitchens.",
+    monthlyPrice: 999,
+    yearlyPrice: 9999,
+    price: 999,
+    annualPrice: 9999,
+    currency: "INR",
+    currencySymbol: "₹",
+    billingCycle: "MONTHLY",
+    trialDays: 7,
+    maxBranches: 1,
+    maxUsers: 5,
+    stripePriceIdMonthly: "price_starter_monthly",
+    stripePriceIdYearly: "price_starter_yearly",
+    badge: "Single Outlet",
+    features: [
+      { feature: "Basic Dashboard", type: "INCLUDE" },
+      { feature: "Order Management", type: "INCLUDE" },
+      { feature: "Email Support", type: "INCLUDE" },
+      { feature: "Advanced Analytics", type: "INCLUDE" },
+      { feature: "Priority Support", type: "INCLUDE" },
+    ],
+  },
+  {
+    id: 2,
+    numericId: 2,
+    slug: "growth-pro",
+    name: "Growth Pro",
+    title: "Growth Pro Plan",
+    tagline: "Multi-brand & scaling ghost kitchens needing high efficiency.",
+    description: "Best for Multi-Branch Outlets & Growing Brands.",
+    monthlyPrice: 2499,
+    yearlyPrice: 24999,
+    price: 2499,
+    annualPrice: 24999,
+    currency: "INR",
+    currencySymbol: "₹",
+    billingCycle: "MONTHLY",
+    trialDays: 7,
+    maxBranches: 3,
+    maxUsers: 15,
+    stripePriceIdMonthly: "price_growth_monthly",
+    stripePriceIdYearly: "price_growth_yearly",
+    badge: "Most Popular",
+    isPopular: true,
+    features: [
+      { feature: "Up to 3 Branches Supported", type: "INCLUDE" },
+      { feature: "15 Staff / Chef / Cashier Logins", type: "INCLUDE" },
+      { feature: "Centralized Inventory & Stock Transfer", type: "INCLUDE" },
+      { feature: "Role-Based Staff Permissions", type: "INCLUDE" },
+      { feature: "Detailed P&L & Consumption Reports", type: "INCLUDE" },
+    ],
+  },
+  {
+    id: 3,
+    numericId: 3,
+    slug: "enterprise",
+    name: "Enterprise Chain",
+    title: "Enterprise Chain Plan",
+    tagline: "Full-scale franchise operations with unlimited branches and integrations.",
+    description: "Unlimited Scale for Large Franchise Chains.",
+    monthlyPrice: 4999,
+    yearlyPrice: 49999,
+    price: 4999,
+    annualPrice: 49999,
+    currency: "INR",
+    currencySymbol: "₹",
+    billingCycle: "MONTHLY",
+    trialDays: 7,
+    maxBranches: 10,
+    maxUsers: 48,
+    stripePriceIdMonthly: "price_enterprise_monthly",
+    stripePriceIdYearly: "price_enterprise_yearly",
+    badge: "Franchise Scale",
+    features: [
+      { feature: "Up to 10 Branches Across Cities", type: "INCLUDE" },
+      { feature: "50 Team Accounts with Custom Roles", type: "INCLUDE" },
+      { feature: "Automated Supplier Purchase Orders", type: "INCLUDE" },
+      { feature: "Multi-Brand Cloud Kitchen Setup", type: "INCLUDE" },
+    ],
+  },
+];
+
+export function getPlanStripePriceId(plan, cycle = "MONTHLY") {
+  const isYearly = String(cycle || "").toUpperCase() === "YEARLY";
+  if (isYearly) {
+    return plan?.stripePriceIdYearly || `price_${plan?.slug || plan?.id || "plan"}_yearly`;
+  }
+  return plan?.stripePriceIdMonthly || `price_${plan?.slug || plan?.id || "plan"}_monthly`;
+}
+
+export function findStandardPlan(planIdentifier) {
+  if (!planIdentifier) return STANDARD_PLANS[1] || STANDARD_PLANS[0];
+  if (typeof planIdentifier === "object" && planIdentifier?.name && (planIdentifier?.monthlyPrice || planIdentifier?.price)) {
+    return planIdentifier;
+  }
+  const key = String(planIdentifier?.id ?? planIdentifier?.slug ?? planIdentifier?.name ?? planIdentifier).toLowerCase().trim();
+  return (
+    STANDARD_PLANS.find(
+      (p) =>
+        String(p.id || "").toLowerCase() === key ||
+        String(p.slug || "").toLowerCase() === key ||
+        String(p.name || "").toLowerCase() === key ||
+        String(p.numericId || "").toLowerCase() === key ||
+        String(p.stripePriceIdMonthly || "").toLowerCase() === key ||
+        String(p.stripePriceIdYearly || "").toLowerCase() === key
+    ) || STANDARD_PLANS[1] || STANDARD_PLANS[0]
+  );
+}
+
+export function getSubscriptionStatus(subscriptionOrKitchen) {
+  const sub = getKitchenSubscription(subscriptionOrKitchen) || subscriptionOrKitchen;
+  if (!sub) return "NONE";
+  const raw = String(sub.status || sub.subscriptionStatus || sub.state || "").toUpperCase();
+  if (["ACTIVE", "TRIALING", "PENDING_PAYMENT", "PAST_DUE", "CANCELLED", "EXPIRED"].includes(raw)) {
+    return raw;
+  }
+  if (sub.confirmedActive || sub.alreadyActive || sub.isActive) return "ACTIVE";
+  return raw || "ACTIVE";
+}
+
+export function isSubscriptionActiveOrTrial(kitchen) {
+  const status = getSubscriptionStatus(kitchen);
+  return status === "ACTIVE" || status === "TRIALING";
+}
+
 export function getPlanTitle(plan) {
   return plan?.title || plan?.name || plan?.planName || plan?.subscriptionName || `Plan #${plan?.id || ""}`;
+}
+
+export function formatTrialExpiryDate(days = 14) {
+  const d = new Date();
+  d.setDate(d.getDate() + Number(days || 14));
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 export function getPlanPrice(plan, cycle = "MONTHLY") {
   const isYearly = String(cycle || "").toUpperCase() === "YEARLY" || String(plan?.billingCycle || "").toUpperCase() === "YEARLY";
   const amount = isYearly
-    ? (plan?.annualPrice ?? plan?.yearlyPrice ?? (plan?.price ? plan.price * 10 : null))
-    : (plan?.price ?? plan?.amount ?? plan?.monthlyPrice ?? plan?.planPrice);
-  if (amount === undefined || amount === null || amount === "") return "Custom";
-  const currency = plan?.currency || plan?.currencyCode || "INR";
+    ? (plan?.yearlyPrice ?? plan?.annualPrice ?? (plan?.price ? plan.price * 10 : 290))
+    : (plan?.monthlyPrice ?? plan?.price ?? plan?.amount ?? 29);
+  const symbol = plan?.currencySymbol || "$";
   const period = isYearly ? "/ yr" : "/ mo";
-  return `${currency} ${Number(amount).toLocaleString("en-IN")} ${period}`;
+  return `${symbol}${Number(amount).toLocaleString("en-US")} ${period}`;
 }
 
 /**

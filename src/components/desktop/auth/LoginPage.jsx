@@ -1,6 +1,6 @@
-import React, { useState, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Lock, Mail, ArrowRight, AlertCircle, LogIn } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Eye, EyeOff, Lock, Mail, ArrowRight, AlertCircle, LogIn, CheckCircle2 } from "lucide-react";
 import { AuthLayout } from "./AuthLayout";
 import { getApiErrorMessage } from "../../../api";
 import { Loader } from "../../ui/Loader";
@@ -10,9 +10,24 @@ const REMEMBER_KEY_FLAG = "cloud_kitchen_remember_me";
 
 export function LoginPage({ onLogin, onToast }) {
   const navigate = useNavigate();
-  const [form, setForm] = useState(() => {
-    const savedUser = localStorage.getItem(REMEMBER_KEY_USER) || "";
-    return { username: savedUser, password: "" };
+  const location = useLocation();
+  const justSubscribed = location.state?.justSubscribed;
+  const initialEmail = location.state?.email || localStorage.getItem(REMEMBER_KEY_USER) || localStorage.getItem("cloud_kitchen_account_user") || "";
+
+  useEffect(() => {
+    try {
+      const containers = document.querySelectorAll(".razorpay-container, iframe[name*='razorpay'], div[class*='razorpay']");
+      containers.forEach((el) => el.remove());
+      document.body.style.overflow = "";
+      document.body.classList.remove("razorpay-open");
+    } catch (e) {
+      console.warn("Razorpay cleanup on login:", e);
+    }
+  }, []);
+
+  const [form, setForm] = useState({
+    username: initialEmail || "",
+    password: "",
   });
   const [rememberMe, setRememberMe] = useState(() => {
     return localStorage.getItem(REMEMBER_KEY_FLAG) === "true" || !!localStorage.getItem(REMEMBER_KEY_USER);
@@ -93,6 +108,18 @@ export function LoginPage({ onLogin, onToast }) {
       subtitle="Sign in to your account to manage orders, inventory & branches"
       icon={LogIn}
     >
+      {justSubscribed && (
+        <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50/90 p-4 text-xs font-semibold text-emerald-800 shadow-xs">
+          <div className="flex items-center gap-2 text-emerald-900 font-bold text-sm">
+            <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+            <span>Subscription Activated (14-Day Free Trial)</span>
+          </div>
+          <p className="mt-1 text-emerald-700 font-medium text-[11.5px] leading-relaxed">
+            Your plan has been activated! Log in now with your credentials to complete your Kitchen Onboarding.
+          </p>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         {/* Username / Email field */}
         <div>
@@ -187,8 +214,22 @@ export function LoginPage({ onLogin, onToast }) {
 
         {/* API error alert banner if present */}
         {errors.api && (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-700">
-            {errors.api}
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-700 space-y-2">
+            <div className="flex items-center gap-1.5">
+              <AlertCircle size={15} className="shrink-0" />
+              <span>{errors.api}</span>
+            </div>
+            {errors.api.toLowerCase().includes("subscription") && (
+              <div className="pt-1">
+                <Link
+                  to="/subscription"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#8D0606] px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-[#7A0505] transition"
+                >
+                  <span>Choose a Subscription Plan</span>
+                  <ArrowRight size={13} />
+                </Link>
+              </div>
+            )}
           </div>
         )}
 
@@ -199,20 +240,20 @@ export function LoginPage({ onLogin, onToast }) {
           className="flex py-3 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#8D0606] to-[#b80808] text-sm font-semibold text-white shadow-[0_10px_25px_rgba(141,6,6,0.3)] transition hover:from-[#7a0505] hover:to-[#a10707] disabled:opacity-60"
         >
           {busy ? (
-            <Loader variant="button" text="Logging in..." />
+            <Loader variant="button" text="Checking Subscription & Logging in..." />
           ) : (
             <>
-              <span>LOG IN</span>
+              <span>LOG IN TO KITCHEN</span>
               <ArrowRight size={18} />
             </>
           )}
         </button>
 
-        {/* Switch to Register link */}
-        <div className="pt-4 text-center text-xs font-medium text-[#777]">
-          Don&apos;t have an account?{" "}
-          <Link to="/register" className="font-semibold text-[#8D0606] hover:underline">
-            Create an Account
+        {/* Switch to Subscription Plans */}
+        <div className="pt-3 text-center text-xs font-medium text-[#777]">
+          New kitchen owner?{" "}
+          <Link to="/subscription" className="font-semibold text-[#8D0606] hover:underline">
+            Choose a Subscription Plan to Start
           </Link>
         </div>
       </form>

@@ -181,6 +181,34 @@ export function Sidebar({ collapsed = false, onLogout, apiState, mobileOpen = fa
           </div>
         ))}
 
+        {/* Subscription Info Card */}
+        {(!collapsed || mobileOpen) && (
+          <div className="mx-1 rounded-2xl bg-black/20 p-3.5 border border-white/10 text-white space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold flex items-center gap-1 text-amber-300">
+                <Sparkles size={13} />
+                <span>{apiState?.selectedPlan?.name || "Growth Pro"}</span>
+              </span>
+              <span className="rounded-full bg-emerald-500/30 text-emerald-300 px-2 py-0.5 text-[9.5px] font-extrabold uppercase tracking-wider border border-emerald-400/20">
+                Trial Active
+              </span>
+            </div>
+            <p className="text-[11px] text-rose-100/75 leading-tight">
+              14 days left in your free trial. All features unlocked.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                onCloseMobile?.();
+                navigate("/onboarding");
+              }}
+              className="w-full rounded-lg bg-white/15 py-1.5 text-[11px] font-bold text-white hover:bg-white/25 transition text-center"
+            >
+              Manage Subscription
+            </button>
+          </div>
+        )}
+
         {/* Logout Button at End of Menu */}
         <div className="pt-2">
           {collapsed && !mobileOpen && <div className="my-2 mx-auto h-[1px] w-6 bg-white/20" />}

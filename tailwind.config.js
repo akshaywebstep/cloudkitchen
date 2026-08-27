@@ -22,7 +22,8 @@ export default {
         panel: "0 10px 26px rgba(147, 9, 15, 0.08)",
       },
       fontFamily: {
-        sans: ["Poppins", "ui-sans-serif", "system-ui", "sans-serif"],
+        sans: ["'Roboto'", "ui-sans-serif", "system-ui", "-apple-system", "BlinkMacSystemFont", "'Segoe UI'", "sans-serif"],
+        roboto: ["'Roboto'", "sans-serif"],
       },
     },
   },

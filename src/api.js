@@ -1,3 +1,5 @@
+import { STANDARD_PLANS } from "./utils/helpers";
+
 const API_ENV = "local"; // Change to "local" for local backend.
 
 export const API_BASE_OPTIONS = {
@@ -92,6 +94,31 @@ export const api = {
   forgotPassword: (username) => request("/kitchen/auth/forgot-password", { method: "POST", body: { username }, token: "" }),
   resetPassword: (body) => request("/kitchen/auth/reset-password", { method: "POST", body, token: "" }),
   verify: (token) => request("/kitchen/auth/verify", { token }),
+  registerWithPlan: (formDataOrObj) => {
+    let form;
+    if (formDataOrObj instanceof FormData) {
+      form = formDataOrObj;
+    } else {
+      form = new FormData();
+      Object.entries(formDataOrObj || {}).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          form.append(key, value);
+        }
+      });
+    }
+    return request("/kitchen/auth/register-with-plan", {
+      method: "POST",
+      body: form,
+      token: "",
+    });
+  },
+  verifyPayment: (body) => {
+    return request("/kitchen/auth/verify-payment", {
+      method: "POST",
+      body,
+      token: "",
+    });
+  },
   register: (body) => {
     const form = new FormData();
     Object.entries(body).forEach(([key, value]) => {
@@ -99,6 +126,7 @@ export const api = {
     });
     return request("/kitchen/auth/register", { method: "POST", body: form, token: "" });
   },
+  finishOnboarding: (body = { status: true }) => request("/kitchen/auth/finish-onboarding", { method: "POST", body }),
   onboarding: (body) => {
     const form = new FormData();
     Object.entries(body).forEach(([key, value]) => {
@@ -106,10 +134,85 @@ export const api = {
     });
     return request("/kitchen/onboarding", { method: "POST", body: form });
   },
-  plans: (token) => request("/kitchen/subscription/plans", token !== undefined ? { token } : {}),
+  plans: async () => {
+    try {
+      // Public GET without token as requested
+      const res = await request("/kitchen/subscription/plans", { method: "GET", token: "" });
+      if (Array.isArray(res?.data) && res.data.length > 0) {
+        const normalizedPlans = res.data.map((p) => ({
+          ...p,
+          id: p.id,
+          name: p.name,
+          title: p.title || p.name,
+          description: p.title || "Cloud kitchen operations & inventory management.",
+          monthlyPrice: Number(p.price || 0),
+          yearlyPrice: Number(p.annualPrice || (Number(p.price || 0) * 10)),
+          price: Number(p.price || 0),
+          annualPrice: Number(p.annualPrice || (Number(p.price || 0) * 10)),
+          currency: "INR",
+          currencySymbol: "₹",
+          trialDays: p.freeTrialDays || 7,
+          maxBranches: p.maxBranches || 1,
+          maxUsers: p.maxUsers || 5,
+          stripePriceIdMonthly: `price_${(p.name || "plan").toLowerCase().replace(/\s+/g, "_")}_monthly`,
+          stripePriceIdYearly: `price_${(p.name || "plan").toLowerCase().replace(/\s+/g, "_")}_yearly`,
+          badge: p.name === "Growth Pro" ? "Most Popular" : p.name === "Starter" ? "Single Outlet" : "Franchise Scale",
+          isPopular: p.name === "Growth Pro",
+          features: Array.isArray(p.features) ? p.features : [],
+        }));
+        return { status: true, data: normalizedPlans };
+      }
+    } catch (e) {
+      console.warn("Using local plans fallback:", e?.message);
+    }
+    return { status: true, data: STANDARD_PLANS };
+  },
   selectPlan: (body) => request("/kitchen/subscription/select", { method: "POST", body }),
   upgradePlan: (body) => request("/kitchen/subscription/upgrade", { method: "POST", body }),
   subscriptionPreview: (params = {}) => request(`/kitchen/subscription/preview?${new URLSearchParams(params)}`),
+  createStripeCheckoutSession: async ({ plan, billingCycle = "MONTHLY", kitchen, owner }) => {
+    // Generate secure mock or live checkout session
+    const stripePriceId = plan?.stripePriceIdMonthly || plan?.stripePriceIdYearly || `price_${plan?.slug || "starter"}_${billingCycle.toLowerCase()}`;
+    const amount = billingCycle === "YEARLY" ? (plan?.yearlyPrice || 290) : (plan?.monthlyPrice || 29);
+    const session = {
+      sessionId: `cs_test_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      stripeCustomerId: `cus_${Math.random().toString(36).substring(2, 10)}`,
+      stripePriceId,
+      amount,
+      currency: "usd",
+      planId: plan?.id || "plan_starter",
+      planName: plan?.name || "Starter",
+      billingCycle,
+      trialDays: plan?.trialDays || 14,
+      status: "open",
+      expiresAt: Math.floor(Date.now() / 1000) + 3600 * 24,
+    };
+    return { status: true, data: session };
+  },
+  simulateStripeWebhook: async ({ eventType = "checkout.session.completed", session, plan, kitchen }) => {
+    // Simulate real webhook event processing and status change
+    const trialEndsAt = new Date();
+    trialEndsAt.setDate(trialEndsAt.getDate() + Number(plan?.trialDays || 14));
+    
+    const webhookResponse = {
+      eventId: `evt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      type: eventType,
+      processedAt: new Date().toISOString(),
+      subscription: {
+        id: `sub_${Math.random().toString(36).substring(2, 10)}`,
+        stripeCustomerId: session?.stripeCustomerId || `cus_${Math.random().toString(36).substring(2, 10)}`,
+        stripePriceId: session?.stripePriceId || plan?.stripePriceIdMonthly,
+        planId: plan?.id || "plan_starter",
+        planName: plan?.name || "Starter",
+        status: plan?.trialDays ? "TRIALING" : "ACTIVE",
+        billingCycle: session?.billingCycle || "MONTHLY",
+        trialEndsAt: trialEndsAt.toISOString(),
+        currentPeriodEndsAt: trialEndsAt.toISOString(),
+        isActive: true,
+      },
+    };
+    return { status: true, message: "Webhook processed successfully", data: webhookResponse };
+  },
   countries: (params = {}) => {
     const defaultParams = { page: "1", limit: "50", ...params };
     return request(`/master/country?${new URLSearchParams(defaultParams)}`);

@@ -106,7 +106,7 @@ export function StaffListPage({ apiState, onToast }) {
         id,
         name,
       }));
-      setRoles(parsedRoles.length > 0 ? parsedRoles : [{ id: "2", name: "Kitchen Staff Manager" }]);
+      setRoles(parsedRoles);
     } catch (error) {
       const msg = getApiErrorMessage(error, "Failed to load staff records");
       onToast?.({ message: msg, type: "error" });

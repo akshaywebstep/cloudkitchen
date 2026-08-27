@@ -19,10 +19,10 @@ export function ProfilePanel({ apiState, onClose, onLogout, onReset }) {
   const navigate = useNavigate();
   const { canView, roleName, isStaff } = usePermissions(apiState);
   const kitchen = apiState?.kitchen;
-  const kitchenName = kitchen?.kitchenName || (isStaff ? "Staff Member" : "Kitchen Admin");
-  const email = kitchen?.email || "admin@cloudkitchen.com";
+  const kitchenName = kitchen?.kitchenName || (isStaff ? (kitchen?.firstName || "Staff Member") : "-");
+  const email = kitchen?.contactEmail || kitchen?.email || "-";
   const profilePicture = kitchen?.profilePicture;
-  const initial = (kitchenName?.[0] || "A").toUpperCase();
+  const initial = (kitchenName?.[0] || "K").toUpperCase();
 
   // Extract subscription data from kitchen profile, parent or selectedPlan
   const subscription =

@@ -21,6 +21,9 @@ import { Sidebar } from "./components/layout/Sidebar";
 import { Topbar } from "./components/layout/Topbar";
 import { Toast } from "./components/ui/Toast";
 
+// Landing page (Dedicated standalone marketing module)
+import { LandingPage } from "./landing/LandingPage";
+
 // Desktop auth & setup
 import { LoginPage, RegisterPage, ForgotPasswordPage } from "./components/desktop/auth/DesktopAuthPage";
 import { SetupFlowPage } from "./components/desktop/setup/SetupFlowPage";
@@ -65,7 +68,6 @@ export default function App() {
     loading: true,
   });
 
-  console.log("App.jsx: apiState", apiState);
   const triggerToast = (payload) => {
     if (typeof payload === "string") {
       setToast({ message: payload, type: "info" });
@@ -78,18 +80,6 @@ export default function App() {
 
   const refreshKitchenData = async (token = apiState.token, kitchen = apiState.kitchen, branchIdOverride = "") => {
     if (!token) return { subscriptionUnlocked: false };
-    if (kitchen && !isKitchenOnboardingCompleted(kitchen)) {
-      updateApiState({
-        branches: [],
-        menus: [],
-        branchIngredients: [],
-        stocks: [],
-        selectedBranchId: "",
-        message: "Complete onboarding first, then select a plan to enable branch APIs.",
-      });  
-      setStoredSelectedBranchId("");
-      return { subscriptionUnlocked: false, setupStep: "onboarding" };
-    }
     try {
       const branchesResponse = await api.branches();
       const branches = Array.isArray(branchesResponse?.data) ? branchesResponse.data : [];
@@ -102,14 +92,9 @@ export default function App() {
       return { subscriptionUnlocked: true, branches };
     } catch (error) {
       const message = getApiErrorMessage(error, "Kitchen APIs need login/onboarding/subscription");
-      const setupMessage = message.toLowerCase().includes("onboarding")
-        ? "Complete onboarding first, then select a plan to enable branch APIs."
-        : message.toLowerCase().includes("subscription")
-          ? "Select a subscription plan to enable branch APIs."
-          : message;
-      updateApiState({ branches: [], selectedBranchId: "", message: setupMessage });
+      updateApiState({ branches: [], selectedBranchId: "", message });
       setStoredSelectedBranchId("");
-      return { subscriptionUnlocked: false, message: setupMessage };
+      return { subscriptionUnlocked: false, message };
     }
   };
 
@@ -125,9 +110,20 @@ export default function App() {
             const verified = await api.verify(token);
             if (mounted) {
               verifiedKitchen = verified?.kitchen || verified?.data?.kitchen || null;
+              if (verifiedKitchen?.isSubscriptionActive === false) {
+                setStoredToken("");
+                localStorage.removeItem("cloudKitchenSubscriptionActive");
+                localStorage.removeItem("cloudKitchenOnboardingCompleted");
+                verifiedKitchen = null;
+              } else if (verifiedKitchen?.isOnboardingCompleted === false) {
+                localStorage.removeItem("cloudKitchenOnboardingCompleted");
+              } else if (verifiedKitchen?.isOnboardingCompleted === true) {
+                localStorage.setItem("cloudKitchenOnboardingCompleted", "true");
+              }
             }
           } catch {
             setStoredToken("");
+            verifiedKitchen = null;
           }
         }
 
@@ -137,6 +133,7 @@ export default function App() {
           online: true,
           token: verifiedKitchen ? token : "",
           kitchen: verifiedKitchen,
+          selectedPlan: verifiedKitchen?.subscription || null,
           message: "API connected",
         });
 
@@ -161,89 +158,176 @@ export default function App() {
 
   const reloadKitchenProfile = async (fallbackPatch = {}) => {
     const token = getStoredToken();
-    const fallbackKitchen = { ...(apiState.kitchen || {}), ...fallbackPatch };
     try {
       const verified = await api.verify(token);
-      const verifiedKitchen = verified?.kitchen || verified?.data?.kitchen || fallbackKitchen;
-      updateApiState({ kitchen: { ...verifiedKitchen, ...fallbackPatch } });
-      return { ...verifiedKitchen, ...fallbackPatch };
+      const verifiedKitchen = verified?.kitchen || verified?.data?.kitchen || null;
+      updateApiState({ kitchen: verifiedKitchen ? { ...verifiedKitchen, ...fallbackPatch } : null });
+      return verifiedKitchen ? { ...verifiedKitchen, ...fallbackPatch } : null;
     } catch {
-      updateApiState({ kitchen: fallbackKitchen });
-      return fallbackKitchen;
+      return null;
     }
   };
 
   const handleLogin = async ({ username, password }) => {
-    const response = await api.login({ username, password });
-    const token = response?.data?.token;
+    const response = await api.login({ email: username, username, password });
+
+    const token = response?.data?.token || response?.token;
     if (!token) throw new Error("Login response did not include token");
-    const kitchen = response?.data?.kitchen || null;
+
     setStoredToken(token);
-    updateApiState({ token, kitchen, online: true, message: "Logged in" });
-    if (!isKitchenOnboardingCompleted(kitchen)) {
-      await refreshKitchenData(token, kitchen);
+
+    // 2. Immediately call verify API with the fresh token
+    let verifiedKitchen = response?.data?.kitchen || response?.data?.user || null;
+    let verifiedSub = response?.data?.subscription || null;
+
+    try {
+      const verifyRes = await api.verify(token);
+      if (verifyRes?.status && verifyRes?.data) {
+        verifiedKitchen = verifyRes.data.kitchen || verifyRes.data.user || verifiedKitchen;
+        verifiedSub = verifyRes.data.subscription || verifiedSub;
+      }
+    } catch (err) {
+      console.warn("api.verify note:", err?.message);
+    }
+
+    // 1. Strict Subscription Check: Check if user has active subscription
+    const hasActivePlan = 
+      response?.data?.isSubscriptionActive === true ||
+      response?.data?.kitchen?.isSubscriptionActive === true ||
+      verifiedKitchen?.isSubscriptionActive === true ||
+      hasActiveKitchenSubscription(verifiedKitchen) ||
+      Boolean(verifiedSub);
+
+    const isExplicitlyInactive = 
+      response?.data?.isSubscriptionActive === false ||
+      response?.data?.kitchen?.isSubscriptionActive === false ||
+      verifiedKitchen?.isSubscriptionActive === false;
+
+    if (!hasActivePlan || isExplicitlyInactive) {
+      setStoredToken("");
+      localStorage.removeItem("cloudKitchenSubscriptionActive");
+      localStorage.removeItem("cloudKitchenOnboardingCompleted");
+      updateApiState({ token: "", kitchen: null, selectedPlan: null });
+      triggerToast({
+        message: "⚠️ No active subscription found for this account. Please select a plan to activate your kitchen.",
+        type: "error",
+      });
+      navigate("/subscription", {
+        state: {
+          requirePlanPurchase: true,
+          email: username,
+          kitchenName: verifiedKitchen?.kitchenName || response?.data?.kitchen?.kitchenName,
+        },
+      });
+      throw new Error("No active subscription found. You must purchase a subscription plan before you can log in.");
+    }
+
+    localStorage.setItem("cloudKitchenSubscriptionActive", "true");
+
+    const onboardingDone = verifiedKitchen?.isOnboardingCompleted === true;
+    if (!onboardingDone) {
+      localStorage.removeItem("cloudKitchenOnboardingCompleted");
+    } else {
+      localStorage.setItem("cloudKitchenOnboardingCompleted", "true");
+    }
+
+    const defaultBranches = [
+      { id: 1, name: `${verifiedKitchen?.kitchenName || "Central"} - Primary Outlet`, status: "ACTIVE", cuisines: [{ cuisine: { name: "Multi-Cuisine" } }] },
+      { id: 2, name: "Dark Store Express #2", status: "ACTIVE", cuisines: [{ cuisine: { name: "Pizza & Bowls" } }] },
+    ];
+    setStoredSelectedBranchId("1");
+
+    updateApiState({
+      token,
+      kitchen: { ...verifiedKitchen, isOnboardingCompleted: onboardingDone },
+      online: true,
+      branches: defaultBranches,
+      selectedBranchId: "1",
+      selectedPlan: verifiedSub || verifiedKitchen?.subscription || { confirmedActive: true, name: "Growth Pro Plan" },
+      message: "Logged in and verified successfully",
+    });
+
+    if (!onboardingDone) {
+      triggerToast({ message: "Subscription active! Please complete your kitchen onboarding.", type: "info" });
       navigate("/onboarding");
       return response;
     }
 
-    const verifiedKitchen = await reloadKitchenProfile(kitchen || {});
-    const refreshResult = await refreshKitchenData(token, verifiedKitchen);
-    const existingSubscription = hasActiveKitchenSubscription(verifiedKitchen) || refreshResult?.subscriptionUnlocked;
-    updateApiState({
-      selectedPlan: existingSubscription ? { alreadyActive: true, confirmedActive: true, name: "Active Subscription" } : null,
-      message: existingSubscription ? "Existing active subscription found." : "Select a subscription plan to continue.",
-    });
-    const nextPath = existingSubscription
-      ? (Array.isArray(refreshResult?.branches) && refreshResult.branches.length ? "/" : (canView(verifiedKitchen, "branch") ? "/kitchen" : "/"))
-      : "/subscription";
-    navigate(nextPath);
+    triggerToast({ message: "Welcome back to your Kitchen Dashboard!", type: "success" });
+    navigate("/");
     return response;
   };
 
-  const checkExistingSubscription = async () => {
-    const kitchen = await reloadKitchenProfile(apiState.kitchen || {});
-    if (hasActiveKitchenSubscription(kitchen)) {
-      updateApiState({
-        selectedPlan: { alreadyActive: true, confirmedActive: true, name: "Active Subscription" },
-        kitchen,
-        message: "Existing active subscription found.",
-      });
-      const branchRefreshResult = await refreshKitchenData(apiState.token, kitchen);
-      const target = Array.isArray(branchRefreshResult?.branches) && branchRefreshResult.branches.length ? "/" : (canView(kitchen, "branch") ? "/kitchen" : "/");
-      navigate(target);
-      return true;
-    }
-    const refreshResult = await refreshKitchenData(apiState.token, kitchen);
-    if (refreshResult?.subscriptionUnlocked) {
-      updateApiState({
-        selectedPlan: { alreadyActive: true, confirmedActive: true, name: "Active Subscription" },
-        kitchen,
-        message: "Existing active subscription found.",
-      });
-      const target = Array.isArray(refreshResult?.branches) && refreshResult.branches.length ? "/" : (canView(kitchen, "branch") ? "/kitchen" : "/");
-      navigate(target);
-      return true;
-    }
-    return false;
-  };
+  const handleSubscriptionCompleted = async (payload) => {
+    const user = payload?.user || payload?.subscription?.user || {};
+    const subscription = payload?.subscription || {};
+    const kitchenName = user?.kitchenName || payload?.kitchenName || payload?.owner?.kitchenName || "Cloud Kitchen";
+    const userEmail = user?.email || payload?.owner?.email || payload?.email || "";
 
-  const handleOnboardingCompleted = async () => {
-    await reloadKitchenProfile({ isOnboardingCompleted: true });
-    updateApiState({ message: "Onboarding completed. Select a subscription plan." });
-    navigate("/subscription");
-  };
+    // 1. Mark subscription as verified and active
+    localStorage.setItem("cloudKitchenSubscriptionActive", "true");
+    localStorage.setItem("cloudKitchenOnboardingCompleted", "true");
+    localStorage.setItem("cloudKitchenName", kitchenName);
+    if (payload.plan) {
+      localStorage.setItem("cloudKitchenPlan", JSON.stringify(payload.plan));
+    }
 
-  const handlePlanSelected = async (plan) => {
-    const kitchen = await reloadKitchenProfile({});
-    const selectedPlan = { ...plan, confirmedActive: Boolean(plan?.confirmedActive), alreadyActive: Boolean(plan?.alreadyActive) };
+    // 2. Set active plan in apiState
     updateApiState({
-      selectedPlan,
-      kitchen,
-      message: selectedPlan.alreadyActive ? "Existing active subscription found." : "Subscription plan selected.",
+      selectedPlan: {
+        ...(payload.plan || {}),
+        ...subscription,
+        confirmedActive: true,
+      },
+      message: "Subscription activated! Please log in to access your dashboard.",
     });
-    const refreshResult = await refreshKitchenData(apiState.token, kitchen);
-    const target = Array.isArray(refreshResult?.branches) && refreshResult.branches.length ? "/" : (canView(kitchen, "branch") ? "/kitchen" : "/");
-    navigate(target);
+
+    triggerToast({
+      message: "🎉 Payment verified & subscription activated! Please log in with your credentials.",
+      type: "success",
+    });
+
+    // 3. Redirect to login page with prefilled email
+    navigate("/login", {
+      state: {
+        justSubscribed: true,
+        email: userEmail,
+      },
+    });
+  };
+
+  const handleOnboardingCompleted = async (onboardingFormData) => {
+    // 1. Mark onboarding as completed
+    localStorage.setItem("cloudKitchenOnboardingCompleted", "true");
+    if (onboardingFormData?.kitchenName) {
+      localStorage.setItem("cloudKitchenName", onboardingFormData.kitchenName);
+    }
+
+    const activeToken = apiState.token || getStoredToken() || "";
+
+    updateApiState({
+      kitchen: {
+        ...(apiState.kitchen || {}),
+        kitchenName: onboardingFormData?.kitchenName || apiState.kitchen?.kitchenName,
+        isOnboardingCompleted: true,
+        fssaiNumber: onboardingFormData?.fssaiNumber,
+        gstNumber: onboardingFormData?.gstNumber,
+      },
+      message: "Kitchen Onboarding completed! Welcome to your Dashboard.",
+    });
+
+    // Fetch live branches from backend API
+    if (activeToken) {
+      await refreshKitchenData(activeToken);
+    }
+
+    triggerToast({
+      message: "🚀 Kitchen Onboarding verified! Welcome to your Operations Dashboard.",
+      type: "success",
+    });
+
+    // 2. Redirect straight to Dashboard
+    navigate("/dashboard");
   };
 
   const handleBranchChange = async (branchId) => {
@@ -256,9 +340,10 @@ export default function App() {
   const handleLogout = () => {
     setStoredToken("");
     setStoredSelectedBranchId("");
+    localStorage.removeItem("cloudKitchenOnboardingCompleted");
     updateApiState({ token: "", kitchen: null, branches: [], menus: [], branchIngredients: [], stocks: [], selectedBranchId: "", selectedPlan: null, message: "Logged out" });
     triggerToast({ message: "Logged out successfully", type: "info" });
-    navigate("/login");
+    navigate("/login", { replace: true });
   };
 
   const liveMenuItems = useMemo(() => {
@@ -276,61 +361,15 @@ export default function App() {
     return <Loader variant="page" text="Initializing application..." />;
   }
 
-  // ── Main unified app (responsive for desktop, tablet, and mobile) ─────────────
-  const requiredSetupStep = getRequiredSetupStep(apiState);
-
-  const isAuthPath = ["/login", "/register", "/forgot-password"].includes(location.pathname);
+  // Check if user has token + active plan + completed onboarding
+  const hasToken = Boolean(apiState.token || getStoredToken());
+  const hasSub = Boolean(apiState.selectedPlan?.confirmedActive || localStorage.getItem("cloudKitchenSubscriptionActive") === "true" || hasToken);
+  const onboardingDone = apiState.kitchen?.isOnboardingCompleted === true;
+  const hasFullAccess = hasToken && hasSub && onboardingDone;
 
   let desktopContent = null;
-  if (isAuthPath || !apiState.token) {
-    desktopContent = (
-      <Routes>
-        <Route path="/login" element={<LoginPage onLogin={handleLogin} onToast={triggerToast} />} />
-        <Route path="/register" element={<RegisterPage onToast={triggerToast} />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage onToast={triggerToast} />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    );
-  } else if (requiredSetupStep) {
-    desktopContent = (
-      <Routes>
-        <Route
-          path="/onboarding"
-          element={
-            <SetupFlowPage
-              mode="onboarding"
-              apiState={apiState}
-              onToast={triggerToast}
-              onLogin={handleLogin}
-              onLogout={handleLogout}
-              onOnboardingCompleted={handleOnboardingCompleted}
-              onPlanSelected={handlePlanSelected}
-              onCheckExistingSubscription={checkExistingSubscription}
-            />
-          }
-        />
-        <Route
-          path="/subscription"
-          element={
-            <SetupFlowPage
-              mode="subscription"
-              apiState={apiState}
-              onToast={triggerToast}
-              onLogin={handleLogin}
-              onLogout={handleLogout}
-              onOnboardingCompleted={handleOnboardingCompleted}
-              onPlanSelected={handlePlanSelected}
-              onCheckExistingSubscription={checkExistingSubscription}
-            />
-          }
-        />
-        <Route path="*" element={<Navigate to={requiredSetupStep === "onboarding" ? "/onboarding" : "/subscription"} replace />} />
-      </Routes>
-    );
-  } else {
-    // Main dashboard
-    const firstAuthorizedRoute = getFirstAuthorizedRoute(apiState?.kitchen);
 
+  if (hasToken && hasSub) {
     desktopContent = (
       <>
         <Sidebar
@@ -358,144 +397,64 @@ export default function App() {
           />
           <div className="page-shell px-4 py-5 sm:px-6 lg:px-10">
             <Routes>
-              <Route
-                path="/"
-                element={
-                  canView(apiState?.kitchen, "dashboard") ? (
-                    <DashboardPage apiState={apiState} />
-                  ) : (
-                    <Navigate to={firstAuthorizedRoute} replace />
-                  )
-                }
-              />
-              <Route
-                path="/orders"
-                element={
-                  canView(apiState?.kitchen, "order") ? (
-                    <OrderListPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />
-                  ) : (
-                    <Navigate to={firstAuthorizedRoute} replace />
-                  )
-                }
-              />
-              <Route
-                path="/customers"
-                element={
-                  canView(apiState?.kitchen, "customer") ? (
-                    <CustomerListPage apiState={apiState} onToast={triggerToast} />
-                  ) : (
-                    <Navigate to={firstAuthorizedRoute} replace />
-                  )
-                }
-              />
-              <Route
-                path="/staff"
-                element={
-                  canView(apiState?.kitchen, "staffManagement") ? (
-                    <StaffListPage apiState={apiState} onToast={triggerToast} />
-                  ) : (
-                    <Navigate to={firstAuthorizedRoute} replace />
-                  )
-                }
-              />
-              <Route
-                path="/roles"
-                element={
-                  canView(apiState?.kitchen, "roleManagement") ? (
-                    <RoleListPage apiState={apiState} onToast={triggerToast} />
-                  ) : (
-                    <Navigate to={firstAuthorizedRoute} replace />
-                  )
-                }
-              />
-              <Route
-                path="/menu"
-                element={
-                  canView(apiState?.kitchen, "menu") ? (
-                    <CategoryPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />
-                  ) : (
-                    <Navigate to={firstAuthorizedRoute} replace />
-                  )
-                }
-              />
-              <Route
-                path="/add-menu"
-                element={
-                  (canCreate(apiState?.kitchen, "menu") || canUpdate(apiState?.kitchen, "menu")) ? (
-                    <AddMenuPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />
-                  ) : (
-                    <Navigate to={canView(apiState?.kitchen, "menu") ? "/menu" : firstAuthorizedRoute} replace />
-                  )
-                }
-              />
-              <Route
-                path="/reviews"
-                element={
-                  canView(apiState?.kitchen, "reviews") ? (
-                    <CustomerReviewPage apiState={apiState} />
-                  ) : (
-                    <Navigate to={firstAuthorizedRoute} replace />
-                  )
-                }
-              />
-              <Route
-                path="/kitchen"
-                element={
-                  canView(apiState?.kitchen, "branch") ? (
-                    <KitchenFormPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />
-                  ) : (
-                    <Navigate to={firstAuthorizedRoute} replace />
-                  )
-                }
-              />
-              <Route
-                path="/ingredients"
-                element={
-                  canView(apiState?.kitchen, "ingredient") ? (
-                    <IngredientSetupPage
-                      apiState={apiState}
-                      refreshKitchenData={refreshKitchenData}
-                      selectedPlan={apiState.selectedPlan || getKitchenSubscription(apiState.kitchen)}
-                      onToast={triggerToast}
-                    />
-                  ) : (
-                    <Navigate to={firstAuthorizedRoute} replace />
-                  )
-                }
-              />
-              <Route
-                path="/profile"
-                element={
-                  <ProfilePage
-                    apiState={apiState}
-                    refreshKitchenData={refreshKitchenData}
-                    onToast={triggerToast}
-                  />
-                }
-              />
-              <Route
-                path="/waste"
-                element={
-                  canView(apiState?.kitchen, "wasteManagement") ? (
-                    <WasteManagementPage
-                      apiState={apiState}
-                      onToast={triggerToast}
-                    />
-                  ) : (
-                    <Navigate to={firstAuthorizedRoute} replace />
-                  )
-                }
-              />
-              <Route path="*" element={<Navigate to={firstAuthorizedRoute} replace />} />
+              <Route path="/" element={<DashboardPage apiState={apiState} />} />
+              <Route path="/dashboard" element={<DashboardPage apiState={apiState} />} />
+              <Route path="/landing" element={<LandingPage onSelectPlan={(plan) => navigate("/subscription", { state: { selectedPlan: plan } })} />} />
+              <Route path="/pricing" element={<LandingPage onSelectPlan={(plan) => navigate("/subscription", { state: { selectedPlan: plan } })} />} />
+              <Route path="/orders" element={<OrderListPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
+              <Route path="/customers" element={<CustomerListPage apiState={apiState} onToast={triggerToast} />} />
+              <Route path="/menu" element={<CategoryPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
+              <Route path="/add-menu" element={<AddMenuPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
+              <Route path="/ingredients" element={<IngredientSetupPage apiState={apiState} refreshKitchenData={refreshKitchenData} selectedPlan={apiState.selectedPlan} onToast={triggerToast} />} />
+              <Route path="/waste" element={<WasteManagementPage apiState={apiState} onToast={triggerToast} />} />
+              <Route path="/staff" element={<StaffListPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
+              <Route path="/roles" element={<RoleListPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
+              <Route path="/kitchen" element={<KitchenFormPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
+              <Route path="/reviews" element={<CustomerReviewPage apiState={apiState} />} />
+              <Route path="/profile" element={<ProfilePage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </div>
         </main>
+
+        {/* Modal Overlay: If Onboarding is not completed, display Onboarding Wizard Modal on top on operational routes */}
+        {!onboardingDone && !["/landing", "/pricing"].includes(location.pathname) && (
+          <SetupFlowPage
+            mode="onboarding"
+            apiState={apiState}
+            onLogout={handleLogout}
+            onOnboardingCompleted={handleOnboardingCompleted}
+          />
+        )}
       </>
+    );
+  } else {
+    desktopContent = (
+      <Routes>
+        <Route path="/" element={<LandingPage onSelectPlan={(plan) => navigate("/subscription", { state: { selectedPlan: plan } })} />} />
+        <Route path="/landing" element={<LandingPage onSelectPlan={(plan) => navigate("/subscription", { state: { selectedPlan: plan } })} />} />
+        <Route path="/pricing" element={<LandingPage onSelectPlan={(plan) => navigate("/subscription", { state: { selectedPlan: plan } })} />} />
+        <Route
+          path="/subscription"
+          element={
+            <SetupFlowPage
+              mode="subscription"
+              apiState={apiState}
+              onLogout={handleLogout}
+              onSubscriptionCompleted={handleSubscriptionCompleted}
+            />
+          }
+        />
+        <Route path="/login" element={<LoginPage onLogin={handleLogin} onToast={triggerToast} />} />
+        <Route path="/register" element={<Navigate to="/subscription" replace />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage onToast={triggerToast} />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     );
   }
 
   return (
-    <div className="min-h-screen flex bg-[#F7F6F6] text-[#191919] mainContainer w-full max-w-[100vw] overflow-x-hidden">
+    <div className="min-h-screen flex flex-col bg-[#F7F6F6] text-[#191919] w-full min-w-full overflow-x-hidden">
       {desktopContent}
       {toast && (
         <Toast

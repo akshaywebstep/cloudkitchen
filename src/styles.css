@@ -225,3 +225,13 @@ button:active {
     padding-left: 0 !important;
   }
 }
+
+/* Lighten and soften Razorpay Checkout backdrop */
+.razorpay-container,
+.razorpay-backdrop,
+div[class*="razorpay-backdrop"],
+div[class*="razorpay-container"] {
+  background: rgb(15 23 42 / 12%) !important;
+  backdrop-filter: blur(2px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+}

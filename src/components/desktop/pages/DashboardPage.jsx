@@ -31,7 +31,7 @@ export function DashboardPage({ apiState }) {
 
   const activeBranchId = resolveSelectedBranchId(apiState?.branches || [], apiState?.selectedBranchId);
   const selectedBranch = (apiState?.branches || []).find((b) => String(b.id) === String(activeBranchId));
-  const branchName = selectedBranch?.name || apiState?.kitchen?.kitchenName || "Main Cloud Kitchen";
+  const branchName = selectedBranch?.name || apiState?.kitchen?.kitchenName || "-";
 
   useEffect(() => {
     let isMounted = true;
@@ -99,11 +99,11 @@ export function DashboardPage({ apiState }) {
 
   const planBadgeText = subscription.planName
     ? `${subscription.planName} • ${subscription.status || "ACTIVE"} (${subscription.billingCycle || "MONTHLY"})`
-    : "Cloud Kitchen Operations Hub";
+    : "-";
 
   const branchBadgeText = subscription.maxBranches
-    ? `${subscription.usedBranches || overview.totalBranches || 1}/${subscription.maxBranches} Branches • ${subscription.usedUsers || overview.totalStaff || 1}/${subscription.maxUsers || 1} Users`
-    : `${apiState?.branches?.length || overview.totalBranches || 1} Active Kitchen Outlets`;
+    ? `${subscription.usedBranches || overview.totalBranches || 0}/${subscription.maxBranches} Branches • ${subscription.usedUsers || overview.totalStaff || 0}/${subscription.maxUsers || 0} Users`
+    : (apiState?.branches?.length ? `${apiState.branches.length} Active Kitchen Outlets` : "-");
 
   return (
     <div className="mx-auto space-y-7 pb-10">
