@@ -169,11 +169,12 @@ export const api = {
   },
   selectPlan: (body) => request("/kitchen/subscription/select", { method: "POST", body }),
   upgradePlan: (body) => request("/kitchen/subscription/upgrade", { method: "POST", body }),
+  downgradePlan: (body) => request("/kitchen/subscription/downgrade", { method: "POST", body }),
   subscriptionPreview: (params = {}) => request(`/kitchen/subscription/preview?${new URLSearchParams(params)}`),
   createStripeCheckoutSession: async ({ plan, billingCycle = "MONTHLY", kitchen, owner }) => {
     // Generate secure mock or live checkout session
     const stripePriceId = plan?.stripePriceIdMonthly || plan?.stripePriceIdYearly || `price_${plan?.slug || "starter"}_${billingCycle.toLowerCase()}`;
-    const amount = billingCycle === "YEARLY" ? (plan?.yearlyPrice || 290) : (plan?.monthlyPrice || 29);
+    const amount = billingCycle === "YEARLY" ? (plan?.yearlyPrice || '') : (plan?.monthlyPrice || '');
     const session = {
       sessionId: `cs_test_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
       stripeCustomerId: `cus_${Math.random().toString(36).substring(2, 10)}`,

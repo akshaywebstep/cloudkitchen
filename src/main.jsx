@@ -9,7 +9,7 @@ const rootElement = document.getElementById("root");
 if (rootElement) {
   createRoot(rootElement).render(
     <React.StrictMode>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL || "/demo/cloudkitchen"}>
         <App />
       </BrowserRouter>
     </React.StrictMode>

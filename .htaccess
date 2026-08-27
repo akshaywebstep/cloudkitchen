@@ -1,10 +1,10 @@
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  RewriteBase /demo/cloud-kitchen-admin/
+  RewriteBase /demo/cloudkitchen/
 
   RewriteRule ^index\.html$ - [L]
 
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule . /demo/cloud-kitchen-admin/index.html [L]
+  RewriteRule . /demo/cloudkitchen/index.html [L]
 </IfModule>

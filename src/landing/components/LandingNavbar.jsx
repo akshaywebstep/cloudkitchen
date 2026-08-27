@@ -39,12 +39,18 @@ export function LandingNavbar() {
         </nav>
 
         {/* Action CTAs */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <Link
-            to="/login"
-            className="rounded-xl px-4 py-2 text-xs sm:text-sm font-medium text-[#5B4A45] transition hover:bg-rose-50 hover:text-[#8D0606]"
+            to="/admin/login"
+            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:border-slate-300"
           >
-            Sign In
+            Admin Portal
+          </Link>
+          <Link
+            to="/kitchen/login"
+            className="rounded-xl px-3.5 py-2 text-xs sm:text-sm font-medium text-[#5B4A45] transition hover:bg-rose-50 hover:text-[#8D0606]"
+          >
+            Kitchen Sign In
           </Link>
           <a
             href="#pricing"

@@ -14,37 +14,38 @@ import {
   getKitchenSubscription,
 } from "./utils/helpers";
 import { canView, canCreate, canUpdate, getFirstAuthorizedRoute } from "./utils/permissions";
-import { foodImages } from "./constants/mockData";
 
-// Layout components
-import { Sidebar } from "./components/layout/Sidebar";
-import { Topbar } from "./components/layout/Topbar";
+// Shared UI
 import { Toast } from "./components/ui/Toast";
 
-// Landing page (Dedicated standalone marketing module)
+// 1. Landing Page Module
 import { LandingPage } from "./landing/LandingPage";
 
-// Desktop auth & setup
-import { LoginPage, RegisterPage, ForgotPasswordPage } from "./components/desktop/auth/DesktopAuthPage";
-import { SetupFlowPage } from "./components/desktop/setup/SetupFlowPage";
+// 2. Kitchen Portal Module
+import { Sidebar } from "./kitchen/layout/Sidebar";
+import { Topbar } from "./kitchen/layout/Topbar";
+import { LoginPage, RegisterPage, ForgotPasswordPage } from "./kitchen/auth/DesktopAuthPage";
+import { SetupFlowPage } from "./kitchen/setup/SetupFlowPage";
+import { DashboardPage } from "./kitchen/pages/DashboardPage";
+import { OrderListPage } from "./kitchen/pages/OrderListPage";
+import { CustomerListPage } from "./kitchen/pages/CustomerListPage";
+import { CategoryPage } from "./kitchen/pages/CategoryPage";
+import { AddMenuPage } from "./kitchen/pages/AddMenuPage";
+import { CustomerReviewPage } from "./kitchen/pages/CustomerReviewPage";
+import { KitchenFormPage } from "./kitchen/pages/KitchenFormPage";
+import { IngredientSetupPage } from "./kitchen/pages/IngredientSetupPage";
+import { StaffListPage } from "./kitchen/pages/StaffListPage";
+import { RoleListPage } from "./kitchen/pages/RoleListPage";
+import { ProfilePage } from "./kitchen/pages/ProfilePage";
+import { WasteManagementPage } from "./kitchen/pages/WasteManagementPage";
 
-// Desktop pages
-import { DashboardPage } from "./components/desktop/pages/DashboardPage";
-import { OrderListPage } from "./components/desktop/pages/OrderListPage";
-import { CustomerListPage } from "./components/desktop/pages/CustomerListPage";
-import { CategoryPage } from "./components/desktop/pages/CategoryPage";
-import { AddMenuPage } from "./components/desktop/pages/AddMenuPage";
-import { CustomerReviewPage } from "./components/desktop/pages/CustomerReviewPage";
-import { KitchenFormPage } from "./components/desktop/pages/KitchenFormPage";
-import { IngredientSetupPage } from "./components/desktop/pages/IngredientSetupPage";
-import { StaffListPage } from "./components/desktop/pages/StaffListPage";
-import { RoleListPage } from "./components/desktop/pages/RoleListPage";
-import { ProfilePage } from "./components/desktop/pages/ProfilePage";
-import { WasteManagementPage } from "./components/desktop/pages/WasteManagementPage";
+// 3. Super Admin Portal Module
+import { AdminApp } from "./admin/App";
 
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
+
   const [toast, setToast] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -85,9 +86,7 @@ export default function App() {
       const branches = Array.isArray(branchesResponse?.data) ? branchesResponse.data : [];
       const selectedBranchId = resolveSelectedBranchId(branches, branchIdOverride || apiState.selectedBranchId || getStoredSelectedBranchId());
       setStoredSelectedBranchId(selectedBranchId);
-      const selectedPlan = hasActiveKitchenSubscription(kitchen)
-        ? apiState.selectedPlan
-        : apiState.selectedPlan || { alreadyActive: true, confirmedActive: true, name: "Active Subscription" };
+      const selectedPlan = kitchen?.subscription || apiState.selectedPlan || null;
       updateApiState({ branches, selectedBranchId, selectedPlan, branchesMeta: branchesResponse?.meta });
       return { subscriptionUnlocked: true, branches };
     } catch (error) {
@@ -231,30 +230,27 @@ export default function App() {
       localStorage.setItem("cloudKitchenOnboardingCompleted", "true");
     }
 
-    const defaultBranches = [
-      { id: 1, name: `${verifiedKitchen?.kitchenName || "Central"} - Primary Outlet`, status: "ACTIVE", cuisines: [{ cuisine: { name: "Multi-Cuisine" } }] },
-      { id: 2, name: "Dark Store Express #2", status: "ACTIVE", cuisines: [{ cuisine: { name: "Pizza & Bowls" } }] },
-    ];
-    setStoredSelectedBranchId("1");
-
     updateApiState({
       token,
       kitchen: { ...verifiedKitchen, isOnboardingCompleted: onboardingDone },
       online: true,
-      branches: defaultBranches,
-      selectedBranchId: "1",
-      selectedPlan: verifiedSub || verifiedKitchen?.subscription || { confirmedActive: true, name: "Growth Pro Plan" },
+      branches: [],
+      selectedBranchId: "",
+      selectedPlan: verifiedSub || verifiedKitchen?.subscription || null,
       message: "Logged in and verified successfully",
     });
 
+    // Load actual live branches from backend API
+    await refreshKitchenData(token, verifiedKitchen);
+
     if (!onboardingDone) {
       triggerToast({ message: "Subscription active! Please complete your kitchen onboarding.", type: "info" });
-      navigate("/onboarding");
+      navigate("/kitchen/dashboard");
       return response;
     }
 
     triggerToast({ message: "Welcome back to your Kitchen Dashboard!", type: "success" });
-    navigate("/");
+    navigate("/kitchen/dashboard");
     return response;
   };
 
@@ -288,7 +284,7 @@ export default function App() {
     });
 
     // 3. Redirect to login page with prefilled email
-    navigate("/login", {
+    navigate("/kitchen/login", {
       state: {
         justSubscribed: true,
         email: userEmail,
@@ -326,8 +322,8 @@ export default function App() {
       type: "success",
     });
 
-    // 2. Redirect straight to Dashboard
-    navigate("/dashboard");
+    // 2. Redirect straight to Kitchen Dashboard
+    navigate("/kitchen/dashboard");
   };
 
   const handleBranchChange = async (branchId) => {
@@ -343,21 +339,21 @@ export default function App() {
     localStorage.removeItem("cloudKitchenOnboardingCompleted");
     updateApiState({ token: "", kitchen: null, branches: [], menus: [], branchIngredients: [], stocks: [], selectedBranchId: "", selectedPlan: null, message: "Logged out" });
     triggerToast({ message: "Logged out successfully", type: "info" });
-    navigate("/login", { replace: true });
+    navigate("/kitchen/login", { replace: true });
   };
 
   const liveMenuItems = useMemo(() => {
     if (!apiState.menus.length) return [];
     return apiState.menus.map((menu) => ({
       name: menu.name || "Menu Item",
-      price: menu.price ? `$${Number(menu.price).toFixed(2)}` : "$5.59",
-      image: menu.image || foodImages[1],
-      description: menu.description || "Live menu item from backend",
+      price: menu.price ? `₹${Number(menu.price).toFixed(2)}` : "",
+      image: menu.image || "",
+      description: menu.description || "",
     }));
   }, [apiState.menus]);
 
   // ── Boot splash ─────────────────────────────────────────────────────────────
-  if (apiState.loading) {
+  if (apiState.loading && !location.pathname.startsWith("/admin")) {
     return <Loader variant="page" text="Initializing application..." />;
   }
 
@@ -365,77 +361,40 @@ export default function App() {
   const hasToken = Boolean(apiState.token || getStoredToken());
   const hasSub = Boolean(apiState.selectedPlan?.confirmedActive || localStorage.getItem("cloudKitchenSubscriptionActive") === "true" || hasToken);
   const onboardingDone = apiState.kitchen?.isOnboardingCompleted === true;
-  const hasFullAccess = hasToken && hasSub && onboardingDone;
 
-  let desktopContent = null;
-
-  if (hasToken && hasSub) {
-    desktopContent = (
-      <>
-        <Sidebar
-          collapsed={sidebarCollapsed}
-          onLogout={handleLogout}
-          apiState={apiState}
-          mobileOpen={mobileSidebarOpen}
-          onCloseMobile={() => setMobileSidebarOpen(false)}
-        />
-        <main className={`min-w-0 flex-1 transition-all duration-300 mainContentBox overflow-x-hidden ${sidebarCollapsed ? "lg:pl-[90px]" : "lg:pl-[280px]"}`}>
-          <Topbar
-            apiState={apiState}
-            onLogout={handleLogout}
-            onToast={triggerToast}
-            onLogin={handleLogin}
-            refreshKitchenData={refreshKitchenData}
-            onBranchChange={handleBranchChange}
-            onToggleSidebar={() => {
-              if (window.innerWidth < 1024) {
-                setMobileSidebarOpen((v) => !v);
-              } else {
-                setSidebarCollapsed((v) => !v);
-              }
-            }}
-          />
-          <div className="page-shell px-4 py-5 sm:px-6 lg:px-10">
-            <Routes>
-              <Route path="/" element={<DashboardPage apiState={apiState} />} />
-              <Route path="/dashboard" element={<DashboardPage apiState={apiState} />} />
-              <Route path="/landing" element={<LandingPage onSelectPlan={(plan) => navigate("/subscription", { state: { selectedPlan: plan } })} />} />
-              <Route path="/pricing" element={<LandingPage onSelectPlan={(plan) => navigate("/subscription", { state: { selectedPlan: plan } })} />} />
-              <Route path="/orders" element={<OrderListPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
-              <Route path="/customers" element={<CustomerListPage apiState={apiState} onToast={triggerToast} />} />
-              <Route path="/menu" element={<CategoryPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
-              <Route path="/add-menu" element={<AddMenuPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
-              <Route path="/ingredients" element={<IngredientSetupPage apiState={apiState} refreshKitchenData={refreshKitchenData} selectedPlan={apiState.selectedPlan} onToast={triggerToast} />} />
-              <Route path="/waste" element={<WasteManagementPage apiState={apiState} onToast={triggerToast} />} />
-              <Route path="/staff" element={<StaffListPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
-              <Route path="/roles" element={<RoleListPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
-              <Route path="/kitchen" element={<KitchenFormPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
-              <Route path="/reviews" element={<CustomerReviewPage apiState={apiState} />} />
-              <Route path="/profile" element={<ProfilePage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
-          </div>
-        </main>
-
-        {/* Modal Overlay: If Onboarding is not completed, display Onboarding Wizard Modal on top on operational routes */}
-        {!onboardingDone && !["/landing", "/pricing"].includes(location.pathname) && (
-          <SetupFlowPage
-            mode="onboarding"
-            apiState={apiState}
-            onLogout={handleLogout}
-            onOnboardingCompleted={handleOnboardingCompleted}
-          />
-        )}
-      </>
-    );
-  } else {
-    desktopContent = (
-      <Routes>
-        <Route path="/" element={<LandingPage onSelectPlan={(plan) => navigate("/subscription", { state: { selectedPlan: plan } })} />} />
-        <Route path="/landing" element={<LandingPage onSelectPlan={(plan) => navigate("/subscription", { state: { selectedPlan: plan } })} />} />
-        <Route path="/pricing" element={<LandingPage onSelectPlan={(plan) => navigate("/subscription", { state: { selectedPlan: plan } })} />} />
+  return (
+    <div className="min-h-screen flex flex-col bg-[#F7F6F6] text-[#191919] w-full min-w-full overflow-x-hidden">
+      <Routes basename="/demo/cloudkitchen">
+        {/* ═══════════ 1. PUBLIC MARKETING LANDING (ROOT) ═══════════ */}
         <Route
-          path="/subscription"
+          path="/"
+          element={
+            <LandingPage
+              onSelectPlan={(plan) => navigate("/kitchen/subscription", { state: { selectedPlan: plan } })}
+            />
+          }
+        />
+        <Route
+          path="/landing"
+          element={
+            <LandingPage
+              onSelectPlan={(plan) => navigate("/kitchen/subscription", { state: { selectedPlan: plan } })}
+            />
+          }
+        />
+        <Route
+          path="/pricing"
+          element={
+            <LandingPage
+              onSelectPlan={(plan) => navigate("/kitchen/subscription", { state: { selectedPlan: plan } })}
+            />
+          }
+        />
+
+        {/* ═══════════ 2. KITCHEN AUTH & ONBOARDING ═══════════ */}
+        <Route path="/kitchen/login" element={<LoginPage onLogin={handleLogin} onToast={triggerToast} />} />
+        <Route
+          path="/kitchen/subscription"
           element={
             <SetupFlowPage
               mode="subscription"
@@ -445,17 +404,101 @@ export default function App() {
             />
           }
         />
-        <Route path="/login" element={<LoginPage onLogin={handleLogin} onToast={triggerToast} />} />
-        <Route path="/register" element={<Navigate to="/subscription" replace />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage onToast={triggerToast} />} />
+        <Route path="/kitchen/register" element={<Navigate to="/kitchen/subscription" replace />} />
+        <Route path="/kitchen/forgot-password" element={<ForgotPasswordPage onToast={triggerToast} />} />
+
+        {/* ═══════════ 3. KITCHEN OPERATIONAL PORTAL (/kitchen/*) ═══════════ */}
+        <Route
+          path="/kitchen/*"
+          element={
+            hasToken && hasSub ? (
+              <>
+                <Sidebar
+                  collapsed={sidebarCollapsed}
+                  onLogout={handleLogout}
+                  apiState={apiState}
+                  mobileOpen={mobileSidebarOpen}
+                  onCloseMobile={() => setMobileSidebarOpen(false)}
+                />
+                <main className={`min-w-0 flex-1 transition-all duration-300 mainContentBox overflow-x-hidden ${sidebarCollapsed ? "lg:pl-[90px]" : "lg:pl-[280px]"}`}>
+                  <Topbar
+                    apiState={apiState}
+                    onLogout={handleLogout}
+                    onToast={triggerToast}
+                    onLogin={handleLogin}
+                    refreshKitchenData={refreshKitchenData}
+                    onBranchChange={handleBranchChange}
+                    onToggleSidebar={() => {
+                      if (window.innerWidth < 1024) {
+                        setMobileSidebarOpen((v) => !v);
+                      } else {
+                        setSidebarCollapsed((v) => !v);
+                      }
+                    }}
+                  />
+                  <div className="page-shell px-4 py-5 sm:px-6 lg:px-10">
+                    <Routes>
+                      <Route path="/" element={<DashboardPage apiState={apiState} />} />
+                      <Route path="dashboard" element={<DashboardPage apiState={apiState} />} />
+                      <Route path="orders" element={<OrderListPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
+                      <Route path="customers" element={<CustomerListPage apiState={apiState} onToast={triggerToast} />} />
+                      <Route path="menu" element={<CategoryPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
+                      <Route path="add-menu" element={<AddMenuPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
+                      <Route path="ingredients" element={<IngredientSetupPage apiState={apiState} refreshKitchenData={refreshKitchenData} selectedPlan={apiState.selectedPlan} onToast={triggerToast} />} />
+                      <Route path="waste" element={<WasteManagementPage apiState={apiState} onToast={triggerToast} />} />
+                      <Route path="staff" element={<StaffListPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
+                      <Route path="roles" element={<RoleListPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
+                      <Route path="branches" element={<KitchenFormPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
+                      <Route path="manage" element={<KitchenFormPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
+                      <Route path="reviews" element={<CustomerReviewPage apiState={apiState} />} />
+                      <Route path="profile" element={<ProfilePage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
+                      <Route path="*" element={<Navigate to="/kitchen/dashboard" replace />} />
+                    </Routes>
+                  </div>
+                </main>
+
+                {/* Onboarding Wizard Modal if not completed */}
+                {!onboardingDone && (
+                  <SetupFlowPage
+                    mode="onboarding"
+                    apiState={apiState}
+                    onLogout={handleLogout}
+                    onOnboardingCompleted={handleOnboardingCompleted}
+                  />
+                )}
+              </>
+            ) : (
+              <Navigate to="/kitchen/login" state={{ from: location }} replace />
+            )
+          }
+        />
+
+        {/* Backward Compatibility Redirects */}
+        <Route path="/login" element={<Navigate to="/kitchen/login" replace />} />
+        <Route path="/subscription" element={<Navigate to="/kitchen/subscription" replace />} />
+        <Route path="/register" element={<Navigate to="/kitchen/subscription" replace />} />
+        <Route path="/forgot-password" element={<Navigate to="/kitchen/forgot-password" replace />} />
+        <Route path="/dashboard" element={<Navigate to="/kitchen/dashboard" replace />} />
+        <Route path="/orders" element={<Navigate to="/kitchen/orders" replace />} />
+        <Route path="/menu" element={<Navigate to="/kitchen/menu" replace />} />
+        <Route path="/add-menu" element={<Navigate to="/kitchen/add-menu" replace />} />
+        <Route path="/ingredients" element={<Navigate to="/kitchen/ingredients" replace />} />
+        <Route path="/customers" element={<Navigate to="/kitchen/customers" replace />} />
+        <Route path="/staff" element={<Navigate to="/kitchen/staff" replace />} />
+        <Route path="/roles" element={<Navigate to="/kitchen/roles" replace />} />
+        <Route path="/branches" element={<Navigate to="/kitchen/branches" replace />} />
+        <Route path="/profile" element={<Navigate to="/kitchen/profile" replace />} />
+        <Route path="/waste" element={<Navigate to="/kitchen/waste" replace />} />
+        <Route path="/reviews" element={<Navigate to="/kitchen/reviews" replace />} />
+        <Route path="/onboarding" element={<Navigate to="/kitchen/dashboard" replace />} />
+
+        {/* ═══════════ 4. SUPER ADMIN PORTAL (/admin/*) ═══════════ */}
+        <Route path="/admin/*" element={<AdminApp />} />
+
+        {/* Catch-all fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    );
-  }
 
-  return (
-    <div className="min-h-screen flex flex-col bg-[#F7F6F6] text-[#191919] w-full min-w-full overflow-x-hidden">
-      {desktopContent}
       {toast && (
         <Toast
           message={typeof toast === "string" ? toast : toast.message}

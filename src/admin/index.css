@@ -1,0 +1,175 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-[#f3f4f8] text-slate-800 antialiased font-sans transition-colors duration-200;
+    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    overflow-x: hidden;
+  }
+
+  html.dark body {
+    @apply bg-[#0f172a] text-slate-100;
+  }
+
+  html.dark .bg-white {
+    @apply bg-[#1c2739] border-slate-800 text-slate-100;
+  }
+
+  html.dark .text-slate-900 {
+    @apply text-white;
+  }
+
+  html.dark .text-slate-800 {
+    @apply text-slate-200;
+  }
+
+  html.dark .text-slate-700 {
+    @apply text-slate-300;
+  }
+
+  html.dark .text-slate-600 {
+    @apply text-slate-400;
+  }
+
+  html.dark .bg-slate-50 {
+    @apply bg-slate-800/60 border-slate-700/60 text-slate-200;
+  }
+
+  html.dark .border-slate-100, html.dark .border-slate-200 {
+    @apply border-slate-800;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #8C0D0D;
+}
+html.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #8C0D0D;
+}
+
+/* Disable Recharts Canvas Click / Focus Outline Border */
+.recharts-wrapper,
+.recharts-surface,
+.recharts-wrapper *:focus,
+.recharts-surface *:focus,
+.recharts-layer:focus,
+.recharts-sector:focus,
+.recharts-curve:focus,
+.recharts-rectangle:focus,
+svg:focus {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Ultra-Fast Snappy Animations */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes dropdownSlide {
+  0% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 15px rgba(140, 13, 13, 0.2); }
+  50% { box-shadow: 0 0 30px rgba(140, 13, 13, 0.45); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes floatUp {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
+}
+
+.animate-slide-in {
+  animation: slideInRight 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+.animate-modal-pop {
+  animation: modalPop 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-dropdown {
+  animation: dropdownSlide 0.12s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.glow-brand {
+  animation: pulseGlow 3s infinite ease-in-out;
+}
+
+.animate-float {
+  animation: floatUp 3s ease-in-out infinite;
+}
+
+.shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Hide scrollbar but keep scroll functionality */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}

@@ -32,27 +32,27 @@ export const sidebarSections = [
   {
     title: "Operations",
     items: [
-      { label: "Dashboard",        icon: LayoutDashboard, path: "/",             module: "dashboard" },
-      { label: "Orders",           icon: ShoppingBag,     path: "/orders",       module: "order" },
-      { label: "Food Menu",        icon: UtensilsCrossed, path: "/menu",         module: "menu" },
-      { label: "Ingredients",      icon: Boxes,           path: "/ingredients",  module: "ingredient" },
-      { label: "Waste Management", icon: Trash2,          path: "/waste",        module: "wasteManagement" },
+      { label: "Dashboard",        icon: LayoutDashboard, path: "/kitchen/dashboard",   module: "dashboard" },
+      { label: "Orders",           icon: ShoppingBag,     path: "/kitchen/orders",      module: "order" },
+      { label: "Food Menu",        icon: UtensilsCrossed, path: "/kitchen/menu",        module: "menu" },
+      { label: "Ingredients",      icon: Boxes,           path: "/kitchen/ingredients", module: "ingredient" },
+      { label: "Waste Management", icon: Trash2,          path: "/kitchen/waste",       module: "wasteManagement" },
     ],
   },
   {
     title: "Management",
     items: [
-      { label: "Profile",         icon: UserCheck,       path: "/profile",      module: "profile" },
-      { label: "Staff",           icon: Users,           path: "/staff",        module: "staffManagement" },
-      { label: "Role Management", icon: ShieldCheck,     path: "/roles",        module: "roleManagement" },
-      { label: "Customers",       icon: UserCheck,       path: "/customers",    module: "customer" },
-      { label: "Branch Management",   icon: Building2,       path: "/kitchen",      module: "branch" },
+      { label: "Profile",         icon: UserCheck,       path: "/kitchen/profile",     module: "profile" },
+      { label: "Staff",           icon: Users,           path: "/kitchen/staff",       module: "staffManagement" },
+      { label: "Role Management", icon: ShieldCheck,     path: "/kitchen/roles",       module: "roleManagement" },
+      { label: "Customers",       icon: UserCheck,       path: "/kitchen/customers",   module: "customer" },
+      { label: "Branch Management",   icon: Building2,   path: "/kitchen/branches",    module: "branch" },
     ],
   },
   {
     title: "Feedback",
     items: [
-      { label: "Reviews",         icon: Star,            path: "/reviews",      module: "reviews" },
+      { label: "Reviews",         icon: Star,            path: "/kitchen/reviews",     module: "reviews" },
     ],
   },
 ];
