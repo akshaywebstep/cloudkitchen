@@ -31,11 +31,32 @@ import { AppSelect } from "../../ui/AppSelect";
 import { Pagination } from "../../ui/Pagination";
 import { Loader } from "../../ui/Loader";
 import { api, getApiErrorMessage } from "../../../api";
-import { resolveSelectedBranchId } from "../../../utils/helpers";
+import { resolveSelectedBranchId, formatRecipeQty } from "../../../utils/helpers";
 import { foodImages } from "../../../constants/mockData";
+import { usePermissions } from "../../../utils/permissions";
 
 export function CategoryPage({ apiState, refreshKitchenData, onToast }) {
   const navigate = useNavigate();
+  const { canCreate, canUpdate, canDelete } = usePermissions(apiState);
+
+  const handleEditDish = (dish) => {
+    if (!dish) return;
+    navigate("/add-menu", {
+      state: {
+        editDish: {
+          id: dish.rawId || dish.id,
+          name: dish.name,
+          description: dish.description,
+          price: dish.priceNum || (typeof dish.price === "string" ? dish.price.replace(/[^\d.]/g, "") : dish.price),
+          category: dish.category,
+          subCategory: dish.subCategory,
+          image: dish.image || dish.rawMenu?.image || "",
+          ingredients: dish.rawMenu?.ingredients || dish.ingredients || [],
+          rawMenu: dish.rawMenu || dish,
+        },
+      },
+    });
+  };
 
   // Active branch from header context
   const activeBranchId = resolveSelectedBranchId(apiState?.branches || [], apiState?.selectedBranchId);
@@ -51,6 +72,24 @@ export function CategoryPage({ apiState, refreshKitchenData, onToast }) {
   const [viewMode, setViewMode] = useState("grid"); // "grid" | "table"
   const [selectedDishDetail, setSelectedDishDetail] = useState(null);
   const [stockStatusMap, setStockStatusMap] = useState({});
+  const [apiCategories, setApiCategories] = useState([]);
+
+  // Fetch dynamic categories on mount
+  useEffect(() => {
+    let active = true;
+    async function loadCategories() {
+      try {
+        const res = await api.menuCategories();
+        const data = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        if (!active) return;
+        setApiCategories(data);
+      } catch {}
+    }
+    loadCategories();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Pagination state from API meta
   const [currentPage, setCurrentPage] = useState(1);
@@ -69,7 +108,11 @@ export function CategoryPage({ apiState, refreshKitchenData, onToast }) {
   // Fetch live menu items from server
   const fetchMenuItems = useCallback(
     async (isSilent = false) => {
-      if (!activeBranchId) return;
+      if (!activeBranchId) {
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
       if (!isSilent) setLoading(true);
       else setRefreshing(true);
 
@@ -243,22 +286,32 @@ export function CategoryPage({ apiState, refreshKitchenData, onToast }) {
     return [];
   }, [menuItems, apiState?.menus, ingredientLookup]);
 
-  // Categories list
+  // Categories list (strictly from GET /kitchen/menu/categories)
   const categories = useMemo(() => {
-    const map = new Map();
-    allDishes.forEach((d) => {
-      const cat = d.category || "Main Course";
-      map.set(cat, (map.get(cat) || 0) + 1);
-    });
-    return [
+    const list = [
       { name: "ALL", label: "All Items", count: allDishes.length },
-      ...Array.from(map.entries()).map(([cat, count]) => ({
-        name: cat,
-        label: cat,
-        count,
-      })),
     ];
-  }, [allDishes]);
+
+    (apiCategories || [])
+      .filter((c) => c && (c.status === undefined || c.status === "ACTIVE"))
+      .forEach((c) => {
+        const name = c.name || c.title;
+        if (name?.trim()) {
+          const count = allDishes.filter((d) => {
+            const dCat = typeof d.category === "object" ? d.category?.name : d.category;
+            return dCat && (dCat.toLowerCase() === name.trim().toLowerCase() || String(d.categoryId) === String(c.id));
+          }).length;
+          list.push({
+            name: name.trim(),
+            label: name.trim(),
+            id: c.id,
+            count,
+          });
+        }
+      });
+
+    return list;
+  }, [apiCategories, allDishes]);
 
   // Toggle in-stock status
   const toggleStock = (dishId) => {
@@ -332,42 +385,44 @@ export function CategoryPage({ apiState, refreshKitchenData, onToast }) {
               <RefreshCw size={14} className={refreshing ? "animate-spin text-[#8D0606]" : ""} />
               <span>Refresh</span>
             </button>
-            <button
-              className="flex items-center gap-2 rounded-full bg-gradient-to-r from-[#8D0606] to-[#b80808] px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-rose-950/20 transition hover:from-[#7a0505] hover:to-[#a10707] active:scale-98"
-              onClick={() => navigate("/add-menu")}
-              type="button"
-            >
-              <Plus size={15} />
-              <span>Add Menu Food</span>
-            </button>
+            {canCreate("menu") && (
+              <button
+                className="flex items-center gap-2 rounded-full bg-gradient-to-r from-[#8D0606] to-[#b80808] px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-rose-950/20 transition hover:from-[#7a0505] hover:to-[#a10707] active:scale-98"
+                onClick={() => navigate("/add-menu")}
+                type="button"
+              >
+                <Plus size={15} />
+                <span>Add Menu Food</span>
+              </button>
+            )}
           </div>
         }
       />
 
       {/* Target Branch Header Indicator */}
       <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs">
-        <div className="flex items-center gap-3">
-          <div className="grid size-9 place-items-center rounded-xl bg-rose-50 text-[#8D0606] border border-rose-100 shadow-2xs">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <div className="grid size-9 place-items-center rounded-xl bg-rose-50 text-[#8D0606] border border-rose-100 shadow-2xs shrink-0">
             <Building2 size={16} />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-800">Active Kitchen Branch:</span>
-              <span className="rounded-md bg-rose-50 px-2 py-0.5 text-xs font-bold text-[#8D0606] border border-rose-100">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold text-slate-800 whitespace-nowrap">Active Kitchen Branch:</span>
+              <span className="rounded-md bg-rose-50 px-2 py-0.5 text-xs font-bold text-[#8D0606] border border-rose-100 whitespace-nowrap">
                 {selectedBranch?.name || `Branch #${activeBranchId || "1"}`}
               </span>
             </div>
-            <p className="text-[11px] font-medium text-slate-400">
+            <p className="text-[11px] font-medium text-slate-400 truncate mt-0.5">
               Displaying recipe catalog and pricing for this branch.
             </p>
           </div>
         </div>
 
-        <div className="hidden sm:flex items-center gap-2">
-          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-100">
+        <div className="hidden sm:flex items-center gap-2 shrink-0">
+          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-100 whitespace-nowrap">
             {activeInStockCount} Available
           </span>
-          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600 border border-slate-200">
+          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600 border border-slate-200 whitespace-nowrap">
             {meta.total || allDishes.length} Total Recipes
           </span>
         </div>
@@ -403,11 +458,11 @@ export function CategoryPage({ apiState, refreshKitchenData, onToast }) {
       {/* Control Bar: Search, Filters, Layout Toggle */}
       <div className="flex flex-col gap-3 rounded-2xl bg-white p-3.5 shadow-2xs border border-slate-200 lg:flex-row lg:items-center lg:justify-between">
         {/* Search */}
-        <div className="relative flex-1 max-w-md">
+        <div className="relative flex-1">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
           <input
             type="text"
-            placeholder="Search dish by name, description, category, or ingredient..."
+            placeholder="Search recipes and dishes by name or category..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/60 pl-9 pr-8 text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:border-[#8D0606] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#8D0606]/10 transition"
@@ -426,29 +481,31 @@ export function CategoryPage({ apiState, refreshKitchenData, onToast }) {
         {/* Filters Group */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Stock Filter */}
-          <AppSelect
-            value={stockFilter}
-            onChange={setStockFilter}
-            minWidth="140px"
-            options={[
-              { value: "ALL", label: "All Stock" },
-              { value: "IN_STOCK", label: "In Stock Only" },
-              { value: "OUT_OF_STOCK", label: "Out of Stock" },
-            ]}
-          />
+          <div className="flex-1 sm:flex-initial min-w-[130px]">
+            <AppSelect
+              value={stockFilter}
+              onChange={setStockFilter}
+              options={[
+                { value: "ALL", label: "All Stock" },
+                { value: "IN_STOCK", label: "In Stock Only" },
+                { value: "OUT_OF_STOCK", label: "Out of Stock" },
+              ]}
+            />
+          </div>
 
           {/* Sort By */}
-          <AppSelect
-            value={sortBy}
-            onChange={setSortBy}
-            minWidth="150px"
-            options={[
-              { value: "DEFAULT", label: "Sort: Default" },
-              { value: "PRICE_ASC", label: "Price: Low to High" },
-              { value: "PRICE_DESC", label: "Price: High to Low" },
-              { value: "NAME_ASC", label: "Name: A to Z" },
-            ]}
-          />
+          <div className="flex-1 sm:flex-initial min-w-[140px]">
+            <AppSelect
+              value={sortBy}
+              onChange={setSortBy}
+              options={[
+                { value: "DEFAULT", label: "Sort: Default" },
+                { value: "PRICE_ASC", label: "Price: Low to High" },
+                { value: "PRICE_DESC", label: "Price: High to Low" },
+                { value: "NAME_ASC", label: "Name: A to Z" },
+              ]}
+            />
+          </div>
 
           {/* Grid / Table Toggle */}
           <div className="flex items-center rounded-xl border border-slate-200 bg-slate-100 p-1">
@@ -485,14 +542,15 @@ export function CategoryPage({ apiState, refreshKitchenData, onToast }) {
         viewMode === "grid" ? (
           /* Grid Cards View */
           <div className="space-y-5">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
               {filteredDishes.map((dish) => (
                 <FoodItemCard
                   key={dish.id}
                   dish={dish}
+                  canUpdate={canUpdate("menu")}
                   onToggleStock={() => toggleStock(dish.id)}
                   onSelectDetail={setSelectedDishDetail}
-                  onEdit={() => navigate("/add-menu")}
+                  onEdit={() => handleEditDish(dish)}
                 />
               ))}
             </div>
@@ -572,7 +630,7 @@ export function CategoryPage({ apiState, refreshKitchenData, onToast }) {
                                   key={iIdx}
                                   className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10.5px] font-semibold text-slate-600 border border-slate-200/60"
                                 >
-                                  {ing.name} ({ing.quantity} {ing.unit})
+                                  {ing.name} ({formatRecipeQty(ing.quantity, ing.unit)})
                                 </span>
                               ))
                             ) : (
@@ -616,14 +674,16 @@ export function CategoryPage({ apiState, refreshKitchenData, onToast }) {
                             >
                               View
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => navigate("/add-menu")}
-                              className="grid size-8 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:border-rose-300 hover:bg-rose-50 hover:text-[#8D0606] transition shadow-2xs"
-                              title="Edit Dish"
-                            >
-                              <Pencil size={13} />
-                            </button>
+                            {canUpdate("menu") && (
+                              <button
+                                type="button"
+                                onClick={() => handleEditDish(dish)}
+                                className="grid size-8 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:border-rose-300 hover:bg-rose-50 hover:text-[#8D0606] transition shadow-2xs"
+                                title="Edit Dish"
+                              >
+                                <Pencil size={13} />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -675,8 +735,9 @@ export function CategoryPage({ apiState, refreshKitchenData, onToast }) {
       {selectedDishDetail && (
         <DishDetailModal
           dish={selectedDishDetail}
+          canUpdate={canUpdate("menu")}
           onClose={() => setSelectedDishDetail(null)}
-          onEdit={() => navigate("/add-menu")}
+          onEdit={() => handleEditDish(selectedDishDetail)}
         />
       )}
     </div>
@@ -686,15 +747,15 @@ export function CategoryPage({ apiState, refreshKitchenData, onToast }) {
 // ---------------------------------------------------------------------------
 // Compact Modern Food Card
 // ---------------------------------------------------------------------------
-function FoodItemCard({ dish, onToggleStock, onSelectDetail, onEdit }) {
+function FoodItemCard({ dish, onToggleStock, onSelectDetail, onEdit, canUpdate = true }) {
   return (
     <div
       onClick={() => onSelectDetail(dish)}
-      className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-slate-200/80 bg-white p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300 cursor-pointer"
+      className="group relative flex flex-col justify-between overflow-hidden rounded-2xl sm:rounded-3xl border border-slate-200/80 bg-white p-2.5 sm:p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300 cursor-pointer"
     >
       <div>
         {/* Cover Photo */}
-        <div className="relative aspect-[16/11] w-full overflow-hidden rounded-2xl bg-slate-100">
+        <div className="relative aspect-[16/11] w-full overflow-hidden rounded-xl sm:rounded-2xl bg-slate-100">
           <img
             src={dish.image}
             alt={dish.name}
@@ -706,43 +767,44 @@ function FoodItemCard({ dish, onToggleStock, onSelectDetail, onEdit }) {
           />
 
           {/* In Stock Badge */}
-          <div className="absolute right-2.5 top-2.5" onClick={(e) => e.stopPropagation()}>
+          <div className="absolute right-1.5 sm:right-2.5 top-1.5 sm:top-2.5" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
-              onClick={onToggleStock}
-              className={`flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10.5px] font-bold backdrop-blur-md transition shadow-2xs ${
+              onClick={canUpdate ? onToggleStock : undefined}
+              disabled={!canUpdate}
+              className={`flex items-center gap-1 rounded-md sm:rounded-lg px-1.5 sm:px-2 py-0.5 text-[9.5px] sm:text-[10.5px] font-bold backdrop-blur-md transition shadow-2xs ${
                 dish.inStock
                   ? "bg-emerald-950/80 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-900"
                   : "bg-slate-950/80 text-slate-300 border border-slate-500/30 hover:bg-slate-900"
-              }`}
+              } ${!canUpdate ? "cursor-default opacity-85" : ""}`}
             >
               <span
                 className={`size-1.5 rounded-full ${dish.inStock ? "bg-emerald-400 animate-pulse" : "bg-slate-400"}`}
               />
-              <span>{dish.inStock ? "In Stock" : "Out of Stock"}</span>
+              <span>{dish.inStock ? "In Stock" : "Out"}</span>
             </button>
           </div>
 
           {/* Price Badge */}
-          <div className="absolute bottom-2.5 right-2.5">
-            <span className="rounded-xl bg-[#8D0606] px-2.5 py-1 text-xs font-bold text-white shadow-xs">
+          <div className="absolute bottom-1.5 sm:bottom-2.5 right-1.5 sm:right-2.5">
+            <span className="rounded-lg sm:rounded-xl bg-[#8D0606] px-2 sm:px-2.5 py-0.5 sm:py-1 text-[11px] sm:text-xs font-bold text-white shadow-xs">
               {dish.price}
             </span>
           </div>
 
           {/* Veg / Non-Veg Indicator */}
-          <div className="absolute bottom-2.5 left-2.5">
-            <div className="flex items-center gap-1 rounded-md bg-white/95 px-1.5 py-0.5 shadow-2xs backdrop-blur-xs border border-slate-200/80">
+          <div className="absolute bottom-1.5 sm:bottom-2.5 left-1.5 sm:left-2.5">
+            <div className="flex items-center gap-1 rounded-md bg-white/95 px-1 sm:px-1.5 py-0.5 shadow-2xs backdrop-blur-xs border border-slate-200/80">
               <span
-                className={`flex size-3 items-center justify-center rounded-xs border ${
+                className={`flex size-2.5 sm:size-3 items-center justify-center rounded-xs border ${
                   dish.isVeg ? "border-emerald-600" : "border-rose-700"
                 }`}
               >
                 <span
-                  className={`size-1.5 rounded-full ${dish.isVeg ? "bg-emerald-600" : "bg-rose-700"}`}
+                  className={`size-1 sm:size-1.5 rounded-full ${dish.isVeg ? "bg-emerald-600" : "bg-rose-700"}`}
                 />
               </span>
-              <span className="text-[9.5px] font-extrabold uppercase tracking-wider text-slate-700">
+              <span className="text-[8.5px] sm:text-[9.5px] font-extrabold uppercase tracking-wider text-slate-700">
                 {dish.isVeg ? "Veg" : "Non-Veg"}
               </span>
             </div>
@@ -750,66 +812,48 @@ function FoodItemCard({ dish, onToggleStock, onSelectDetail, onEdit }) {
         </div>
 
         {/* Info */}
-        <div className="mt-3">
+        <div className="mt-2.5 sm:mt-3">
           <div>
             <h3
-              className="text-sm font-bold text-slate-900 truncate group-hover:text-[#8D0606] transition"
+              className="text-xs sm:text-sm font-bold text-slate-900 truncate group-hover:text-[#8D0606] transition"
               title={dish.name}
             >
               {dish.name}
             </h3>
           </div>
 
-          <p className="mt-1 text-xs font-medium text-slate-500 line-clamp-1">
+          <p className="mt-0.5 sm:mt-1 text-[11px] sm:text-xs font-medium text-slate-500 line-clamp-1">
             {dish.description}
           </p>
-
-          {/* Dynamic Resolved Ingredients */}
-          {dish.ingredients && dish.ingredients.length > 0 && (
-            <div className="mt-2.5 flex flex-wrap gap-1">
-              {dish.ingredients.slice(0, 2).map((ing, idx) => (
-                <span
-                  key={idx}
-                  className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-0.5 text-[10.5px] font-semibold text-slate-700 border border-slate-200/60 shadow-2xs"
-                >
-                  <Tag size={10} className="text-slate-400" />
-                  <span>{ing.name} ({ing.quantity} {ing.unit})</span>
-                </span>
-              ))}
-              {dish.ingredients.length > 2 && (
-                <span className="rounded-lg bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500 border border-slate-200/60">
-                  +{dish.ingredients.length - 2} more
-                </span>
-              )}
-            </div>
-          )}
         </div>
       </div>
 
       {/* Card Action Row */}
-      <div className="mt-3.5 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+      <div className="mt-2.5 sm:mt-3.5 pt-2 sm:pt-2.5 border-t border-slate-100 flex items-center justify-between">
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             onSelectDetail(dish);
           }}
-          className="text-xs font-bold text-[#8D0606] hover:underline flex items-center gap-1"
+          className="text-[11px] sm:text-xs font-bold text-[#8D0606] hover:underline flex items-center gap-1"
         >
           <span>View Recipe</span>
         </button>
 
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onEdit();
-          }}
-          title="Edit Dish"
-          className="grid size-8 place-items-center rounded-xl bg-slate-50 border border-slate-200 text-slate-600 hover:bg-rose-50 hover:text-[#8D0606] hover:border-rose-200 transition shadow-2xs active:scale-95"
-        >
-          <Pencil size={13.5} />
-        </button>
+        {canUpdate && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
+            title="Edit Dish"
+            className="grid size-7 sm:size-8 place-items-center rounded-lg sm:rounded-xl bg-slate-50 border border-slate-200 text-slate-600 hover:bg-rose-50 hover:text-[#8D0606] hover:border-rose-200 transition shadow-2xs active:scale-95"
+          >
+            <Pencil size={13} />
+          </button>
+        )}
       </div>
     </div>
   );
@@ -818,7 +862,15 @@ function FoodItemCard({ dish, onToggleStock, onSelectDetail, onEdit }) {
 // ---------------------------------------------------------------------------
 // Dish Quick Detail Modal
 // ---------------------------------------------------------------------------
-function DishDetailModal({ dish, onClose, onEdit }) {
+function DishDetailModal({ dish, onClose, onEdit, canUpdate = true }) {
+  useEffect(() => {
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = orig;
+    };
+  }, []);
+
   const formattedDate = dish.createdAt
     ? new Date(dish.createdAt).toLocaleDateString("en-IN", {
         day: "2-digit",
@@ -980,8 +1032,8 @@ function DishDetailModal({ dish, onClose, onEdit }) {
                           </span>
                         </td>
                         <td className="px-3.5 py-2.5 text-right">
-                          <span className="rounded-lg bg-rose-50 border border-rose-100 px-2 py-1 text-xs font-bold text-[#8D0606]">
-                            {ing.quantity} {ing.unit || "KG"}
+                          <span className="rounded-lg bg-rose-50 border border-rose-100 px-2.5 py-1 text-xs font-bold text-[#8D0606]">
+                            {formatRecipeQty(ing.quantity, ing.unit || "KG")}
                           </span>
                         </td>
                       </tr>
@@ -1014,17 +1066,19 @@ function DishDetailModal({ dish, onClose, onEdit }) {
           >
             Close
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              onEdit();
-            }}
-            className="flex-1 flex items-center justify-center gap-2 rounded-full bg-[#8D0606] py-2.5 text-xs font-bold text-white shadow-md shadow-rose-950/20 hover:bg-[#780404] transition active:scale-98"
-          >
-            <Pencil size={14} />
-            <span>Edit Recipe</span>
-          </button>
+          {canUpdate && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onEdit();
+              }}
+              className="flex-1 flex items-center justify-center gap-2 rounded-full bg-[#8D0606] py-2.5 text-xs font-bold text-white shadow-md shadow-rose-950/20 hover:bg-[#780404] transition active:scale-98"
+            >
+              <Pencil size={14} />
+              <span>Edit Recipe</span>
+            </button>
+          )}
         </div>
       </div>
     </div>,

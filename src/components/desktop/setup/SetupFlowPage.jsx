@@ -138,7 +138,7 @@ export function SetupFlowPage({ mode, step, apiState, onLogout, onOnboardingComp
   const steps = [
     { key: "onboarding", number: "1", label: "Onboarding", helper: "FSSAI & GST", done: onboardingDone },
     { key: "subscription", number: "2", label: "Subscription", helper: "Choose plan", done: subscriptionDone },
-    { key: "ingredients", number: "3", label: "Ingredient Add", helper: "Stock kitchen", done: false },
+    { key: "dashboard", number: "3", label: "Dashboard", helper: "Overview", done: false },
   ];
 
   const goToStep = (key, done) => {
@@ -314,7 +314,7 @@ function OnboardingPage({ onComplete }) {
               FSSAI
             </p>
             <div className="grid gap-3">
-              <Field label="FSSAI Number *" placeholder="e.g. 12345678901234" value={form.fssaiNumber} onChange={updateText("fssaiNumber")} />
+              <Field label="FSSAI Number *" placeholder="Enter 14-digit FSSAI number (e.g. 12345678901234)" value={form.fssaiNumber} onChange={updateText("fssaiNumber")} />
               <FileField label="FSSAI Certificate *" file={form.fssaiFile} onChange={updateFile("fssaiFile")} />
             </div>
           </div>
@@ -324,7 +324,7 @@ function OnboardingPage({ onComplete }) {
               GST
             </p>
             <div className="grid gap-3">
-              <Field label="GST Number *" placeholder="e.g. 22AAAAA0000A1Z5" value={form.gstNumber} onChange={updateText("gstNumber")} />
+              <Field label="GST Number *" placeholder="Enter 15-digit GSTIN (e.g. 22AAAAA0000A1Z5)" value={form.gstNumber} onChange={updateText("gstNumber")} />
               <FileField label="GST Certificate *" file={form.gstFile} onChange={updateFile("gstFile")} />
             </div>
           </div>
@@ -434,14 +434,18 @@ function SubscriptionPlansPage({ plans, onPlanSelected, onCheckExistingSubscript
   }, [plans]);
 
   const dedupedPlanList = React.useMemo(() => {
-    const seen = new Set();
-    return planList.filter((plan) => {
-      const dupeKey = `${getPlanTitle(plan)}|${getPlanPrice(plan)}|${plan.billingCycle || billingCycle}`;
-      if (seen.has(dupeKey)) return false;
-      seen.add(dupeKey);
-      return true;
-    });
-  }, [planList, billingCycle]);
+    const seen = new Map();
+    // Sort so plans with most features come first (e.g. ID 1, 2, 3 with 5 features each)
+    const sorted = [...planList].sort((a, b) => (b.features?.length || 0) - (a.features?.length || 0));
+    for (const plan of sorted) {
+      const key = (plan.name || plan.title || "").toLowerCase().trim();
+      if (!seen.has(key)) {
+        seen.set(key, plan);
+      }
+    }
+    // Sort tiers by monthly price ascending (Starter -> Intermediate -> Pro)
+    return Array.from(seen.values()).sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
+  }, [planList]);
 
   const openPayment = async (plan) => {
     setSelectedPlanId(String(plan.id));
@@ -550,41 +554,55 @@ function SubscriptionPlansPage({ plans, onPlanSelected, onCheckExistingSubscript
                 return (
                   <article
                     key={plan.id || getPlanTitle(plan)}
-                    className={`group relative flex flex-col gap-3 rounded-2xl border bg-white p-4 transition-all hover:shadow-md sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-4 ${
+                    className={`group relative flex flex-col gap-3 rounded-2xl border bg-white p-4 transition-all hover:shadow-md sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-5 ${
                       isChosenForPayment
                         ? "border-[#8D0606] shadow-sm ring-2 ring-[#8D0606]/15"
                         : "border-[#EFEAE8]"
                     }`}
                   >
-                    <div className="flex min-w-0 flex-1 items-center gap-4">
-                      <div className="min-w-0">
+                    <div className="flex min-w-0 flex-1 items-start gap-4">
+                      <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-sm font-semibold capitalize text-[#2B1010]">{getPlanTitle(plan)}</h3>
-                          <span className="rounded-full bg-[#F2FBF6] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#28A75B]">
+                          <h3 className="text-sm font-bold capitalize text-[#2B1010]">{getPlanTitle(plan)}</h3>
+                          <span className="rounded-full bg-[#F2FBF6] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#28A75B]">
                             {plan.status || "Available"}
                           </span>
+                          {billingCycle === "YEARLY" && plan.discountPct ? (
+                            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold text-emerald-700 border border-emerald-100">
+                              Save {plan.discountPct}%
+                            </span>
+                          ) : null}
                           {isChosenForPayment ? (
-                            <span className="flex items-center gap-1 rounded-full bg-[#8D0606] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">
+                            <span className="flex items-center gap-1 rounded-full bg-[#8D0606] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
                               <BadgeCheck size={10} />
                               In checkout
                             </span>
                           ) : null}
                         </div>
-                        <p className="mt-0.5 truncate text-xs text-[#8A7A76]">
-                          {plan.description || plan.shortDescription || "Kitchen subscription plan"}
+                        <p className="mt-1 text-xs text-[#8A7A76]">
+                          {plan.maxBranches ? `Up to ${plan.maxBranches} ${plan.maxBranches > 1 ? "outlets" : "outlet"}` : "1 outlet"}
+                          {plan.maxUsers ? ` • ${plan.maxUsers} staff users` : ""}
+                          {plan.freeTrialDays ? ` • ${plan.freeTrialDays} days free trial` : ""}
                         </p>
-                        <div className="mt-1.5 flex flex-wrap gap-1.5 text-[10px] text-[#6B5D59]">
-                          <span className="rounded-full bg-[#F5F1EF] px-2 py-0.5">
-                            {plan.duration || plan.durationInMonths || 1} mo
-                          </span>
-                          <span className="rounded-full bg-[#F5F1EF] px-2 py-0.5">{plan.billingCycle || billingCycle}</span>
-                        </div>
+                        {Array.isArray(plan.features) && plan.features.length > 0 && (
+                          <div className="mt-2.5 flex flex-wrap gap-x-3.5 gap-y-1 text-[11px] text-slate-600">
+                            {plan.features
+                              .filter((f) => f.type === "INCLUDE")
+                              .slice(0, 3)
+                              .map((f, i) => (
+                                <span key={i} className="flex items-center gap-1">
+                                  <Check size={12} className="text-emerald-600 shrink-0" />
+                                  <span>{f.feature}</span>
+                                </span>
+                              ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center justify-between gap-4 sm:justify-end">
-                      <p className="text-lg font-semibold text-[#8D0606]">{getPlanPrice(plan)}</p>
+                      <p className="text-lg font-bold text-[#8D0606] whitespace-nowrap">{getPlanPrice(plan, billingCycle)}</p>
                       <button
-                        className="flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#8D0606] px-4 text-xs font-semibold text-white shadow-sm transition-all hover:bg-[#7A0505] hover:shadow-md active:scale-[0.98] disabled:opacity-60 disabled:active:scale-100"
+                        className="flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#8D0606] px-4 text-xs font-bold text-white shadow-sm transition-all hover:bg-[#7A0505] hover:shadow-md active:scale-[0.98] disabled:opacity-60 disabled:active:scale-100 whitespace-nowrap"
                         disabled={saving}
                         onClick={() => openPayment(plan)}
                         type="button"
@@ -643,14 +661,14 @@ function SubscriptionPlansPage({ plans, onPlanSelected, onCheckExistingSubscript
             <form className="grid gap-3.5" onSubmit={activatePlan}>
               <Field
                 label="Name on Card *"
-                placeholder="Demo User"
+                placeholder="Enter cardholder name (e.g. John Doe)"
                 value={paymentForm.name}
                 onChange={updatePayment("name")}
                 disabled={!paymentPlan}
               />
               <Field
                 label="Card Number *"
-                placeholder="4242 4242 4242 4242"
+                placeholder="Enter 16-digit card number (e.g. 4242 4242 4242 4242)"
                 value={paymentForm.cardNumber}
                 onChange={updatePayment("cardNumber")}
                 disabled={!paymentPlan}
@@ -669,7 +687,7 @@ function SubscriptionPlansPage({ plans, onPlanSelected, onCheckExistingSubscript
                 />
                 <Field
                   label="CVC *"
-                  placeholder="123"
+                  placeholder="3-digit CVC (e.g. 123)"
                   value={paymentForm.cvc}
                   onChange={updatePayment("cvc")}
                   disabled={!paymentPlan}
@@ -679,7 +697,7 @@ function SubscriptionPlansPage({ plans, onPlanSelected, onCheckExistingSubscript
               </div>
               <Field
                 label="Postal Code *"
-                placeholder="110001"
+                placeholder="Enter 6-digit postal code (e.g. 110001)"
                 value={paymentForm.postalCode}
                 onChange={updatePayment("postalCode")}
                 disabled={!paymentPlan}
@@ -698,7 +716,7 @@ function SubscriptionPlansPage({ plans, onPlanSelected, onCheckExistingSubscript
                 ) : (
                   <>
                     <Lock size={15} />
-                    Pay & Activate
+                    <span>{paymentPlan ? `Pay ${getPlanPrice(paymentPlan, billingCycle)} & Activate` : "Pay & Activate"}</span>
                   </>
                 )}
               </button>

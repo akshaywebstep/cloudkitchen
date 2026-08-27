@@ -106,13 +106,30 @@ export const api = {
     });
     return request("/kitchen/onboarding", { method: "POST", body: form });
   },
-  plans: () => request("/kitchen/subscription/plans", { token: "" }),
+  plans: (token) => request("/kitchen/subscription/plans", token !== undefined ? { token } : {}),
   selectPlan: (body) => request("/kitchen/subscription/select", { method: "POST", body }),
-  countries: (params = {}) => request(`/master/country?${new URLSearchParams({ limit: "250", ...params })}`, { token: "" }),
-  states: (params = {}) => request(`/master/state?${new URLSearchParams({ limit: "500", ...params })}`, { token: "" }),
-  cities: (params = {}) => request(`/master/city?${new URLSearchParams({ limit: "500", ...params })}`, { token: "" }),
-  cuisines: (params = {}) => request(`/master/cuisine?${new URLSearchParams({ page: "1", limit: "10", name: "", category: "", status: "ACTIVE", ...params })}`, { token: "" }),
-  ingredients: (params = {}) => request(`/master/ingredient?${new URLSearchParams({ page: "1", limit: "20", status: "ACTIVE", ...params })}`, { token: "" }),
+  upgradePlan: (body) => request("/kitchen/subscription/upgrade", { method: "POST", body }),
+  subscriptionPreview: (params = {}) => request(`/kitchen/subscription/preview?${new URLSearchParams(params)}`),
+  countries: (params = {}) => {
+    const defaultParams = { page: "1", limit: "50", ...params };
+    return request(`/master/country?${new URLSearchParams(defaultParams)}`);
+  },
+  states: (params = {}) => {
+    const defaultParams = { page: "1", limit: "50", ...params };
+    return request(`/master/state?${new URLSearchParams(defaultParams)}`);
+  },
+  cities: (params = {}) => {
+    const defaultParams = { page: "1", limit: "50", ...params };
+    return request(`/master/city?${new URLSearchParams(defaultParams)}`);
+  },
+  cuisines: (params = {}) => {
+    const defaultParams = { page: "1", limit: "50", name: "", category: "", status: "ACTIVE", ...params };
+    return request(`/master/cuisine?${new URLSearchParams(defaultParams)}`);
+  },
+  ingredients: (params = {}, token) => {
+    const search = Object.keys(params).length ? `?${new URLSearchParams(params)}` : "";
+    return request(`/master/ingredient${search}`, token !== undefined ? { token } : {});
+  },
   branches: (params = {}) => request(`/kitchen/branch?${new URLSearchParams(params)}`),
   branch: (branchId) => request(`/kitchen/branch/${branchId}`),
   createBranch: (body) => request("/kitchen/branch", { method: "POST", body }),
@@ -121,15 +138,29 @@ export const api = {
   createBranchIngredients: (branchId, body) => request(`/kitchen/branch/${branchId}/ingredient`, { method: "POST", body }),
   updateBranchIngredient: (branchId, inventoryId, body) => request(`/kitchen/branch/${branchId}/ingredient/${inventoryId}`, { method: "PUT", body }),
   deleteBranchIngredient: (branchId, inventoryId) => request(`/kitchen/branch/${branchId}/ingredient/${inventoryId}`, { method: "DELETE" }),
-  branchIngredients: (branchId, params = {}) => request(`/kitchen/branch/${branchId}/ingredient?${new URLSearchParams(params)}`),
+  branchIngredients: (branchId, params = {}) => {
+    const defaultParams = { page: "1", limit: "50", ...params };
+    return request(`/kitchen/branch/${branchId}/ingredient?${new URLSearchParams(defaultParams)}`);
+  },
   createStock: (branchId, body) => request(`/kitchen/branch/${branchId}/ingredient/stock`, { method: "POST", body }),
   stocks: (branchId) => request(`/kitchen/branch/${branchId}/ingredient/stock`),
-  menus: (branchId, params = {}) => request(`/kitchen/branch/${branchId}/menu?${new URLSearchParams(params)}`),
-  createMenu: (branchId, body) => request(`/kitchen/branch/${branchId}/menu`, { method: "POST", body }),
-  orders: (branchId, params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    return request(`/kitchen/order/branch/${branchId}${query ? `?${query}` : ""}`);
+  menus: (branchId, params = {}) => {
+    const defaultParams = { page: "1", limit: "50", ...params };
+    return request(`/kitchen/branch/${branchId}/menu?${new URLSearchParams(defaultParams)}`);
   },
+  createMenu: (branchId, body) => request(`/kitchen/branch/${branchId}/menu`, { method: "POST", body }),
+  updateMenu: (branchId, menuId, body) => request(`/kitchen/branch/${branchId}/menu/${menuId}`, { method: "PUT", body }),
+  deleteMenu: (branchId, menuId) => request(`/kitchen/branch/${branchId}/menu/${menuId}`, { method: "DELETE" }),
+  menuCategories: (params = {}) => {
+    const search = Object.keys(params).length ? `?${new URLSearchParams(params)}` : "";
+    return request(`/kitchen/menu/categories${search}`);
+  },
+  orders: (branchId, params = {}) => {
+    const defaultParams = { page: "1", limit: "50", ...params };
+    return request(`/kitchen/order/branch/${branchId}?${new URLSearchParams(defaultParams)}`);
+  },
+  orderDetail: (branchId, orderId) => request(`/kitchen/order/branch/${branchId}/${orderId}`),
+  updateOrderStatus: (branchId, body) => request(`/kitchen/order/branch/${branchId}/bulk-status`, { method: "PATCH", body }),
   createOrder: (branchId, body) => request(`/kitchen/order/branch/${branchId}`, { method: "POST", body }),
   customers: (params = {}) => {
     const query = new URLSearchParams(params).toString();
@@ -201,11 +232,11 @@ export const api = {
     });
     return request("/kitchen/auth/profile", { method: "PUT", body: form });
   },
-  wasteLogs: (branchId = 2, params = {}) => {
+  wasteLogs: (branchId, params = {}) => {
     const query = new URLSearchParams(params).toString();
     return request(`/kitchen/branch/${branchId}/waste${query ? `?${query}` : ""}`);
   },
-  createWasteLog: (branchId = 2, body) => request(`/kitchen/branch/${branchId}/waste`, { method: "POST", body }),
-  updateWasteLog: (branchId = 2, id, body) => request(`/kitchen/branch/${branchId}/waste/${id}`, { method: "PUT", body }),
-  deleteWasteLog: (branchId = 2, id) => request(`/kitchen/branch/${branchId}/waste/${id}`, { method: "DELETE" }),
+  createWasteLog: (branchId, body) => request(`/kitchen/branch/${branchId}/waste`, { method: "POST", body }),
+  updateWasteLog: (branchId, id, body) => request(`/kitchen/branch/${branchId}/waste/${id}`, { method: "PUT", body }),
+  deleteWasteLog: (branchId, id) => request(`/kitchen/branch/${branchId}/waste/${id}`, { method: "DELETE" }),
 };

@@ -155,7 +155,7 @@ export function CustomerListPage({ apiState, onToast }) {
           <Search className="absolute left-3.5 top-3 text-slate-400" size={17} />
           <input
             type="text"
-            placeholder="Search customer by name, phone, email, or address..."
+            placeholder="Search customers by name, phone, email, or address..."
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);

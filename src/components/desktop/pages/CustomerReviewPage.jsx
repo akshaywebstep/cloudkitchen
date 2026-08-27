@@ -110,6 +110,7 @@ export function CustomerReviewPage({ apiState }) {
 
       <SearchFilterRow
         calendarTone="red"
+        placeholder="Search reviews by diner name, dish, or order ID..."
         searchQuery={searchQuery}
         onSearchChange={(q) => {
           setSearchQuery(q);

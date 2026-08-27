@@ -78,7 +78,7 @@ export function ApiProvider({ children }) {
       const selectedPlan = hasActiveKitchenSubscription(kitchen)
         ? apiState.selectedPlan
         : apiState.selectedPlan || { alreadyActive: true, confirmedActive: true, name: "Active Subscription" };
-      updateApiState({ branches, menus, branchIngredients, stocks, selectedBranchId, selectedPlan });
+      updateApiState({ branches, menus, branchIngredients, stocks, selectedBranchId, selectedPlan, branchesMeta: branchesResponse?.meta });
       return { subscriptionUnlocked: true, branches };
     } catch (error) {
       const message = getApiErrorMessage(error, "Kitchen APIs need login/onboarding/subscription");
@@ -104,10 +104,10 @@ export function ApiProvider({ children }) {
           online: true,
           loading: false,
           message: "API connected",
-          cuisines: cuisineResponse.status === "fulfilled" && Array.isArray(cuisineResponse.value?.data) ? cuisineResponse.value.data : [],
-          ingredients: ingredientResponse.status === "fulfilled" && Array.isArray(ingredientResponse.value?.data) ? ingredientResponse.value.data : [],
-          plans: planResponse.status === "fulfilled" && Array.isArray(planResponse.value?.data) ? planResponse.value.data : [],
-          countries: countryResponse.status === "fulfilled" && Array.isArray(countryResponse.value?.data) ? countryResponse.value.data : [],
+          cuisines: cuisineResponse.status === "fulfilled" ? (Array.isArray(cuisineResponse.value?.data) ? cuisineResponse.value.data : Array.isArray(cuisineResponse.value) ? cuisineResponse.value : []) : [],
+          ingredients: ingredientResponse.status === "fulfilled" ? (Array.isArray(ingredientResponse.value?.data) ? ingredientResponse.value.data : Array.isArray(ingredientResponse.value) ? ingredientResponse.value : []) : [],
+          plans: planResponse.status === "fulfilled" ? (Array.isArray(planResponse.value?.data) ? planResponse.value.data : Array.isArray(planResponse.value) ? planResponse.value : []) : [],
+          countries: countryResponse.status === "fulfilled" ? (Array.isArray(countryResponse.value?.data) ? countryResponse.value.data : Array.isArray(countryResponse.value) ? countryResponse.value : []) : [],
         });
 
         const token = getStoredToken();

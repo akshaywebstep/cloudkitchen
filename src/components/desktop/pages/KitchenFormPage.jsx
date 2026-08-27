@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import Select from "react-select";
+import Select, { components } from "react-select";
 import {
   Building2,
   MapPin,
@@ -53,6 +53,7 @@ import {
   resolveSelectedBranchId,
   setStoredSelectedBranchId,
 } from "../../../utils/helpers";
+import { usePermissions } from "../../../utils/permissions";
 
 // ---------------------------------------------------------------------------
 // Shared styling for react-select dropdowns
@@ -77,22 +78,62 @@ const selectStyles = (hasError) => ({
   option: (base, state) => ({
     ...base,
     fontSize: 13,
-    fontWeight: 500,
-    backgroundColor: state.isSelected ? "#8D0606" : state.isFocused ? "#fff1f1" : "white",
-    color: state.isSelected ? "white" : "#1e293b",
+    fontWeight: state.isSelected ? 600 : 500,
+    backgroundColor: state.isSelected
+      ? state.isFocused
+        ? "#fee2e2"
+        : "#fef2f2"
+      : state.isFocused
+      ? "#f8fafc"
+      : "white",
+    color: state.isSelected ? "#8D0606" : "#1e293b",
     cursor: "pointer",
-    padding: "9px 12px",
+    padding: "9px 14px",
+    transition: "all 0.15s ease",
   }),
-  multiValue: (base) => ({ ...base, backgroundColor: "#fff1f1", borderRadius: 8, padding: "2px 4px" }),
-  multiValueLabel: (base) => ({ ...base, color: "#8D0606", fontWeight: 600, fontSize: 12 }),
+  multiValue: (base) => ({
+    ...base,
+    backgroundColor: "#f8fafc",
+    border: "1px solid #e2e8f0",
+    borderRadius: 8,
+    padding: "2px 5px",
+  }),
+  multiValueLabel: (base) => ({
+    ...base,
+    color: "#1e293b",
+    fontWeight: 600,
+    fontSize: 12,
+  }),
   multiValueRemove: (base) => ({
     ...base,
-    color: "#8D0606",
+    color: "#64748b",
     borderRadius: 6,
-    "&:hover": { backgroundColor: "#8D0606", color: "white" },
+    "&:hover": { backgroundColor: "#fee2e2", color: "#8D0606" },
   }),
   menuPortal: (base) => ({ ...base, zIndex: 60 }),
 });
+
+// Custom Option with checkbox for Multi-select dropdowns
+const MultiSelectOption = (props) => {
+  return (
+    <components.Option {...props}>
+      <div className="flex w-full items-center justify-between">
+        <span className={props.isSelected ? "font-semibold text-[#8D0606]" : "text-[#1e293b]"}>
+          {props.label}
+        </span>
+        <div
+          className={`flex size-4 items-center justify-center rounded border transition-colors ${
+            props.isSelected
+              ? "border-[#8D0606] bg-[#8D0606] text-white"
+              : "border-slate-300 bg-white"
+          }`}
+        >
+          {props.isSelected && <Check size={12} strokeWidth={3} />}
+        </div>
+      </div>
+    </components.Option>
+  );
+};
 
 // ---------------------------------------------------------------------------
 // Reusable TextField with centered icon & clean padding
@@ -141,15 +182,27 @@ const TextField = React.forwardRef(function TextField(
 // Reusable SelectField
 // ---------------------------------------------------------------------------
 const SelectField = React.forwardRef(function SelectField(
-  { label, required, error, helper, className = "", ...props },
+  { label, required, error, helper, className = "", closeMenuOnSelect, hideSelectedOptions, components: customComponents, ...props },
   ref
 ) {
+  const isMulti = props.isMulti;
   return (
     <div className={className}>
       <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-[#475569]">
         {label} {required ? <span className="text-[#8D0606]">*</span> : null}
       </label>
-      <Select ref={ref} styles={selectStyles(!!error)} menuPortalTarget={document.body} {...props} />
+      <Select
+        ref={ref}
+        styles={selectStyles(!!error)}
+        menuPortalTarget={document.body}
+        closeMenuOnSelect={closeMenuOnSelect !== undefined ? closeMenuOnSelect : !isMulti}
+        hideSelectedOptions={hideSelectedOptions !== undefined ? hideSelectedOptions : false}
+        components={{
+          ...(isMulti ? { Option: MultiSelectOption } : {}),
+          ...customComponents,
+        }}
+        {...props}
+      />
       {helper && !error ? (
         <p className="mt-1 text-[11px] text-[#64748b]">{helper}</p>
       ) : null}
@@ -165,6 +218,7 @@ const SelectField = React.forwardRef(function SelectField(
 
 export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
   const navigate = useNavigate();
+  const { canCreate, canUpdate, canDelete } = usePermissions(apiState);
   const defaultCountryId = apiState?.countries?.[0]?.id ? String(apiState.countries[0].id) : "101";
   const kitchen = apiState?.kitchen || {};
 
@@ -182,10 +236,19 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
     totalPages: 1,
     hasNextPage: false,
     hasPrevPage: false,
+    branchLimit: null,
   });
 
   const branchList = branches.length > 0 ? branches : apiState?.branches || [];
   const activeBranchId = resolveSelectedBranchId(branchList, apiState?.selectedBranchId);
+
+  // Check branch subscription limit
+  const branchLimit = meta?.branchLimit || apiState?.branchesMeta?.branchLimit;
+  const isBranchLimitReached = Boolean(
+    branchLimit?.isLimitReached ||
+    branchLimit?.isMaxLimitExceeded ||
+    (branchLimit?.remainingBranches !== undefined && Number(branchLimit?.remainingBranches) <= 0)
+  );
 
   // Tabs: "list" (Directory View) or "form" (Add / Edit Form)
   const [activeTab, setActiveTab] = useState(branchList.length === 0 ? "form" : "list");
@@ -226,6 +289,7 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
           totalPages: Math.max(1, Math.ceil(dataArray.length / pageSize)),
           hasNextPage: false,
           hasPrevPage: false,
+          branchLimit: null,
         });
       }
     } catch (err) {
@@ -240,6 +304,16 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
   useEffect(() => {
     fetchBranches();
   }, [fetchBranches]);
+
+  useEffect(() => {
+    if (quickViewBranch) {
+      const orig = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = orig;
+      };
+    }
+  }, [quickViewBranch]);
 
   const selectedBranch = useMemo(() => {
     if (selectedBranchId === "new") return null;
@@ -331,6 +405,11 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
   ];
 
   const handleStartCreate = () => {
+    if (isBranchLimitReached) {
+      const limitMsg = branchLimit?.message || "Branch limit reached. Please upgrade your subscription plan to add more branches.";
+      onToast?.({ message: limitMsg, type: "warning" });
+      return;
+    }
     setSelectedBranchId("new");
     setForm(createBranchForm(null));
     setErrors({});
@@ -465,6 +544,35 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
     };
   }, []);
 
+  const [countriesList, setCountriesList] = useState(apiState?.countries || []);
+  const [loadingCountries, setLoadingCountries] = useState(false);
+
+  // Fetch master countries for selection
+  useEffect(() => {
+    let mounted = true;
+    async function loadCountries() {
+      setLoadingCountries(true);
+      try {
+        const response = await api.countries({ page: "1", limit: "50" });
+        const list = Array.isArray(response?.data)
+          ? response.data
+          : Array.isArray(response)
+          ? response
+          : [];
+        if (!mounted) return;
+        if (list.length > 0) setCountriesList(list);
+      } catch (err) {
+        console.error("Failed to load countries in KitchenFormPage:", err);
+      } finally {
+        if (mounted) setLoadingCountries(false);
+      }
+    }
+    loadCountries();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const cuisineOptions = useMemo(() => {
     const list = cuisinesList.length ? cuisinesList : apiState?.cuisines || [];
     return list.length
@@ -476,13 +584,16 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
   }, [cuisinesList, apiState?.cuisines]);
 
   const countryOptions = useMemo(() => {
-    return apiState?.countries?.length
-      ? apiState.countries.map((country) => ({
+    const list = countriesList.length ? countriesList : apiState?.countries || [];
+    return list.length
+      ? list.map((country) => ({
           value: String(country.id),
           label: country.name || `Country ${country.id}`,
         }))
-      : [{ value: form.countryId, label: `Country #${form.countryId}` }];
-  }, [apiState?.countries, form.countryId]);
+      : form.countryId
+      ? [{ value: String(form.countryId), label: `Country #${form.countryId}` }]
+      : [];
+  }, [countriesList, apiState?.countries, form.countryId]);
 
   const stateOptions = useMemo(() => {
     return locationOptions.states.length
@@ -631,6 +742,14 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
         setMessage(msg);
         onToast?.({ message: msg, type: "error" });
         setSaving(false);
+        return;
+      }
+
+      if (!selectedBranch?.id && isBranchLimitReached) {
+        const limitMsg = branchLimit?.message || "Branch limit reached. Please upgrade your subscription plan to add more branches.";
+        setMessage(limitMsg);
+        setMessageType("error");
+        onToast?.({ message: limitMsg, type: "error" });
         return;
       }
 
@@ -797,10 +916,18 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
               <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-3.5 py-1 text-xs font-bold text-[#8D0606] border border-rose-200/60">
                 Kitchen Branch Network
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200/60">
-                <span className="size-2 rounded-full bg-emerald-500" />
-                {dynamicStats.total} Active Branch Outlets
-              </span>
+              {isBranchLimitReached ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3.5 py-1 text-xs font-bold text-amber-900 border border-amber-300">
+                  <span className="size-2 rounded-full bg-amber-600" />
+                  Branch Limit Reached ({branchLimit?.totalBranches ?? dynamicStats.total}/{branchLimit?.maxBranches ?? dynamicStats.total})
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200/60">
+                  <span className="size-2 rounded-full bg-emerald-500" />
+                  {dynamicStats.total} Active Branch Outlets
+                  {branchLimit?.maxBranches ? ` (${dynamicStats.total}/${branchLimit.maxBranches})` : ""}
+                </span>
+              )}
             </div>
             <div>
               <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
@@ -823,7 +950,17 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                 <ArrowLeft size={15} />
                 <span>Back to Branch List</span>
               </button>
-            ) : (
+            ) : isBranchLimitReached ? (
+              <button
+                type="button"
+                onClick={() => navigate("/profile")}
+                className="flex items-center gap-2 rounded-full bg-amber-600 px-5 py-3 text-xs font-bold text-white shadow-md shadow-amber-900/20 transition-all hover:bg-amber-700 hover:shadow-lg active:scale-98"
+                title={branchLimit?.message || "Branch limit reached. Upgrade subscription."}
+              >
+                <Sparkles size={15} />
+                <span>Upgrade Plan</span>
+              </button>
+            ) : canCreate("branch") ? (
               <button
                 type="button"
                 onClick={handleStartCreate}
@@ -832,7 +969,7 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                 <Plus size={16} strokeWidth={2.5} />
                 <span>Create New Branch</span>
               </button>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
@@ -840,13 +977,42 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
       {/* ── TAB 1: ALL BRANCHES DIRECTORY TABLE VIEW ─────────────────────────── */}
       {activeTab === "list" && (
         <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Branch Limit Notice Banner */}
+          {isBranchLimitReached && (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-amber-300 bg-amber-50/95 p-4 text-xs shadow-xs animate-in fade-in">
+              <div className="flex items-start sm:items-center gap-3 text-amber-950 font-medium">
+                <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-amber-200 text-amber-900 font-bold">
+                  <ShieldCheck size={18} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-900 text-sm">Branch Limit Reached</span>
+                    <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10.5px] font-extrabold text-amber-900">
+                      {branchLimit?.totalBranches ?? (meta?.total || branches.length)} / {branchLimit?.maxBranches ?? (meta?.total || branches.length)} Used
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-slate-700 text-xs">
+                    {branchLimit?.message || "You have reached the maximum branch limit for your active subscription plan. Please upgrade your plan to add more branches."}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate("/profile")}
+                className="inline-flex items-center gap-1.5 shrink-0 rounded-xl bg-[#8D0606] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#780404] transition active:scale-98"
+              >
+                <Sparkles size={14} />
+                <span>Upgrade Plan</span>
+              </button>
+            </div>
+          )}
           {/* Dynamic Search & Filter Toolbar */}
           <div className="flex flex-col gap-3 rounded-2xl bg-white p-3.5 shadow-xs border border-slate-200/80 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative flex-1 max-w-md">
               <Search size={16} className="absolute left-4 top-3 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search by branch name, area, address..."
+                placeholder="Search branches by name, area, or address..."
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
                 className="h-10 w-full rounded-full border border-slate-200/90 bg-slate-50/50 pl-11 pr-8 text-xs font-medium text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-[#8D0606] focus:bg-white focus:ring-2 focus:ring-[#8D0606]/10"
@@ -1000,14 +1166,16 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                               >
                                 <Eye size={15} />
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => handleStartEdit(branch)}
-                                title="Edit Branch"
-                                className="grid size-8 place-items-center rounded-xl bg-slate-50 text-slate-600 border border-slate-200/60 transition hover:bg-slate-100 hover:text-slate-900 shadow-2xs"
-                              >
-                                <Edit3 size={15} />
-                              </button>
+                              {canUpdate("branch") && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEdit(branch)}
+                                  title="Edit Branch"
+                                  className="grid size-8 place-items-center rounded-xl bg-slate-50 text-slate-600 border border-slate-200/60 transition hover:bg-slate-100 hover:text-slate-900 shadow-2xs"
+                                >
+                                  <Edit3 size={15} />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1060,7 +1228,16 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                   >
                     Reset Filter
                   </button>
-                ) : (
+                ) : isBranchLimitReached ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate("/profile")}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#8D0606] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#7a0505] transition"
+                  >
+                    <Sparkles size={15} />
+                    <span>Upgrade Plan to Add Branches</span>
+                  </button>
+                ) : canCreate("branch") ? (
                   <button
                     type="button"
                     onClick={handleStartCreate}
@@ -1069,7 +1246,7 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                     <Plus size={16} />
                     <span>Create First Branch</span>
                   </button>
-                )}
+                ) : null}
               </div>
             </div>
           )}
@@ -1077,7 +1254,36 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
       )}
 
       {/* ── TAB 2: ADD / EDIT BRANCH FORM WITH REAL-TIME PREVIEW ────────────── */}
-      {activeTab === "form" && (
+      {activeTab === "form" && !isEditing && isBranchLimitReached ? (
+        <div className="flex flex-col items-center justify-center rounded-3xl border border-amber-200 bg-white p-10 text-center shadow-xs space-y-4 animate-in fade-in duration-200">
+          <div className="grid size-16 place-items-center rounded-2xl bg-amber-100 text-amber-800">
+            <AlertCircle size={32} />
+          </div>
+          <div className="max-w-md space-y-2">
+            <h3 className="text-xl font-bold text-slate-900">Branch Limit Reached</h3>
+            <p className="text-xs text-slate-600 font-medium">
+              {branchLimit?.message || "You have reached the maximum branch limit for your active subscription plan. Please upgrade your plan to add more branches."}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab("list")}
+              className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition"
+            >
+              Back to Branch List
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/profile")}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#8D0606] px-6 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#7a0505] transition active:scale-98"
+            >
+              <Sparkles size={15} />
+              <span>Upgrade Subscription Plan</span>
+            </button>
+          </div>
+        </div>
+      ) : activeTab === "form" && (
         <div className="space-y-6 animate-in fade-in duration-200">
           {/* Navigation Bar & Mode Banner */}
           <div className="flex flex-col gap-3 rounded-2xl bg-white p-4 shadow-sm border border-[#e2e8f0] sm:flex-row sm:items-center sm:justify-between">
@@ -1154,7 +1360,7 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                       icon={Building2}
                       label="Branch / Kitchen Name"
                       required
-                      placeholder="e.g. Main Branch"
+                      placeholder="Enter branch outlet name (e.g. Downtown Cloud Kitchen)"
                       value={form.name}
                       onChange={updateForm("name")}
                       error={errors.name}
@@ -1166,6 +1372,8 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                       label="Cuisines Offered"
                       required
                       isMulti
+                      closeMenuOnSelect={false}
+                      hideSelectedOptions={false}
                       isLoading={loadingCuisines}
                       options={cuisineOptions}
                       value={cuisineOptions.filter((option) => form.cuisineIds?.includes(option.value))}
@@ -1236,7 +1444,7 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                       ref={fieldRefs.pincode}
                       label="Pincode"
                       required
-                      placeholder="e.g. 201301"
+                      placeholder="Enter 6-digit postal pincode (e.g. 201301)"
                       value={form.pincode}
                       onChange={updateForm("pincode")}
                       error={errors.pincode}
@@ -1246,7 +1454,7 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                       ref={fieldRefs.addressLine1}
                       label="Street Address / Shop Details"
                       required
-                      placeholder="e.g. Shop No 12, Ground Floor"
+                      placeholder="Enter street address, shop or unit number (e.g. Shop 12, Ground Floor)"
                       value={form.addressLine1}
                       onChange={updateForm("addressLine1")}
                       error={errors.addressLine1}
@@ -1281,7 +1489,7 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                       icon={User}
                       label="Contact Name"
                       required
-                      placeholder="e.g. Rahul"
+                      placeholder="Enter manager first name (e.g. Rahul)"
                       value={form.contactFirstName}
                       onChange={updateForm("contactFirstName")}
                       error={errors.contactFirstName}
@@ -1292,7 +1500,7 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                       label="Contact Email"
                       required
                       type="email"
-                      placeholder="e.g. rahul@example.com"
+                      placeholder="Enter manager email address (e.g. manager@kitchen.com)"
                       value={form.contactEmail}
                       onChange={updateForm("contactEmail")}
                       error={errors.contactEmail}
@@ -1302,7 +1510,7 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                       icon={Phone}
                       label="Contact Phone"
                       required
-                      placeholder="e.g. 9876543210"
+                      placeholder="Enter 10-digit mobile number (e.g. 9876543210)"
                       value={form.contactPhone}
                       onChange={updateForm("contactPhone")}
                       error={errors.contactPhone}
@@ -1426,21 +1634,23 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
             </div>
 
             <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-              <button
-                type="button"
-                disabled={saving}
-                onClick={saveBranch}
-                className="flex h-11 min-w-[170px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#8D0606] to-[#b80808] px-6 text-xs font-bold text-white shadow-lg shadow-rose-900/25 transition duration-200 hover:from-[#7a0505] hover:to-[#a10707] active:scale-[0.98] disabled:opacity-60"
-              >
-                {saving ? (
-                  <Loader variant="button" text={isEditing ? "Updating Branch..." : "Saving Branch..."} />
-                ) : (
-                  <>
-                    <Save size={16} />
-                    <span>{isEditing ? "Update Branch Details" : "Save & Activate Branch"}</span>
-                  </>
-                )}
-              </button>
+              {((isEditing && canUpdate("branch")) || (!isEditing && canCreate("branch"))) && (
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={saveBranch}
+                  className="flex h-11 min-w-[170px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#8D0606] to-[#b80808] px-6 text-xs font-bold text-white shadow-lg shadow-rose-900/25 transition duration-200 hover:from-[#7a0505] hover:to-[#a10707] active:scale-[0.98] disabled:opacity-60"
+                >
+                  {saving ? (
+                    <Loader variant="button" text={isEditing ? "Updating Branch..." : "Saving Branch..."} />
+                  ) : (
+                    <>
+                      <Save size={16} />
+                      <span>{isEditing ? "Update Branch Details" : "Save & Activate Branch"}</span>
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>

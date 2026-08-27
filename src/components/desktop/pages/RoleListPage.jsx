@@ -14,11 +14,13 @@ import {
   KeyRound,
 } from "lucide-react";
 import { api, getApiBaseUrl, getStoredToken, getApiErrorMessage } from "../../../api";
+import { usePermissions } from "../../../utils/permissions";
 import { Loader } from "../../ui/Loader";
 import { Pagination } from "../../ui/Pagination";
 import { PageHeader } from "../../ui/PageHeader";
 
 export function RoleListPage({ apiState, onToast }) {
+  const { canCreate, canUpdate, canDelete } = usePermissions(apiState);
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -118,17 +120,19 @@ export function RoleListPage({ apiState, onToast }) {
               <span>Refresh</span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedRole(null);
-                setIsModalOpen(true);
-              }}
-              className="flex items-center gap-2 rounded-full bg-[#8D0606] px-6 py-3 text-xs font-bold text-white shadow-md shadow-rose-950/20 transition hover:bg-[#780404] active:scale-98"
-            >
-              <Plus size={16} strokeWidth={2.5} />
-              <span>Create New Role</span>
-            </button>
+            {canCreate("roleManagement") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRole(null);
+                  setIsModalOpen(true);
+                }}
+                className="flex items-center gap-2 rounded-full bg-[#8D0606] px-6 py-3 text-xs font-bold text-white shadow-md shadow-rose-950/20 transition hover:bg-[#780404] active:scale-98"
+              >
+                <Plus size={16} strokeWidth={2.5} />
+                <span>Create New Role</span>
+              </button>
+            )}
           </div>
         }
       />
@@ -140,7 +144,7 @@ export function RoleListPage({ apiState, onToast }) {
           <Search className="absolute left-3.5 top-3 text-slate-400" size={18} />
           <input
             type="text"
-            placeholder="Search role by name or ID..."
+            placeholder="Search roles by title or ID..."
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
@@ -186,7 +190,6 @@ export function RoleListPage({ apiState, onToast }) {
                 <tr className="border-b border-slate-200 bg-slate-50/75 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                   <th className="pl-6 pr-3 py-4 w-14 text-slate-400">#</th>
                   <th className="px-5 py-4">Role Title & Identifier</th>
-                  <th className="px-5 py-4">Scope & Authority</th>
                   <th className="px-5 py-4">Status</th>
                   <th className="px-5 py-4">Created Date</th>
                   <th className="px-6 py-4 text-right">Actions</th>
@@ -232,14 +235,7 @@ export function RoleListPage({ apiState, onToast }) {
                         </div>
                       </td>
 
-                      {/* Scope */}
-                      <td className="px-5 py-4">
-                        <span className="inline-flex items-center gap-1.5 rounded-lg border border-rose-100 bg-[#fff5f5] px-2.5 py-1 text-xs font-bold text-[#8D0606]">
-                          <Lock size={12} />
-                          <span>Kitchen & Outlets Scope</span>
-                        </span>
-                      </td>
-
+                    
                       {/* Status */}
                       <td className="px-5 py-4">
                         <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">
@@ -256,18 +252,20 @@ export function RoleListPage({ apiState, onToast }) {
                       {/* Actions */}
                       <td className="px-6 py-4 text-right">
                         <div className="inline-flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedRole(role);
-                              setIsModalOpen(true);
-                            }}
-                            title="Edit Role"
-                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-[#8D0606] hover:bg-rose-50 hover:text-[#8D0606] shadow-2xs"
-                          >
-                            <Edit2 size={13} />
-                            <span>Edit</span>
-                          </button>
+                          {canUpdate("roleManagement") && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedRole(role);
+                                setIsModalOpen(true);
+                              }}
+                              title="Edit Role"
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-[#8D0606] hover:bg-rose-50 hover:text-[#8D0606] shadow-2xs"
+                            >
+                              <Edit2 size={13} />
+                              <span>Edit</span>
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -288,17 +286,19 @@ export function RoleListPage({ apiState, onToast }) {
                     ? "No roles match your search query. Try typing another role title."
                     : "Get started by defining your first kitchen staff role."}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedRole(null);
-                    setIsModalOpen(true);
-                  }}
-                  className="mt-4 flex items-center gap-2 rounded-xl bg-[#8D0606] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#7a0505]"
-                >
-                  <Plus size={15} />
-                  <span>Create New Role</span>
-                </button>
+                {canCreate("roleManagement") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedRole(null);
+                      setIsModalOpen(true);
+                    }}
+                    className="mt-4 flex items-center gap-2 rounded-xl bg-[#8D0606] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#7a0505]"
+                  >
+                    <Plus size={15} />
+                    <span>Create New Role</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -432,6 +432,14 @@ function RoleFormModal({ role, apiState, onClose, onSuccess, onToast }) {
     }
   };
 
+  useEffect(() => {
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = orig;
+    };
+  }, []);
+
   return createPortal(
     <div
       className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-950/60 p-4 sm:p-6 backdrop-blur-sm flex min-h-screen items-center justify-center animate-in fade-in duration-200"
@@ -482,7 +490,7 @@ function RoleFormModal({ role, apiState, onClose, onSuccess, onToast }) {
             </label>
             <input
               type="text"
-              placeholder="e.g. Kitchen Staff Manager"
+              placeholder="Enter role title (e.g. Kitchen Staff Manager)"
               value={roleName}
               onChange={(e) => {
                 setRoleName(e.target.value);
@@ -496,18 +504,7 @@ function RoleFormModal({ role, apiState, onClose, onSuccess, onToast }) {
             </p>
           </div>
 
-          <div>
-            <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700">
-              Notes / Operational Scope (Optional)
-            </label>
-            <textarea
-              rows={3}
-              placeholder="Optional description of the duties and authority for this role..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white p-3 text-xs font-semibold text-slate-800 outline-none focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10 transition resize-none"
-            />
-          </div>
+         
 
           {/* Quick Suggestions */}
           {!isEditMode && (
@@ -518,10 +515,10 @@ function RoleFormModal({ role, apiState, onClose, onSuccess, onToast }) {
               <div className="flex flex-wrap gap-1.5">
                 {[
                   "Kitchen Staff Manager",
-                  "Head Chef & Prep Lead",
-                  "Line Cook Associate",
-                  "Inventory Manager",
-                  "Order & POS Dispatcher",
+                  // "Head Chef & Prep Lead",
+                  // "Line Cook Associate",
+                  // "Inventory Manager",
+                  // "Order & POS Dispatcher",
                 ].map((sug) => (
                   <button
                     key={sug}

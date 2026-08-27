@@ -12,7 +12,7 @@ export function HeaderPanel({ title, items = [], onClose, onAction }) {
   const hasItems = Array.isArray(items) && items.length > 0;
 
   return (
-    <div className="absolute right-28 top-16 z-50 w-[340px] overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-xl animate-in fade-in zoom-in-95">
+    <div className="absolute right-3 sm:right-28 top-16 z-50 w-[calc(100vw-24px)] sm:w-[340px] max-w-[340px] overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-xl animate-in fade-in zoom-in-95">
       <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-3">
         <div className="flex items-center gap-2">
           <div className="grid size-8 place-items-center rounded-lg bg-rose-50 text-[#8D0606]">

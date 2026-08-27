@@ -36,6 +36,7 @@ import { PageHeader } from "../../ui/PageHeader";
 import { ApiCount } from "../../ui/ApiCount";
 import { api, getApiErrorMessage } from "../../../api";
 import { resolveSelectedBranchId } from "../../../utils/helpers";
+import { usePermissions } from "../../../utils/permissions";
 
 // ---------------------------------------------------------------------------
 // Shared styling for react-select dropdowns
@@ -87,6 +88,7 @@ const getIngredientAvatarStyle = (name = "") => {
 };
 
 export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan, onToast }) {
+  const { canCreate, canUpdate, canDelete } = usePermissions(apiState);
   const branches = apiState?.branches || [];
   const branchOptions = branches.map((branch) => ({
     value: String(branch.id),
@@ -113,45 +115,37 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
     "SERVING",
   ].map((unit) => ({ value: unit, label: unit }));
 
-  const categoryOptions = useMemo(() => {
-    const defaults = [
-      "Vegetable",
-      "Spices",
-      "Dairy",
-      "Sauce",
-      "Meat & Poultry",
-      "Seafood",
-      "Grains & Pulses",
-      "Bakery & Bread",
-      "Oil & Fat",
-      "Fruits",
-      "Dry Fruits & Nuts",
-      "Beverages",
-      "Condiments",
-      "Packaging",
-      "General",
-    ];
-    const dynamicSet = new Set(defaults);
-    (apiState?.ingredients || []).forEach((item) => {
-      if (item.category?.trim()) dynamicSet.add(item.category.trim());
-    });
-    (apiState?.branchIngredients || []).forEach((item) => {
-      const cat = item.ingredient?.category || item.category;
-      if (cat?.trim()) dynamicSet.add(cat.trim());
-    });
-    return Array.from(dynamicSet).map((cat) => ({ value: cat, label: cat }));
-  }, [apiState?.ingredients, apiState?.branchIngredients]);
-
   // Tab mode in Add Panel: 'master' | 'custom'
   const [activeTab, setActiveTab] = useState("master");
 
   // Master Ingredient Search & Select state
   const [masterSearchText, setMasterSearchText] = useState("");
+  const [masterCatalog, setMasterCatalog] = useState([]);
   const [masterSearchResults, setMasterSearchResults] = useState([]);
+  const [apiCategories, setApiCategories] = useState([]);
   const [isSearchingMaster, setIsSearchingMaster] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedMasterItems, setSelectedMasterItems] = useState([]);
   const [defaultMasterUnit, setDefaultMasterUnit] = useState("KG");
+
+  // Load categories directly from GET /kitchen/menu/categories on mount
+  useEffect(() => {
+    let active = true;
+    async function loadApiCategories() {
+      try {
+        const res = await api.menuCategories();
+        const data = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        if (!active) return;
+        setApiCategories(data);
+      } catch (err) {
+        console.warn("Failed to load categories API in ingredients setup:", err);
+      }
+    }
+    loadApiCategories();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Custom Form state
   const [customForm, setCustomForm] = useState({
@@ -185,6 +179,17 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
   const [inventoryViewMode, setInventoryViewMode] = useState("table"); // "table" | "grid"
   const [loadingInventory, setLoadingInventory] = useState(false);
   const [filterType, setFilterType] = useState("ALL"); // "ALL" | "MASTER" | "CUSTOM"
+
+  // Dynamic category options loaded STRICTLY from Categories API (GET /kitchen/menu/categories)
+  const categoryOptions = useMemo(() => {
+    return (apiCategories || [])
+      .filter((cat) => cat && (cat.status === undefined || cat.status === "ACTIVE"))
+      .map((cat) => ({
+        value: cat.name,
+        label: cat.name,
+        id: cat.id,
+      }));
+  }, [apiCategories]);
 
   // Stock update modal state
   const [stockModalOpen, setStockModalOpen] = useState(false);
@@ -448,37 +453,52 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
     return map;
   }, [apiState?.stocks]);
 
+  // Load full master ingredients catalog on mount
+  useEffect(() => {
+    let active = true;
+    async function loadMasterCatalog() {
+      try {
+        const response = await api.ingredients({ page: "1", limit: "50" });
+        const items = Array.isArray(response?.data) ? response.data : Array.isArray(response) ? response : [];
+        if (!active) return;
+        if (items.length > 0) {
+          setMasterCatalog(items);
+          setMasterSearchResults(items);
+        }
+      } catch (err) {
+        console.error("Failed to load master ingredients catalog:", err);
+      }
+    }
+    loadMasterCatalog();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   // Debounced search for Master Ingredients API
   useEffect(() => {
     const timer = setTimeout(async () => {
-      if (!masterSearchText.trim()) {
-        setMasterSearchResults(apiState?.ingredients || []);
-        setIsSearchingMaster(false);
-        return;
-      }
+      const query = masterSearchText.trim();
       setIsSearchingMaster(true);
       try {
-        const response = await api.ingredients({
-          name: masterSearchText.trim(),
-          page: "1",
-          limit: "20",
-          status: "ACTIVE",
-        });
-        const items = Array.isArray(response?.data) ? response.data : [];
+        const params = query ? { name: query } : {};
+        const response = await api.ingredients(params);
+        const items = Array.isArray(response?.data) ? response.data : Array.isArray(response) ? response : [];
         setMasterSearchResults(items);
       } catch (err) {
         console.error("Failed to search master ingredients:", err);
-        const query = masterSearchText.toLowerCase();
+        const lowerQ = query.toLowerCase();
         const fallback = (apiState?.ingredients || []).filter(
           (item) =>
-            (item.name || "").toLowerCase().includes(query) ||
-            (item.category || "").toLowerCase().includes(query)
+            !lowerQ ||
+            (item.name || "").toLowerCase().includes(lowerQ) ||
+            (item.category || "").toLowerCase().includes(lowerQ)
         );
         setMasterSearchResults(fallback);
       } finally {
         setIsSearchingMaster(false);
       }
-    }, 300);
+    }, 250);
 
     return () => clearTimeout(timer);
   }, [masterSearchText, apiState?.ingredients]);
@@ -555,12 +575,6 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
 
       await api.createBranchIngredients(activeBranchId, payload);
 
-      // Instant list API re-fetch & state refresh
-      setInventoryPage(1);
-      setInventorySearch("");
-      await fetchBranchInventory(activeBranchId, 1, inventoryLimit, "");
-      refreshKitchenData?.(undefined, undefined, activeBranchId);
-
       const count = selectedMasterItems.length;
       const successMsg = `Successfully added ${count} ingredient${count > 1 ? "s" : ""} to branch inventory.`;
       setMessageType("success");
@@ -569,6 +583,14 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
       setSelectedMasterItems([]);
       setMasterSearchText("");
       setIsDropdownOpen(false);
+
+      // Instant list API re-fetch & state refresh
+      setInventoryPage(1);
+      setInventorySearch("");
+      await Promise.allSettled([
+        fetchBranchInventory(activeBranchId, 1, inventoryLimit, ""),
+        refreshKitchenData?.(undefined, undefined, activeBranchId),
+      ]);
     } catch (error) {
       const errMsg = getApiErrorMessage(error, "Unable to add ingredients to branch");
       setMessageType("error");
@@ -695,8 +717,8 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
 
     try {
       const ingredientId = Number(
-        stockItem.id ||
         stockItem.ingredientId ||
+        stockItem.id ||
         stockItem.ingredient?.id
       );
 
@@ -710,17 +732,19 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
 
       // If stockMode === "update" and currentStockId exists -> include stockId
       // If stockMode === "create" -> omit stockId (New stock batch creation)
-      const stockEntry = {
-        id: ingredientId,
-        ...(stockMode === "update" && currentStockId ? { stockId: Number(currentStockId) } : {}),
-        stock: Number(stockValue),
-        alertQuantity: Number(alertQuantity),
-        ...(expireAtISO ? { expireAt: expireAtISO } : {}),
-      };
 
-      const payload = {
-        stocks: [stockEntry],
-      };
+
+      const payload = [
+        {
+          id: ingredientId,
+          ...(stockMode === "update" && currentStockId
+            ? { stockId: Number(currentStockId) }
+            : {}),
+          stock: Number(stockValue),
+          alertQuantity: Number(alertQuantity),
+          ...(expireAtISO ? { expireAt: expireAtISO } : {}),
+        },
+      ];
 
       console.log("Submitting stock payload:", JSON.stringify(payload, null, 2));
 
@@ -844,8 +868,10 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
       // Instant list API re-fetch & state refresh
       setInventoryPage(1);
       setInventorySearch("");
-      await fetchBranchInventory(activeBranchId, 1, inventoryLimit, "");
-      refreshKitchenData?.(undefined, undefined, activeBranchId);
+      await Promise.allSettled([
+        fetchBranchInventory(activeBranchId, 1, inventoryLimit, ""),
+        refreshKitchenData?.(undefined, undefined, activeBranchId),
+      ]);
     } catch (error) {
       const errMsg = getApiErrorMessage(
         error,
@@ -860,7 +886,7 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
   };
 
   // Filtered inventory list
-  const activeItemsList = inventoryList.length > 0 ? inventoryList : (apiState?.branchIngredients || []);
+  const activeItemsList = inventoryList;
   const filteredInventoryList = useMemo(() => {
     let list = activeItemsList;
     if (filterType === "MASTER") {
@@ -884,31 +910,52 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
         activeBadge={`${totalInventoryCount} Active Items`}
         title="Ingredients & Stock"
         subtitle="Manage master ingredients, configure custom recipe items, and record live stock batches for your active kitchen branch."
+        actions={
+          <button
+            type="button"
+            onClick={async () => {
+              await Promise.allSettled([
+                fetchBranchInventory(activeBranchId, inventoryPage, inventoryLimit, inventorySearch),
+                refreshKitchenData?.(undefined, undefined, activeBranchId),
+              ]);
+              onToast?.({ message: "Inventory refreshed", type: "success" });
+            }}
+            disabled={loadingInventory || saving || stockSaving}
+            className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 active:scale-95 disabled:opacity-50"
+            title="Refresh Ingredients"
+          >
+            <RefreshCw size={14} className={loadingInventory ? "animate-spin text-[#8D0606]" : ""} />
+            <span>Refresh</span>
+          </button>
+        }
       />
 
-      {/* 2-Column Responsive SaaS Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] xl:grid-cols-[410px_1fr] gap-6 items-start">
+      {/* 2-Column Responsive Layout (Full width if user has no Create permission) */}
+      <div className={canCreate("ingredient") ? "grid grid-cols-1 lg:grid-cols-[380px_1fr] xl:grid-cols-[410px_1fr] gap-6 items-start" : "space-y-6"}>
 
         {/* ========================================================================= */}
         {/* LEFT COLUMN: ADD / ATTACH INGREDIENTS PANEL                              */}
         {/* ========================================================================= */}
-        <div className="rounded-[24px] border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs space-y-5 lg:sticky lg:top-6">
-          {/* Active Target Branch Badge Indicator (Header-synced) */}
-          <div className="flex items-center gap-3 rounded-2xl bg-slate-50 border border-slate-200/80 p-3.5 shadow-2xs">
-            <div className="grid size-9 place-items-center rounded-xl bg-rose-50 text-[#8D0606] border border-rose-100 shrink-0">
-              <Building2 size={16} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-1">
-                <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-400">Target Kitchen Branch</span>
-                <span className="rounded-md bg-rose-50 px-1.5 py-0.5 text-[9.5px] font-bold text-[#8D0606] border border-rose-100">
-                  Active in Header
+        {canCreate("ingredient") && (
+          <div className="rounded-[24px] border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs space-y-5 lg:sticky lg:top-6">
+            {/* Active Target Branch Badge Indicator (Header-synced) */}
+            <div className="flex items-center justify-between gap-2.5 rounded-2xl bg-slate-50 border border-slate-200/80 p-3.5 shadow-2xs">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="grid size-9 place-items-center rounded-xl bg-rose-50 text-[#8D0606] border border-rose-100 shrink-0">
+                  <Building2 size={16} />
+                </div>
+              <div className="min-w-0 flex-1">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate">
+                  Target Kitchen Branch
                 </span>
+                <p className="text-xs font-bold text-slate-900 truncate mt-0.5">
+                  {branches.find((b) => String(b.id) === String(activeBranchId))?.name || `Branch Outlet #${activeBranchId || "1"}`}
+                </p>
               </div>
-              <p className="text-xs font-bold text-slate-900 truncate mt-0.5">
-                {branches.find((b) => String(b.id) === String(activeBranchId))?.name || `Branch Outlet #${activeBranchId || "1"}`}
-              </p>
             </div>
+            <span className="rounded-md bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-[#8D0606] border border-rose-100 whitespace-nowrap shrink-0">
+              Active
+            </span>
           </div>
 
           {/* Tab Switcher: Master Catalog vs Custom Item */}
@@ -921,8 +968,8 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                   setMessage("");
                 }}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition ${activeTab === "master"
-                    ? "bg-white text-[#8D0606] shadow-xs"
-                    : "text-slate-500 hover:text-slate-800"
+                  ? "bg-white text-[#8D0606] shadow-xs"
+                  : "text-slate-500 hover:text-slate-800"
                   }`}
               >
                 <Sparkles size={14} />
@@ -935,8 +982,8 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                   setMessage("");
                 }}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition ${activeTab === "custom"
-                    ? "bg-white text-[#8D0606] shadow-xs"
-                    : "text-slate-500 hover:text-slate-800"
+                  ? "bg-white text-[#8D0606] shadow-xs"
+                  : "text-slate-500 hover:text-slate-800"
                   }`}
               >
                 <PlusCircle size={14} />
@@ -957,7 +1004,7 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                   <Search className="absolute left-3.5 top-3.5 text-slate-400" size={16} />
                   <input
                     type="text"
-                    placeholder="Type name (Tomato, Onion, Butter)..."
+                    placeholder="Search master ingredients (e.g. Tomato, Onion, Butter)..."
                     value={masterSearchText}
                     onFocus={() => setIsDropdownOpen(true)}
                     onChange={(e) => {
@@ -1012,10 +1059,10 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                                 }
                               }}
                               className={`flex items-center justify-between p-2.5 rounded-xl transition cursor-pointer ${isSelected
-                                  ? "bg-[#fff1f1] border border-rose-200"
-                                  : isAlreadyInBranch
-                                    ? "bg-slate-50 opacity-50 cursor-not-allowed"
-                                    : "hover:bg-slate-50"
+                                ? "bg-[#fff1f1] border border-rose-200"
+                                : isAlreadyInBranch
+                                  ? "bg-slate-50 opacity-50 cursor-not-allowed"
+                                  : "hover:bg-slate-50"
                                 }`}
                             >
                               <div className="flex items-center gap-2.5 min-w-0">
@@ -1182,7 +1229,7 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                 <input
                   ref={nameRef}
                   type="text"
-                  placeholder="e.g. Special Garam Masala"
+                  placeholder="Enter ingredient name (e.g. Special Garam Masala)"
                   value={customForm.name}
                   onChange={(e) => {
                     setCustomForm((f) => ({ ...f, name: e.target.value }));
@@ -1206,7 +1253,7 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                     setCustomForm((f) => ({ ...f, category: opt?.value || "" }));
                     setErrors((err) => ({ ...err, category: undefined }));
                   }}
-                  placeholder="Select or type"
+                  placeholder="Select or type category (e.g. Spices, Dairy)"
                   menuPortalTarget={document.body}
                 />
                 {errors.category && <p className="mt-1 text-[11px] font-semibold text-rose-600">{errors.category}</p>}
@@ -1229,17 +1276,17 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
 
               {/* Image Section: Upload File or URL */}
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">
+                <div className="flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap mb-1.5">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 whitespace-nowrap">
                     Ingredient Image
                   </label>
-                  <div className="flex items-center rounded-lg bg-slate-100 p-0.5 border border-slate-200">
+                  <div className="flex items-center rounded-lg bg-slate-100 p-0.5 border border-slate-200 shrink-0">
                     <button
                       type="button"
                       onClick={() => setImageInputMode("upload")}
-                      className={`px-2 py-0.5 rounded-md text-[10.5px] font-bold transition ${imageInputMode === "upload"
-                          ? "bg-white text-[#8D0606] shadow-2xs"
-                          : "text-slate-500 hover:text-slate-800"
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-bold whitespace-nowrap transition ${imageInputMode === "upload"
+                        ? "bg-white text-[#8D0606] shadow-2xs"
+                        : "text-slate-500 hover:text-slate-800"
                         }`}
                     >
                       Upload File
@@ -1247,9 +1294,9 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                     <button
                       type="button"
                       onClick={() => setImageInputMode("url")}
-                      className={`px-2 py-0.5 rounded-md text-[10.5px] font-bold transition ${imageInputMode === "url"
-                          ? "bg-white text-[#8D0606] shadow-2xs"
-                          : "text-slate-500 hover:text-slate-800"
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-bold whitespace-nowrap transition ${imageInputMode === "url"
+                        ? "bg-white text-[#8D0606] shadow-2xs"
+                        : "text-slate-500 hover:text-slate-800"
                         }`}
                     >
                       Image URL
@@ -1315,7 +1362,7 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                   <div className="space-y-2">
                     <input
                       type="text"
-                      placeholder="https://images.unsplash.com/..."
+                      placeholder="Enter image URL (e.g. https://images.unsplash.com/...)"
                       value={customForm.image}
                       onChange={(e) => {
                         setCustomForm((f) => ({ ...f, image: e.target.value }));
@@ -1377,10 +1424,10 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
           {message ? (
             <p
               className={`flex items-center gap-1 text-xs font-semibold ${messageType === "error"
-                  ? "text-rose-600"
-                  : messageType === "success"
-                    ? "text-emerald-600"
-                    : "text-[#8D0606]"
+                ? "text-rose-600"
+                : messageType === "success"
+                  ? "text-emerald-600"
+                  : "text-[#8D0606]"
                 }`}
             >
               {messageType === "error" ? <AlertCircle size={13} /> : <CheckCircle2 size={13} />}
@@ -1388,6 +1435,7 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
             </p>
           ) : null}
         </div>
+      )}
 
         {/* ========================================================================= */}
         {/* RIGHT COLUMN: LIVE BRANCH INVENTORY & STOCK CONTROL TABLE                 */}
@@ -1401,7 +1449,7 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                 <Search className="absolute left-3.5 top-3 text-slate-400" size={15} />
                 <input
                   type="text"
-                  placeholder="Search branch ingredients..."
+                  placeholder="Search branch ingredients by name or category..."
                   value={inventorySearch}
                   onChange={(e) => setInventorySearch(e.target.value)}
                   className="h-10 w-full rounded-xl border border-slate-200/90 bg-white pl-9 pr-8 text-xs font-medium text-slate-800 outline-none transition focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
@@ -1431,8 +1479,8 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                       type="button"
                       onClick={() => setFilterType(f.id)}
                       className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${filterType === f.id
-                          ? "bg-[#8D0606] text-white shadow-xs"
-                          : "text-slate-500 hover:text-slate-800"
+                        ? "bg-[#8D0606] text-white shadow-xs"
+                        : "text-slate-500 hover:text-slate-800"
                         }`}
                     >
                       {f.label}
@@ -1446,8 +1494,8 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                     type="button"
                     onClick={() => setInventoryViewMode("table")}
                     className={`p-1.5 rounded-lg transition ${inventoryViewMode === "table"
-                        ? "bg-white text-[#8D0606] shadow-2xs font-bold"
-                        : "text-slate-400 hover:text-slate-700"
+                      ? "bg-white text-[#8D0606] shadow-2xs font-bold"
+                      : "text-slate-400 hover:text-slate-700"
                       }`}
                     title="Table View"
                   >
@@ -1457,8 +1505,8 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                     type="button"
                     onClick={() => setInventoryViewMode("grid")}
                     className={`p-1.5 rounded-lg transition ${inventoryViewMode === "grid"
-                        ? "bg-white text-[#8D0606] shadow-2xs font-bold"
-                        : "text-slate-400 hover:text-slate-700"
+                      ? "bg-white text-[#8D0606] shadow-2xs font-bold"
+                      : "text-slate-400 hover:text-slate-700"
                       }`}
                     title="Grid Cards View"
                   >
@@ -1554,11 +1602,10 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                         </td>
                         <td className="px-4 py-3.5">
                           <div
-                            className={`inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-bold border shadow-2xs ${
-                              isLowStock
-                                ? "bg-rose-50 text-rose-700 border-rose-200"
-                                : "bg-slate-50 text-slate-800 border-slate-200"
-                            }`}
+                            className={`inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-bold border shadow-2xs ${isLowStock
+                              ? "bg-rose-50 text-rose-700 border-rose-200"
+                              : "bg-slate-50 text-slate-800 border-slate-200"
+                              }`}
                           >
                             <Boxes size={13} className={isLowStock ? "text-rose-600 shrink-0" : "text-amber-600 shrink-0"} />
                             <span>{currentStockVal !== undefined && currentStockVal !== null && currentStockVal !== "" ? String(currentStockVal) : "0"}</span>
@@ -1568,11 +1615,10 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                         <td className="px-4 py-3.5">
                           {currentAlertVal !== "" && currentAlertVal !== undefined && currentAlertVal !== null ? (
                             <div
-                              className={`inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-bold border shadow-2xs ${
-                                isLowStock
-                                  ? "bg-rose-100/80 text-rose-800 border-rose-300"
-                                  : "bg-amber-50 text-amber-800 border-amber-200/80"
-                              }`}
+                              className={`inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-bold border shadow-2xs ${isLowStock
+                                ? "bg-rose-100/80 text-rose-800 border-rose-300"
+                                : "bg-amber-50 text-amber-800 border-amber-200/80"
+                                }`}
                             >
                               <AlertCircle size={12} className={isLowStock ? "text-rose-600 shrink-0" : "text-amber-600 shrink-0"} />
                               <span>{String(currentAlertVal)}</span>
@@ -1585,8 +1631,8 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                         <td className="px-4 py-3.5">
                           <span
                             className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold border ${isCustom
-                                ? "bg-amber-50 text-amber-700 border-amber-200/80"
-                                : "bg-emerald-50 text-emerald-700 border-emerald-200/80"
+                              ? "bg-amber-50 text-amber-700 border-amber-200/80"
+                              : "bg-emerald-50 text-emerald-700 border-emerald-200/80"
                               }`}
                           >
                             <span
@@ -1599,16 +1645,18 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                         <td className="pl-3 pr-5 py-3.5 text-right">
                           <div className="flex justify-end items-center gap-2">
                             {/* Update Stock Icon Button */}
-                            <button
-                              className="grid size-8 place-items-center rounded-xl bg-amber-50 text-amber-800 border border-amber-200/90 hover:bg-amber-100 hover:border-amber-300 transition shadow-2xs active:scale-98 disabled:opacity-50"
-                              disabled={saving || stockSaving}
-                              onClick={() => openStockModal(item)}
-                              type="button"
-                              title="Update Stock"
-                            >
-                              <Boxes size={14} className="text-amber-700" />
-                            </button>
-                            {isCustom && (
+                            {canUpdate("ingredient") && (
+                              <button
+                                className="grid size-8 place-items-center rounded-xl bg-amber-50 text-amber-800 border border-amber-200/90 hover:bg-amber-100 hover:border-amber-300 transition shadow-2xs active:scale-98 disabled:opacity-50"
+                                disabled={saving || stockSaving}
+                                onClick={() => openStockModal(item)}
+                                type="button"
+                                title="Update Stock"
+                              >
+                                <Boxes size={14} className="text-amber-700" />
+                              </button>
+                            )}
+                            {isCustom && canUpdate("ingredient") && (
                               <button
                                 className="grid size-8 place-items-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition shadow-2xs"
                                 disabled={saving || stockSaving}
@@ -1634,7 +1682,9 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                   </div>
                   <p className="text-xs font-semibold text-slate-600">No branch ingredients found.</p>
                   <p className="text-[11px] text-slate-400 mt-0.5">
-                    Use the catalog search on the left to add items.
+                    {canCreate("ingredient")
+                      ? "Use the catalog search on the left to add items."
+                      : "Contact your kitchen administrator to add ingredients to this branch."}
                   </p>
                 </div>
               )}
@@ -1719,30 +1769,34 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                       </div>
 
                       {/* Card Footer Actions */}
-                      <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                        <button
-                          type="button"
-                          disabled={saving || stockSaving}
-                          onClick={() => openStockModal(item)}
-                          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-amber-50 text-amber-900 border border-amber-200/90 py-1.5 text-xs font-bold hover:bg-amber-100 transition shadow-2xs active:scale-98"
-                        >
-                          <Boxes size={12.5} className="text-amber-700" />
-                          <span>Update Stock</span>
-                        </button>
-
-                        <div className="flex items-center gap-1">
-                          {isCustom && (
+                      {(canUpdate("ingredient") || (isCustom && canUpdate("ingredient"))) && (
+                        <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                          {canUpdate("ingredient") && (
                             <button
                               type="button"
-                              onClick={() => startEditInventory(item)}
-                              className="grid size-8 place-items-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 transition shadow-2xs"
-                              title="Edit"
+                              disabled={saving || stockSaving}
+                              onClick={() => openStockModal(item)}
+                              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-amber-50 text-amber-900 border border-amber-200/90 py-1.5 text-xs font-bold hover:bg-amber-100 transition shadow-2xs active:scale-98"
                             >
-                              <Pencil size={12} />
+                              <Boxes size={12.5} className="text-amber-700" />
+                              <span>Update Stock</span>
                             </button>
                           )}
+
+                          <div className="flex items-center gap-1">
+                            {isCustom && canUpdate("ingredient") && (
+                              <button
+                                type="button"
+                                onClick={() => startEditInventory(item)}
+                                className="grid size-8 place-items-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 transition shadow-2xs"
+                                title="Edit"
+                              >
+                                <Pencil size={12} />
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   );
                 })}
@@ -1755,7 +1809,9 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                   </div>
                   <p className="text-xs font-semibold text-slate-600">No branch ingredients found.</p>
                   <p className="text-[11px] text-slate-400 mt-0.5">
-                    Use the catalog search on the left to add items.
+                    {canCreate("ingredient")
+                      ? "Use the catalog search on the left to add items."
+                      : "Contact your kitchen administrator to add ingredients to this branch."}
                   </p>
                 </div>
               )}
@@ -1854,11 +1910,10 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                     <button
                       type="button"
                       onClick={() => setStockMode("update")}
-                      className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 px-2.5 text-xs font-bold transition ${
-                        stockMode === "update"
-                          ? "bg-[#8D0606] text-white shadow-2xs"
-                          : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
-                      }`}
+                      className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 px-2.5 text-xs font-bold transition ${stockMode === "update"
+                        ? "bg-[#8D0606] text-white shadow-2xs"
+                        : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
+                        }`}
                     >
                       <Layers size={13} />
                       <span>Update Batch #{currentStockId}</span>
@@ -1872,11 +1927,10 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                       setStockValue("");
                       setExpireDate("");
                     }}
-                    className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 px-2.5 text-xs font-bold transition ${
-                      stockMode === "create" || !currentStockId
-                        ? "bg-[#8D0606] text-white shadow-2xs"
-                        : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
-                    }`}
+                    className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 px-2.5 text-xs font-bold transition ${stockMode === "create" || !currentStockId
+                      ? "bg-[#8D0606] text-white shadow-2xs"
+                      : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
+                      }`}
                   >
                     <Plus size={14} />
                     <span>+ New Stock Batch</span>
@@ -1932,7 +1986,7 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                       step="any"
                       min="0"
                       required
-                      placeholder="e.g. 80"
+                      placeholder="Enter stock quantity (e.g. 80)"
                       value={stockValue}
                       onChange={(e) => {
                         setStockValue(e.target.value);
@@ -1960,7 +2014,7 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                       step="any"
                       min="0"
                       required
-                      placeholder="e.g. 10 (triggers low stock notification)"
+                      placeholder="Enter threshold quantity for low stock alerts (e.g. 10)"
                       value={alertQuantity}
                       onChange={(e) => {
                         setAlertQuantity(e.target.value);

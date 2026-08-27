@@ -147,7 +147,7 @@ export function RegisterPage({ onToast }) {
                   ? "border-rose-500 bg-rose-50/30 text-rose-900 focus:ring-2 focus:ring-rose-500/20"
                   : "border-[#e2e2e2] text-[#191919] focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
               }`}
-              placeholder="e.g. Royal Spice Cloud Kitchen"
+              placeholder="Enter kitchen or brand name (e.g. Royal Spice Kitchen)"
               value={form.kitchenName}
               onChange={updateForm("kitchenName")}
             />
@@ -176,7 +176,7 @@ export function RegisterPage({ onToast }) {
                     ? "border-rose-500 bg-rose-50/30 text-rose-900 focus:ring-2 focus:ring-rose-500/20"
                     : "border-[#e2e2e2] text-[#191919] focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
                 }`}
-                placeholder="kitchen@example.com"
+                placeholder="Enter official email address (e.g. kitchen@example.com)"
                 value={form.email}
                 onChange={updateForm("email")}
               />
@@ -203,7 +203,7 @@ export function RegisterPage({ onToast }) {
                     ? "border-rose-500 bg-rose-50/30 text-rose-900 focus:ring-2 focus:ring-rose-500/20"
                     : "border-[#e2e2e2] text-[#191919] focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
                 }`}
-                placeholder="9876543210"
+                placeholder="Enter 10-digit mobile number (e.g. 9876543210)"
                 value={form.phone}
                 onChange={updateForm("phone")}
               />
@@ -232,7 +232,7 @@ export function RegisterPage({ onToast }) {
                     ? "border-rose-500 bg-rose-50/30 text-rose-900 focus:ring-2 focus:ring-rose-500/20"
                     : "border-[#e2e2e2] text-[#191919] focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
                 }`}
-                placeholder="John"
+                placeholder="Enter first name (e.g. John)"
                 value={form.contactFirstName}
                 onChange={updateForm("contactFirstName")}
               />
@@ -253,7 +253,7 @@ export function RegisterPage({ onToast }) {
               <input
                 type="text"
                 className="h-12 w-full rounded-xl border border-[#e2e2e2] bg-white pl-12 pr-4 text-sm font-medium text-[#191919] outline-none transition duration-200 focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
-                placeholder="Doe"
+                placeholder="Enter last name (e.g. Doe)"
                 value={form.contactLastName}
                 onChange={updateForm("contactLastName")}
               />
@@ -278,7 +278,7 @@ export function RegisterPage({ onToast }) {
                     ? "border-rose-500 bg-rose-50/30 text-rose-900 focus:ring-2 focus:ring-rose-500/20"
                     : "border-[#e2e2e2] text-[#191919] focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
                 }`}
-                placeholder="Min 6 characters"
+                placeholder="Create a password (min 6 characters)"
                 value={form.password}
                 onChange={updateForm("password")}
               />
@@ -312,7 +312,7 @@ export function RegisterPage({ onToast }) {
                     ? "border-rose-500 bg-rose-50/30 text-rose-900 focus:ring-2 focus:ring-rose-500/20"
                     : "border-[#e2e2e2] text-[#191919] focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
                 }`}
-                placeholder="Re-enter password"
+                placeholder="Re-enter password to confirm"
                 value={form.confirmPassword}
                 onChange={updateForm("confirmPassword")}
               />

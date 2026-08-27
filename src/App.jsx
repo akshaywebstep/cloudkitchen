@@ -13,6 +13,7 @@ import {
   getRequiredSetupStep,
   getKitchenSubscription,
 } from "./utils/helpers";
+import { canView, canCreate, canUpdate, getFirstAuthorizedRoute } from "./utils/permissions";
 import { foodImages } from "./constants/mockData";
 
 // Layout components
@@ -38,26 +39,12 @@ import { RoleListPage } from "./components/desktop/pages/RoleListPage";
 import { ProfilePage } from "./components/desktop/pages/ProfilePage";
 import { WasteManagementPage } from "./components/desktop/pages/WasteManagementPage";
 
-// Mobile app
-import { MobileApp } from "./components/mobile/MobileApp";
-
-// Detect mobile viewport (below Tailwind's lg = 1024px)
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 1023px)");
-    const handler = (e) => setIsMobile(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-  return isMobile;
-}
-
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
-  const isMobile = useIsMobile();
   const [toast, setToast] = useState(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [apiState, setApiState] = useState({
     online: false,
     message: "Connecting API...",
@@ -79,7 +66,6 @@ export default function App() {
   });
 
   console.log("App.jsx: apiState", apiState);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const triggerToast = (payload) => {
     if (typeof payload === "string") {
       setToast({ message: payload, type: "info" });
@@ -112,7 +98,7 @@ export default function App() {
       const selectedPlan = hasActiveKitchenSubscription(kitchen)
         ? apiState.selectedPlan
         : apiState.selectedPlan || { alreadyActive: true, confirmedActive: true, name: "Active Subscription" };
-      updateApiState({ branches, selectedBranchId, selectedPlan });
+      updateApiState({ branches, selectedBranchId, selectedPlan, branchesMeta: branchesResponse?.meta });
       return { subscriptionUnlocked: true, branches };
     } catch (error) {
       const message = getApiErrorMessage(error, "Kitchen APIs need login/onboarding/subscription");
@@ -208,7 +194,7 @@ export default function App() {
       message: existingSubscription ? "Existing active subscription found." : "Select a subscription plan to continue.",
     });
     const nextPath = existingSubscription
-      ? (Array.isArray(refreshResult?.branches) && refreshResult.branches.length ? "/ingredients" : "/kitchen")
+      ? (Array.isArray(refreshResult?.branches) && refreshResult.branches.length ? "/" : (canView(verifiedKitchen, "branch") ? "/kitchen" : "/"))
       : "/subscription";
     navigate(nextPath);
     return response;
@@ -223,7 +209,8 @@ export default function App() {
         message: "Existing active subscription found.",
       });
       const branchRefreshResult = await refreshKitchenData(apiState.token, kitchen);
-      navigate(Array.isArray(branchRefreshResult?.branches) && branchRefreshResult.branches.length ? "/ingredients" : "/kitchen");
+      const target = Array.isArray(branchRefreshResult?.branches) && branchRefreshResult.branches.length ? "/" : (canView(kitchen, "branch") ? "/kitchen" : "/");
+      navigate(target);
       return true;
     }
     const refreshResult = await refreshKitchenData(apiState.token, kitchen);
@@ -233,7 +220,8 @@ export default function App() {
         kitchen,
         message: "Existing active subscription found.",
       });
-      navigate(Array.isArray(refreshResult?.branches) && refreshResult.branches.length ? "/ingredients" : "/kitchen");
+      const target = Array.isArray(refreshResult?.branches) && refreshResult.branches.length ? "/" : (canView(kitchen, "branch") ? "/kitchen" : "/");
+      navigate(target);
       return true;
     }
     return false;
@@ -254,7 +242,8 @@ export default function App() {
       message: selectedPlan.alreadyActive ? "Existing active subscription found." : "Subscription plan selected.",
     });
     const refreshResult = await refreshKitchenData(apiState.token, kitchen);
-    navigate(Array.isArray(refreshResult?.branches) && refreshResult.branches.length ? "/ingredients" : "/kitchen");
+    const target = Array.isArray(refreshResult?.branches) && refreshResult.branches.length ? "/" : (canView(kitchen, "branch") ? "/kitchen" : "/");
+    navigate(target);
   };
 
   const handleBranchChange = async (branchId) => {
@@ -287,28 +276,8 @@ export default function App() {
     return <Loader variant="page" text="Initializing application..." />;
   }
 
-  // ── Mobile app (single Routes tree, no parallel routing) ────────────────────
-  if (isMobile) {
-    return (
-      <>
-        <Routes>
-          <Route path="/mobile/*" element={<MobileApp apiState={apiState} onLogin={handleLogin} onLogout={handleLogout} />} />
-          <Route path="*" element={<Navigate to="/mobile/splash" replace />} />
-        </Routes>
-        {toast && (
-          <Toast
-            message={typeof toast === "string" ? toast : toast.message}
-            type={typeof toast === "string" ? "info" : toast.type || "info"}
-            onClose={() => setToast(null)}
-          />
-        )}
-      </>
-    );
-  }
-
-  // ── Desktop app (single Routes tree, no parallel routing) ───────────────────
+  // ── Main unified app (responsive for desktop, tablet, and mobile) ─────────────
   const requiredSetupStep = getRequiredSetupStep(apiState);
-
 
   const isAuthPath = ["/login", "/register", "/forgot-password"].includes(location.pathname);
 
@@ -360,10 +329,18 @@ export default function App() {
     );
   } else {
     // Main dashboard
+    const firstAuthorizedRoute = getFirstAuthorizedRoute(apiState?.kitchen);
+
     desktopContent = (
       <>
-        <Sidebar collapsed={sidebarCollapsed} onLogout={handleLogout} />
-        <main className={`min-w-0 flex-1 transition-all duration-300 mainContentBox ${sidebarCollapsed ? "lg:pl-[90px]" : "lg:pl-[280px]"}`}>
+        <Sidebar
+          collapsed={sidebarCollapsed}
+          onLogout={handleLogout}
+          apiState={apiState}
+          mobileOpen={mobileSidebarOpen}
+          onCloseMobile={() => setMobileSidebarOpen(false)}
+        />
+        <main className={`min-w-0 flex-1 transition-all duration-300 mainContentBox overflow-x-hidden ${sidebarCollapsed ? "lg:pl-[90px]" : "lg:pl-[280px]"}`}>
           <Topbar
             apiState={apiState}
             onLogout={handleLogout}
@@ -371,28 +348,119 @@ export default function App() {
             onLogin={handleLogin}
             refreshKitchenData={refreshKitchenData}
             onBranchChange={handleBranchChange}
-            onToggleSidebar={() => setSidebarCollapsed((v) => !v)}
+            onToggleSidebar={() => {
+              if (window.innerWidth < 1024) {
+                setMobileSidebarOpen((v) => !v);
+              } else {
+                setSidebarCollapsed((v) => !v);
+              }
+            }}
           />
-          <div className="page-shell px-5 py-7 sm:px-8 lg:px-10">
+          <div className="page-shell px-4 py-5 sm:px-6 lg:px-10">
             <Routes>
-              <Route path="/" element={<DashboardPage apiState={apiState} />} />
-              <Route path="/orders" element={<OrderListPage apiState={apiState} onToast={triggerToast} />} />
-              <Route path="/customers" element={<CustomerListPage />} />
-              <Route path="/staff" element={<StaffListPage apiState={apiState} onToast={triggerToast} />} />
-              <Route path="/roles" element={<RoleListPage apiState={apiState} onToast={triggerToast} />} />
-              <Route path="/menu" element={<CategoryPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
-              <Route path="/add-menu" element={<AddMenuPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
-              <Route path="/reviews" element={<CustomerReviewPage apiState={apiState} />} />
-              <Route path="/kitchen" element={<KitchenFormPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
+              <Route
+                path="/"
+                element={
+                  canView(apiState?.kitchen, "dashboard") ? (
+                    <DashboardPage apiState={apiState} />
+                  ) : (
+                    <Navigate to={firstAuthorizedRoute} replace />
+                  )
+                }
+              />
+              <Route
+                path="/orders"
+                element={
+                  canView(apiState?.kitchen, "order") ? (
+                    <OrderListPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />
+                  ) : (
+                    <Navigate to={firstAuthorizedRoute} replace />
+                  )
+                }
+              />
+              <Route
+                path="/customers"
+                element={
+                  canView(apiState?.kitchen, "customer") ? (
+                    <CustomerListPage apiState={apiState} onToast={triggerToast} />
+                  ) : (
+                    <Navigate to={firstAuthorizedRoute} replace />
+                  )
+                }
+              />
+              <Route
+                path="/staff"
+                element={
+                  canView(apiState?.kitchen, "staffManagement") ? (
+                    <StaffListPage apiState={apiState} onToast={triggerToast} />
+                  ) : (
+                    <Navigate to={firstAuthorizedRoute} replace />
+                  )
+                }
+              />
+              <Route
+                path="/roles"
+                element={
+                  canView(apiState?.kitchen, "roleManagement") ? (
+                    <RoleListPage apiState={apiState} onToast={triggerToast} />
+                  ) : (
+                    <Navigate to={firstAuthorizedRoute} replace />
+                  )
+                }
+              />
+              <Route
+                path="/menu"
+                element={
+                  canView(apiState?.kitchen, "menu") ? (
+                    <CategoryPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />
+                  ) : (
+                    <Navigate to={firstAuthorizedRoute} replace />
+                  )
+                }
+              />
+              <Route
+                path="/add-menu"
+                element={
+                  (canCreate(apiState?.kitchen, "menu") || canUpdate(apiState?.kitchen, "menu")) ? (
+                    <AddMenuPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />
+                  ) : (
+                    <Navigate to={canView(apiState?.kitchen, "menu") ? "/menu" : firstAuthorizedRoute} replace />
+                  )
+                }
+              />
+              <Route
+                path="/reviews"
+                element={
+                  canView(apiState?.kitchen, "reviews") ? (
+                    <CustomerReviewPage apiState={apiState} />
+                  ) : (
+                    <Navigate to={firstAuthorizedRoute} replace />
+                  )
+                }
+              />
+              <Route
+                path="/kitchen"
+                element={
+                  canView(apiState?.kitchen, "branch") ? (
+                    <KitchenFormPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />
+                  ) : (
+                    <Navigate to={firstAuthorizedRoute} replace />
+                  )
+                }
+              />
               <Route
                 path="/ingredients"
                 element={
-                  <IngredientSetupPage
-                    apiState={apiState}
-                    refreshKitchenData={refreshKitchenData}
-                    selectedPlan={apiState.selectedPlan || getKitchenSubscription(apiState.kitchen)}
-                    onToast={triggerToast}
-                  />
+                  canView(apiState?.kitchen, "ingredient") ? (
+                    <IngredientSetupPage
+                      apiState={apiState}
+                      refreshKitchenData={refreshKitchenData}
+                      selectedPlan={apiState.selectedPlan || getKitchenSubscription(apiState.kitchen)}
+                      onToast={triggerToast}
+                    />
+                  ) : (
+                    <Navigate to={firstAuthorizedRoute} replace />
+                  )
                 }
               />
               <Route
@@ -408,13 +476,17 @@ export default function App() {
               <Route
                 path="/waste"
                 element={
-                  <WasteManagementPage
-                    apiState={apiState}
-                    onToast={triggerToast}
-                  />
+                  canView(apiState?.kitchen, "wasteManagement") ? (
+                    <WasteManagementPage
+                      apiState={apiState}
+                      onToast={triggerToast}
+                    />
+                  ) : (
+                    <Navigate to={firstAuthorizedRoute} replace />
+                  )
                 }
               />
-              <Route path="*" element={<Navigate to="/" replace />} />
+              <Route path="*" element={<Navigate to={firstAuthorizedRoute} replace />} />
             </Routes>
           </div>
         </main>
@@ -423,7 +495,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen flex bg-[#F7F6F6] text-[#191919] mainContainer">
+    <div className="min-h-screen flex bg-[#F7F6F6] text-[#191919] mainContainer w-full max-w-[100vw] overflow-x-hidden">
       {desktopContent}
       {toast && (
         <Toast

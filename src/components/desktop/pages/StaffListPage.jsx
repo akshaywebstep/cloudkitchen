@@ -35,12 +35,14 @@ import {
 } from "lucide-react";
 import { api, getApiBaseUrl, getStoredToken, getApiErrorMessage } from "../../../api";
 import { resolveSelectedBranchId } from "../../../utils/helpers";
+import { usePermissions } from "../../../utils/permissions";
 import { Loader } from "../../ui/Loader";
 import { Pagination } from "../../ui/Pagination";
 import { PageHeader } from "../../ui/PageHeader";
 import { AppSelect } from "../../ui/AppSelect";
 
 export function StaffListPage({ apiState, onToast }) {
+  const { canCreate, canUpdate, canDelete } = usePermissions(apiState);
   const [staffList, setStaffList] = useState([]);
   const [roles, setRoles] = useState([]);
   const [formBranches, setFormBranches] = useState([]);
@@ -207,17 +209,19 @@ export function StaffListPage({ apiState, onToast }) {
               <span>Refresh</span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setFormModalStaff(null);
-                setIsFormModalOpen(true);
-              }}
-              className="flex items-center gap-2 rounded-full bg-[#8D0606] px-6 py-3 text-xs font-bold text-white shadow-md shadow-rose-950/20 transition hover:bg-[#780404] active:scale-98"
-            >
-              <UserPlus size={16} strokeWidth={2.5} />
-              <span>Create New Staff</span>
-            </button>
+            {canCreate("staffManagement") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFormModalStaff(null);
+                  setIsFormModalOpen(true);
+                }}
+                className="flex items-center gap-2 rounded-full bg-[#8D0606] px-6 py-3 text-xs font-bold text-white shadow-md shadow-rose-950/20 transition hover:bg-[#780404] active:scale-98"
+              >
+                <UserPlus size={16} strokeWidth={2.5} />
+                <span>Create New Staff</span>
+              </button>
+            )}
           </div>
         }
       />
@@ -229,7 +233,7 @@ export function StaffListPage({ apiState, onToast }) {
           <Search className="absolute left-3.5 top-3 text-slate-400" size={18} />
           <input
             type="text"
-            placeholder="Search by name, email, phone, role, or branch..."
+            placeholder="Search staff by name, email, phone, role, or branch..."
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
@@ -408,7 +412,7 @@ export function StaffListPage({ apiState, onToast }) {
                           >
                             <ShieldCheck size={12} className="text-[#8D0606] group-hover:scale-110 transition" />
                             <span className="underline decoration-slate-300 group-hover:decoration-[#8D0606]">
-                              {staff.permissions?.assignedCount ?? staff.permissions?.assignedPermissions?.length ?? 16} Permissions
+                              {staff.permissions?.assignedCount ?? staff.permissions?.assignedPermissions?.length ?? 0} Permissions
                             </span>
                           </button>
                         </div>
@@ -466,32 +470,36 @@ export function StaffListPage({ apiState, onToast }) {
                       {/* Action */}
                       <td className="px-6 py-4 text-right">
                         <div className="inline-flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedPermissionsStaff(staff);
-                            }}
-                            title="View & Update Permissions"
-                            className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50/70 px-2.5 py-1.5 text-xs font-semibold text-[#8D0606] transition hover:bg-rose-100 hover:border-[#8D0606]"
-                          >
-                            <ShieldCheck size={13} />
-                            <span>Permissions</span>
-                          </button>
+                          {canUpdate("staffManagement") && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedPermissionsStaff(staff);
+                                }}
+                                title="View & Update Permissions"
+                                className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50/70 px-2.5 py-1.5 text-xs font-semibold text-[#8D0606] transition hover:bg-rose-100 hover:border-[#8D0606]"
+                              >
+                                <ShieldCheck size={13} />
+                                <span>Permissions</span>
+                              </button>
 
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setFormModalStaff(staff);
-                              setIsFormModalOpen(true);
-                            }}
-                            title="Edit Staff Member"
-                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-[#8D0606] hover:bg-rose-50 hover:text-[#8D0606]"
-                          >
-                            <Edit2 size={13} />
-                            <span>Edit</span>
-                          </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setFormModalStaff(staff);
+                                  setIsFormModalOpen(true);
+                                }}
+                                title="Edit Staff Member"
+                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-[#8D0606] hover:bg-rose-50 hover:text-[#8D0606]"
+                              >
+                                <Edit2 size={13} />
+                                <span>Edit</span>
+                              </button>
+                            </>
+                          )}
 
                           <button
                             type="button"
@@ -525,17 +533,19 @@ export function StaffListPage({ apiState, onToast }) {
                     ? "Try adjusting your search query or filters to find what you're looking for."
                     : "Get started by creating your first kitchen staff member."}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFormModalStaff(null);
-                    setIsFormModalOpen(true);
-                  }}
-                  className="mt-4 flex items-center gap-2 rounded-xl bg-[#8D0606] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#7a0505]"
-                >
-                  <UserPlus size={15} />
-                  <span>Create New Staff</span>
-                </button>
+                {canCreate("staffManagement") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormModalStaff(null);
+                      setIsFormModalOpen(true);
+                    }}
+                    className="mt-4 flex items-center gap-2 rounded-xl bg-[#8D0606] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#7a0505]"
+                  >
+                    <UserPlus size={15} />
+                    <span>Create New Staff</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -629,13 +639,13 @@ function StaffFormModal({ staff, roles, branches, activeBranchId, onClose, onSuc
   }, []);
 
   const [form, setForm] = useState({
-    title: staff?.title || "Mr",
+    title: staff?.title || "",
     firstName: staff?.firstName || "",
     lastName: staff?.lastName || "",
     email: staff?.email || "",
     phone: staff?.phone || "",
     password: "",
-    roleId: staff?.roleId ? String(staff.roleId) : staff?.role?.id ? String(staff.role.id) : roles[0]?.id ? String(roles[0].id) : "2",
+    roleId: staff?.roleId ? String(staff.roleId) : staff?.role?.id ? String(staff.role.id) : "",
     status: staff?.status || "ACTIVE",
   });
 
@@ -644,6 +654,7 @@ function StaffFormModal({ staff, roles, branches, activeBranchId, onClose, onSuc
   const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
+  const [apiError, setApiError] = useState("");
   const fileInputRef = useRef(null);
 
   const handleFileChange = (e) => {
@@ -660,6 +671,12 @@ function StaffFormModal({ staff, roles, branches, activeBranchId, onClose, onSuc
     if (errors[key]) {
       setErrors((prev) => ({ ...prev, [key]: undefined }));
     }
+    if (apiError) setApiError("");
+  };
+
+  const updateForm = (key) => (e) => {
+    const val = e?.target ? e.target.value : e;
+    updateField(key, val);
   };
 
   const validate = () => {
@@ -667,26 +684,22 @@ function StaffFormModal({ staff, roles, branches, activeBranchId, onClose, onSuc
     if (!form.firstName.trim()) errs.firstName = "First name is required";
     if (!form.lastName.trim()) errs.lastName = "Last name is required";
     if (!form.email.trim()) {
-      errs.email = "Email address is required";
+      errs.email = "Email is required";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-      errs.email = "Please enter a valid email address";
+      errs.email = "Invalid email format";
     }
     if (!form.phone.trim()) {
       errs.phone = "Phone number is required";
     } else if (!/^\d{7,15}$/.test(form.phone.replace(/[\s+-]/g, ""))) {
-      errs.phone = "Please enter a valid phone number";
-    }
-    if (!isEditMode) {
-      if (!form.password.trim()) {
-        errs.password = "Password is required for new staff";
-      } else if (form.password.length < 6) {
-        errs.password = "Password must be at least 6 characters";
-      }
-    } else if (form.password && form.password.length < 6) {
-      errs.password = "Password must be at least 6 characters if updating";
+      errs.phone = "Valid phone number required";
     }
     if (!form.roleId) {
-      errs.roleId = "Please select a role";
+      errs.roleId = "Staff role is required";
+    }
+    if (!isEditMode && !form.password.trim()) {
+      errs.password = "Password is required for new staff";
+    } else if (form.password && form.password.length < 6) {
+      errs.password = "Password must be at least 6 characters";
     }
 
     setErrors(errs);
@@ -701,6 +714,7 @@ function StaffFormModal({ staff, roles, branches, activeBranchId, onClose, onSuc
     }
 
     setSaving(true);
+    setApiError("");
     try {
       const formdata = new FormData();
       if (profilePictureFile) {
@@ -716,9 +730,11 @@ function StaffFormModal({ staff, roles, branches, activeBranchId, onClose, onSuc
       }
       formdata.append("roleId", String(form.roleId));
       
-      // Always assign target branch from header active branch
-      const targetBranchNum = Number(activeBranchId || branches[0]?.id || 1);
-      formdata.append("branchIds", JSON.stringify([targetBranchNum]));
+      // Assign target branch from header active branch
+      const targetBranchNum = Number(activeBranchId || branches[0]?.id);
+      if (targetBranchNum) {
+        formdata.append("branchIds", JSON.stringify([targetBranchNum]));
+      }
       formdata.append("status", form.status || "ACTIVE");
 
       if (isEditMode) {
@@ -729,11 +745,20 @@ function StaffFormModal({ staff, roles, branches, activeBranchId, onClose, onSuc
       onSuccess(isEditMode);
     } catch (error) {
       const errMsg = getApiErrorMessage(error, `Failed to ${isEditMode ? "update" : "create"} staff member`);
+      setApiError(errMsg);
       onToast?.({ message: errMsg, type: "error" });
     } finally {
       setSaving(false);
     }
   };
+
+  useEffect(() => {
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = orig;
+    };
+  }, []);
 
   return createPortal(
     <div
@@ -773,6 +798,14 @@ function StaffFormModal({ staff, roles, branches, activeBranchId, onClose, onSuc
         {/* Modal Form Body */}
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0" autoComplete="off">
           <div className="flex-1 overflow-y-auto p-6 space-y-5">
+            {/* Inline API Error Alert Banner */}
+            {apiError && (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-xs font-semibold text-rose-700 flex items-center gap-2 animate-in fade-in">
+                <AlertCircle size={16} className="shrink-0 text-rose-600" />
+                <span>{apiError}</span>
+              </div>
+            )}
+
             {/* Profile Picture Upload Section */}
             <div className="flex flex-col sm:flex-row items-center gap-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50/50 p-4">
               <div className="relative group">
@@ -791,7 +824,7 @@ function StaffFormModal({ staff, roles, branches, activeBranchId, onClose, onSuc
 
               <div className="flex-1 text-center sm:text-left space-y-1.5">
                 <p className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                  Profile Photo (Optional)
+                  Profile Photo 
                 </p>
                 <p className="text-[11px] text-slate-500 font-medium">
                   JPG, PNG or WEBP format. Max 5MB.
@@ -859,7 +892,7 @@ function StaffFormModal({ staff, roles, branches, activeBranchId, onClose, onSuc
                   type="text"
                   name="staff_first_name"
                   autoComplete="off"
-                  placeholder="e.g. Akshay"
+                  placeholder="Enter first name (e.g. Akshay)"
                   value={form.firstName}
                   onChange={(e) => updateField("firstName", e.target.value)}
                   className={`h-11 w-full rounded-xl border px-3.5 text-xs font-semibold text-slate-800 placeholder:text-slate-400 outline-none transition ${
@@ -885,7 +918,7 @@ function StaffFormModal({ staff, roles, branches, activeBranchId, onClose, onSuc
                   type="text"
                   name="staff_last_name"
                   autoComplete="off"
-                  placeholder="e.g. Kumar"
+                  placeholder="Enter last name (e.g. Kumar)"
                   value={form.lastName}
                   onChange={(e) => updateField("lastName", e.target.value)}
                   className={`h-11 w-full rounded-xl border px-3.5 text-xs font-semibold text-slate-800 placeholder:text-slate-400 outline-none transition ${
@@ -916,7 +949,7 @@ function StaffFormModal({ staff, roles, branches, activeBranchId, onClose, onSuc
                     type="email"
                     name="staff_user_email"
                     autoComplete="off"
-                    placeholder="e.g. staff.member@kitchen.com"
+                    placeholder="Enter email address (e.g. staff@kitchen.com)"
                     value={form.email}
                     onChange={(e) => updateField("email", e.target.value)}
                     className={`h-11 w-full rounded-xl border pl-10 pr-3.5 text-xs font-semibold text-slate-800 placeholder:text-slate-400 outline-none transition ${
@@ -945,7 +978,7 @@ function StaffFormModal({ staff, roles, branches, activeBranchId, onClose, onSuc
                     type="tel"
                     name="staff_user_phone"
                     autoComplete="off"
-                    placeholder="e.g. 7876060888"
+                    placeholder="Enter 10-digit mobile number (e.g. 9876543210)"
                     value={form.phone}
                     onChange={(e) => updateField("phone", e.target.value)}
                     className={`h-11 w-full rounded-xl border pl-10 pr-3.5 text-xs font-semibold text-slate-800 placeholder:text-slate-400 outline-none transition ${
@@ -976,7 +1009,7 @@ function StaffFormModal({ staff, roles, branches, activeBranchId, onClose, onSuc
                     type={showPassword ? "text" : "password"}
                     name="staff_new_password"
                     autoComplete="new-password"
-                    placeholder={isEditMode ? "Enter new password (optional)" : "Enter login password (min 6 chars)"}
+                    placeholder={isEditMode ? "Enter new password" : "Create a password (min 6 characters)"}
                     value={form.password}
                     onChange={(e) => updateField("password", e.target.value)}
                     className={`h-11 w-full rounded-xl border pl-3.5 pr-10 text-xs font-semibold text-slate-800 placeholder:text-slate-400 outline-none transition ${
@@ -1011,10 +1044,13 @@ function StaffFormModal({ staff, roles, branches, activeBranchId, onClose, onSuc
                   error={!!errors.roleId}
                   value={form.roleId}
                   onChange={(val) => updateField("roleId", val)}
-                  options={roles.map((r) => ({
-                    value: String(r.id),
-                    label: r.name,
-                  }))}
+                  options={[
+                    { value: "", label: "Select Staff Role..." },
+                    ...roles.map((r) => ({
+                      value: String(r.id),
+                      label: r.name,
+                    })),
+                  ]}
                 />
                 {errors.roleId && (
                   <p className="mt-1 text-[11px] font-semibold text-rose-600 flex items-center gap-1">
@@ -1129,8 +1165,8 @@ function StaffDetailModal({ staff, onEdit, onManagePermissions, onClose }) {
   const branches = staff.branchAccess || [];
   const initials = `${(staff.firstName?.[0] || "").toUpperCase()}${(staff.lastName?.[0] || "").toUpperCase()}` || "ST";
   const isActive = (staff.status || "ACTIVE").toUpperCase() === "ACTIVE";
-  const assignedCount = staff.permissions?.assignedCount ?? staff.permissions?.assignedPermissions?.length ?? 16;
-  const totalCount = staff.permissions?.totalPermissionsCount ?? 16;
+  const assignedCount = staff.permissions?.assignedCount ?? staff.permissions?.assignedPermissions?.length ?? 0;
+  const totalCount = staff.permissions?.totalPermissionsCount ?? (staff.permissions?.unassignedPermissions?.length ? (assignedCount + staff.permissions.unassignedPermissions.length) : 26);
 
   return createPortal(
     <div
@@ -1297,6 +1333,7 @@ function StaffPermissionsModal({ staff, onClose, onSuccess, onToast }) {
   }, []);
 
   const [saving, setSaving] = useState(false);
+  const [apiError, setApiError] = useState("");
 
   // Extract assigned and unassigned permissions from staff response
   const assignedList = useMemo(() => {
@@ -1334,7 +1371,7 @@ function StaffPermissionsModal({ staff, onClose, onSuccess, onToast }) {
             module: mod,
             action: act,
             status: "ACTIVE",
-            isInitiallyAssigned: true,
+            isInitiallyAssigned: false,
           });
           dummyId++;
         });
@@ -1344,17 +1381,23 @@ function StaffPermissionsModal({ staff, onClose, onSuccess, onToast }) {
     return Array.from(map.values());
   }, [assignedList, unassignedList]);
 
-  // Selected permission IDs: initially all assigned permissions are selected
+  // Selected permission IDs: strictly initialized with assigned permissions only
   const [selectedIds, setSelectedIds] = useState(() => {
     const initialChecked = new Set();
     assignedList.forEach((p) => {
       if (p?.id) initialChecked.add(p.id);
     });
-    if (initialChecked.size === 0 && allPermissions.length > 0) {
-      allPermissions.forEach((p) => initialChecked.add(p.id));
-    }
     return initialChecked;
   });
+
+  // Keep selectedIds in sync whenever staff or assignedList changes
+  useEffect(() => {
+    const next = new Set();
+    assignedList.forEach((p) => {
+      if (p?.id) next.add(p.id);
+    });
+    setSelectedIds(next);
+  }, [assignedList]);
 
   const togglePermission = (id) => {
     setSelectedIds((prev) => {
@@ -1366,16 +1409,17 @@ function StaffPermissionsModal({ staff, onClose, onSuccess, onToast }) {
   };
 
   const handleSelectAll = () => {
-    const next = new Set();
-    allPermissions.forEach((p) => next.add(p.id));
-    setSelectedIds(next);
+    setSelectedIds(new Set(allPermissions.map((p) => p.id)));
+    if (apiError) setApiError("");
   };
 
   const handleDeselectAll = () => {
     setSelectedIds(new Set());
+    if (apiError) setApiError("");
   };
 
   const toggleModulePermissions = (perms) => {
+    if (apiError) setApiError("");
     const allSelected = perms.every((p) => selectedIds.has(p.id));
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -1402,10 +1446,13 @@ function StaffPermissionsModal({ staff, onClose, onSuccess, onToast }) {
   const handleSavePermissions = async () => {
     const roleId = staff.roleId || staff.role?.id || staff.role_id;
     if (!roleId) {
-      onToast?.({ message: "Role ID not found for this staff member.", type: "error" });
+      const msg = "Role ID not found for this staff member.";
+      setApiError(msg);
+      onToast?.({ message: msg, type: "error" });
       return;
     }
     setSaving(true);
+    setApiError("");
 
     try {
       const myHeaders = new Headers();
@@ -1414,6 +1461,7 @@ function StaffPermissionsModal({ staff, onClose, onSuccess, onToast }) {
       if (token) myHeaders.append("Authorization", `Bearer ${token}`);
 
       const raw = JSON.stringify({
+        "staffId": staff.id,
         permissionIds: Array.from(selectedIds).map(String),
       });
 
@@ -1451,11 +1499,20 @@ function StaffPermissionsModal({ staff, onClose, onSuccess, onToast }) {
     } catch (error) {
       console.error("Update permissions error:", error);
       const msg = getApiErrorMessage(error, "Failed to update permissions");
+      setApiError(msg);
       onToast?.({ message: msg, type: "error" });
     } finally {
       setSaving(false);
     }
   };
+
+  useEffect(() => {
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = orig;
+    };
+  }, []);
 
   const titleStr = staff.title ? `${staff.title}. ` : "";
   const fullName =
@@ -1526,6 +1583,14 @@ function StaffPermissionsModal({ staff, onClose, onSuccess, onToast }) {
 
         {/* Clean Permissions Matrix List */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {/* Inline API Error Alert Banner */}
+          {apiError && (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-xs font-semibold text-rose-700 flex items-center gap-2 animate-in fade-in">
+              <AlertCircle size={16} className="shrink-0 text-rose-600" />
+              <span>{apiError}</span>
+            </div>
+          )}
+
           {Object.entries(groupedPermissions).map(([modName, perms]) => {
             const isAllSelected = perms.every((p) => selectedIds.has(p.id));
             const selectedCount = perms.filter((p) => selectedIds.has(p.id)).length;

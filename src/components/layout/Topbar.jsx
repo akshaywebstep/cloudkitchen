@@ -31,6 +31,8 @@ const PATH_TITLES = {
   "/add-menu": "Add Menu Item",
   "/staff": "Staff Management",
   "/roles": "Role Management",
+  "/profile": "Kitchen Profile",
+  "/waste": "Waste Management",
 };
 
 export function Topbar({ apiState, onLogout, onToast, onLogin, refreshKitchenData, onBranchChange, onToggleSidebar }) {
@@ -55,18 +57,20 @@ export function Topbar({ apiState, onLogout, onToast, onLogin, refreshKitchenDat
   ];
 
   return (
-    <header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-slate-200/80 bg-white/95 px-5 shadow-2xs backdrop-blur-md sm:px-8 lg:px-10">
-      <div className="flex items-center gap-4">
+    <header className="sticky top-0 z-20 flex h-16 sm:h-20 items-center justify-between border-b border-slate-200/80 bg-white/95 px-3.5 shadow-2xs backdrop-blur-md sm:px-8 lg:px-10">
+      <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
         <button
-          className="grid size-10 place-items-center rounded-xl border border-slate-200 bg-slate-50 text-[#8D0606] transition hover:bg-slate-100"
+          className="grid size-9 sm:size-10 shrink-0 place-items-center rounded-xl border border-slate-200 bg-slate-50 text-[#8D0606] transition hover:bg-slate-100 active:scale-95"
           onClick={onToggleSidebar}
           type="button"
-          title="Toggle Sidebar (Collapse / Expand)"
+          title="Toggle Navigation Menu"
         >
-          <Menu size={20} />
+          <Menu size={18} />
         </button>
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight text-slate-900">{title}</h1>
+        <div className="min-w-0">
+          <h1 className="text-[15px] sm:text-lg font-semibold tracking-tight text-slate-900 truncate max-w-[160px] sm:max-w-none leading-tight">
+            {title}
+          </h1>
         </div>
       </div>
 

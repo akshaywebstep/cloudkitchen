@@ -72,7 +72,7 @@ export function ResetPasswordModal({ onClose, onToast }) {
                 className={`h-11 w-full rounded-xl border bg-white pl-10 pr-4 text-xs font-medium text-slate-800 outline-none transition ${
                   errors.token ? "border-rose-500 bg-rose-50/20" : "border-slate-200 focus:border-[#8D0606]"
                 }`}
-                placeholder="Paste token from reset email"
+                placeholder="Enter reset token from email or server"
                 value={form.token}
                 onChange={(e) => {
                   setForm((f) => ({ ...f, token: e.target.value }));
@@ -98,7 +98,7 @@ export function ResetPasswordModal({ onClose, onToast }) {
                 className={`h-11 w-full rounded-xl border bg-white pl-10 pr-4 text-xs font-medium text-slate-800 outline-none transition ${
                   errors.password ? "border-rose-500 bg-rose-50/20" : "border-slate-200 focus:border-[#8D0606]"
                 }`}
-                placeholder="••••••••"
+                placeholder="Enter new password (min 6 characters)"
                 value={form.password}
                 onChange={(e) => {
                   setForm((f) => ({ ...f, password: e.target.value }));
@@ -124,7 +124,7 @@ export function ResetPasswordModal({ onClose, onToast }) {
                 className={`h-11 w-full rounded-xl border bg-white pl-10 pr-4 text-xs font-medium text-slate-800 outline-none transition ${
                   errors.confirmPassword ? "border-rose-500 bg-rose-50/20" : "border-slate-200 focus:border-[#8D0606]"
                 }`}
-                placeholder="••••••••"
+                placeholder="Re-enter new password to confirm"
                 value={form.confirmPassword}
                 onChange={(e) => {
                   setForm((f) => ({ ...f, confirmPassword: e.target.value }));

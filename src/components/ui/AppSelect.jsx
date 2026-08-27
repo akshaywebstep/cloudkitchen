@@ -68,11 +68,13 @@ export const selectStyles = ({ variant = "filter", error = false, minWidth } = {
   option: (base, state) => ({
     ...base,
     backgroundColor: state.isSelected
-      ? "#8D0606"
+      ? state.isFocused
+        ? "#fee2e2"
+        : "#fef2f2"
       : state.isFocused
-      ? "#fff1f1"
+      ? "#f8fafc"
       : "transparent",
-    color: state.isSelected ? "#ffffff" : state.isFocused ? "#8D0606" : "#334155",
+    color: state.isSelected ? "#8D0606" : state.isFocused ? "#8D0606" : "#334155",
     borderRadius: "0.6rem",
     padding: "8px 12px",
     fontSize: "12px",
@@ -80,7 +82,7 @@ export const selectStyles = ({ variant = "filter", error = false, minWidth } = {
     cursor: "pointer",
     transition: "all 0.12s ease",
     "&:active": {
-      backgroundColor: state.isSelected ? "#8D0606" : "#fee2e2",
+      backgroundColor: "#fee2e2",
     },
   }),
   indicatorSeparator: () => ({ display: "none" }),
@@ -107,6 +109,7 @@ export function AppSelect({
   minWidth,
   className = "",
   formatOptionLabel,
+  closeMenuOnSelect,
   ...props
 }) {
   const currentOption = options.find((opt) => String(opt.value) === String(value)) || (value && typeof value === "object" ? value : null);
@@ -126,6 +129,7 @@ export function AppSelect({
         menuPortalTarget={typeof document !== "undefined" ? document.body : null}
         styles={selectStyles({ variant, error, minWidth })}
         formatOptionLabel={formatOptionLabel}
+        closeMenuOnSelect={closeMenuOnSelect !== undefined ? closeMenuOnSelect : !props.isMulti}
         {...props}
       />
     </div>

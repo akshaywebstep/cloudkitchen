@@ -32,44 +32,44 @@ export const sidebarSections = [
   {
     title: "Operations",
     items: [
-      { label: "Dashboard",        icon: LayoutDashboard, path: "/" },
-      { label: "Orders",           icon: ShoppingBag,     path: "/orders" },
-      { label: "Food Menu",        icon: UtensilsCrossed, path: "/menu" },
-      { label: "Ingredients",      icon: Boxes,           path: "/ingredients" },
-      { label: "Waste Management", icon: Trash2,          path: "/waste" },
+      { label: "Dashboard",        icon: LayoutDashboard, path: "/",             module: "dashboard" },
+      { label: "Orders",           icon: ShoppingBag,     path: "/orders",       module: "order" },
+      { label: "Food Menu",        icon: UtensilsCrossed, path: "/menu",         module: "menu" },
+      { label: "Ingredients",      icon: Boxes,           path: "/ingredients",  module: "ingredient" },
+      { label: "Waste Management", icon: Trash2,          path: "/waste",        module: "wasteManagement" },
     ],
   },
   {
     title: "Management",
     items: [
-      { label: "Profile",         icon: UserCheck,       path: "/profile" },
-      { label: "Staff",           icon: Users,           path: "/staff" },
-      { label: "Role Management", icon: ShieldCheck,     path: "/roles" },
-      { label: "Customers",       icon: UserCheck,       path: "/customers" },
-      { label: "Branch Setup",   icon: Building2,       path: "/kitchen" },
+      { label: "Profile",         icon: UserCheck,       path: "/profile",      module: "profile" },
+      { label: "Staff",           icon: Users,           path: "/staff",        module: "staffManagement" },
+      { label: "Role Management", icon: ShieldCheck,     path: "/roles",        module: "roleManagement" },
+      { label: "Customers",       icon: UserCheck,       path: "/customers",    module: "customer" },
+      { label: "Branch Management",   icon: Building2,       path: "/kitchen",      module: "branch" },
     ],
   },
   {
     title: "Feedback",
     items: [
-      { label: "Reviews",         icon: Star,            path: "/reviews" },
+      { label: "Reviews",         icon: Star,            path: "/reviews",      module: "reviews" },
     ],
   },
 ];
 
 // Flat list for direct iteration / backwards compatibility
 export const sidebarItems = [
-  { label: "Dashboard",        icon: LayoutDashboard, path: "/" },
-  { label: "Orders",           icon: ShoppingBag,     path: "/orders" },
-  { label: "Food Menu",        icon: UtensilsCrossed, path: "/menu" },
-  { label: "Ingredients",      icon: Boxes,           path: "/ingredients" },
-  { label: "Waste Management", icon: Trash2,          path: "/waste" },
-  { label: "Profile",          icon: UserCheck,       path: "/profile" },
-  { label: "Staff",           icon: Users,           path: "/staff" },
-  { label: "Role Management", icon: ShieldCheck,     path: "/roles" },
-  { label: "Customers",       icon: UserCheck,       path: "/customers" },
-  { label: "Branch Setup",   icon: Building2,       path: "/kitchen" },
-  { label: "Reviews",         icon: Star,            path: "/reviews" },
+  { label: "Dashboard",        icon: LayoutDashboard, path: "/",             module: "dashboard" },
+  { label: "Orders",           icon: ShoppingBag,     path: "/orders",       module: "order" },
+  { label: "Food Menu",        icon: UtensilsCrossed, path: "/menu",         module: "menu" },
+  { label: "Ingredients",      icon: Boxes,           path: "/ingredients",  module: "ingredient" },
+  { label: "Waste Management", icon: Trash2,          path: "/waste",        module: "wasteManagement" },
+  { label: "Profile",          icon: UserCheck,       path: "/profile",      module: "profile" },
+  { label: "Staff",           icon: Users,           path: "/staff",        module: "staffManagement" },
+  { label: "Role Management", icon: ShieldCheck,     path: "/roles",        module: "roleManagement" },
+  { label: "Customers",       icon: UserCheck,       path: "/customers",    module: "customer" },
+  { label: "Branch Management",   icon: Building2,       path: "/kitchen",      module: "branch" },
+  { label: "Reviews",         icon: Star,            path: "/reviews",      module: "reviews" },
 ];
 
 export const topAlerts = [

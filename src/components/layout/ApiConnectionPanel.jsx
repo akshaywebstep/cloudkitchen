@@ -45,8 +45,8 @@ export function ApiConnectionPanel({ apiState, onLogin, compact = false }) {
 
         {!apiState.token ? (
           <form className={`grid gap-3 ${compact ? "" : "sm:grid-cols-[1fr_1fr_auto]"}`} onSubmit={submit}>
-            <input className="h-12 rounded-lg border border-[#e2e2e2] px-4 outline-none" placeholder="Email / phone" value={credentials.username} onChange={(e) => setCredentials((c) => ({ ...c, username: e.target.value }))} />
-            <input className="h-12 rounded-lg border border-[#e2e2e2] px-4 outline-none" placeholder="Password" type="password" value={credentials.password} onChange={(e) => setCredentials((c) => ({ ...c, password: e.target.value }))} />
+            <input className="h-12 rounded-lg border border-[#e2e2e2] px-4 outline-none" placeholder="Enter email or phone" value={credentials.username} onChange={(e) => setCredentials((c) => ({ ...c, username: e.target.value }))} />
+            <input className="h-12 rounded-lg border border-[#e2e2e2] px-4 outline-none" placeholder="Enter password" type="password" value={credentials.password} onChange={(e) => setCredentials((c) => ({ ...c, password: e.target.value }))} />
             <button className="h-12 rounded-lg bg-[#8D0606] px-6 font-semibold text-white disabled:opacity-60" disabled={busy} type="submit">{busy ? "..." : "Login"}</button>
             {message ? <p className="whitespace-pre-line text-sm font-semibold text-[#8D0606] sm:col-span-3">{message}</p> : null}
           </form>

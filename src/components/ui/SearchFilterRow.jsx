@@ -7,6 +7,7 @@ export function SearchFilterRow({
   onSearchChange,
   dateLabel = "Filter Period",
   dateRange = "17 April 2024 - 21 May 2024",
+  placeholder = "Search by order ID, customer, or location...",
 }) {
   const redTone = calendarTone === "red";
 
@@ -19,7 +20,7 @@ export function SearchFilterRow({
           value={searchQuery}
           onChange={(e) => onSearchChange?.(e.target.value)}
           className="w-full bg-transparent text-xs font-medium text-slate-800 outline-none placeholder:text-slate-400"
-          placeholder="Search by order ID, customer, or location..."
+          placeholder={placeholder}
         />
       </div>
 

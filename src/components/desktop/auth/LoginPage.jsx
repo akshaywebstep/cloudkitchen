@@ -5,9 +5,18 @@ import { AuthLayout } from "./AuthLayout";
 import { getApiErrorMessage } from "../../../api";
 import { Loader } from "../../ui/Loader";
 
+const REMEMBER_KEY_USER = "cloud_kitchen_remember_username";
+const REMEMBER_KEY_FLAG = "cloud_kitchen_remember_me";
+
 export function LoginPage({ onLogin, onToast }) {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ username: "", password: "" });
+  const [form, setForm] = useState(() => {
+    const savedUser = localStorage.getItem(REMEMBER_KEY_USER) || "";
+    return { username: savedUser, password: "" };
+  });
+  const [rememberMe, setRememberMe] = useState(() => {
+    return localStorage.getItem(REMEMBER_KEY_FLAG) === "true" || !!localStorage.getItem(REMEMBER_KEY_USER);
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
@@ -53,6 +62,13 @@ export function LoginPage({ onLogin, onToast }) {
     setBusy(true);
     try {
       await onLogin(form);
+      if (rememberMe) {
+        localStorage.setItem(REMEMBER_KEY_USER, form.username.trim());
+        localStorage.setItem(REMEMBER_KEY_FLAG, "true");
+      } else {
+        localStorage.removeItem(REMEMBER_KEY_USER);
+        localStorage.removeItem(REMEMBER_KEY_FLAG);
+      }
       console.log("[LoginPage] Login success");
       onToast?.({ message: "Login successful! Welcome back.", type: "success" });
     } catch (error) {
@@ -93,7 +109,7 @@ export function LoginPage({ onLogin, onToast }) {
                   ? "border-rose-500 bg-rose-50/30 text-rose-900 focus:ring-2 focus:ring-rose-500/20"
                   : "border-[#e2e2e2] text-[#191919] focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
               }`}
-              placeholder="demo@gmail.com or 9876543210"
+              placeholder="Enter your registered email or phone number"
               value={form.username}
               onChange={(e) => {
                 setForm((f) => ({ ...f, username: e.target.value }));
@@ -110,18 +126,9 @@ export function LoginPage({ onLogin, onToast }) {
 
         {/* Password field */}
         <div>
-          <div className="mb-2 flex items-center justify-between">
-            <label className="text-xs font-semibold uppercase tracking-wider text-[#444]">
-              Password *
-            </label>
-            <button
-              type="button"
-              onClick={handleForgotClick}
-              className="text-xs font-semibold text-[#8D0606] hover:underline"
-            >
-              Forgot Password?
-            </button>
-          </div>
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[#444]">
+            Password *
+          </label>
           <div className="relative">
             <Lock className="absolute left-4 top-3.5 text-[#999]" size={19} />
             <input
@@ -152,6 +159,30 @@ export function LoginPage({ onLogin, onToast }) {
               <AlertCircle size={13} className="shrink-0" /> {errors.password}
             </p>
           )}
+        </div>
+
+        {/* Remember Me & Forgot Password Row */}
+        <div className="flex items-center justify-between pt-0.5">
+          <label className="flex items-center gap-2 cursor-pointer select-none group">
+            <input
+              type="checkbox"
+              id="rememberMe"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="size-4 rounded border-slate-300 text-[#8D0606] accent-[#8D0606] focus:ring-[#8D0606]/20 cursor-pointer"
+            />
+            <span className="text-xs font-medium text-slate-600 group-hover:text-slate-900 transition">
+              Remember me
+            </span>
+          </label>
+
+          <button
+            type="button"
+            onClick={handleForgotClick}
+            className="text-xs font-semibold text-[#8D0606] hover:underline"
+          >
+            Forgot Password?
+          </button>
         </div>
 
         {/* API error alert banner if present */}

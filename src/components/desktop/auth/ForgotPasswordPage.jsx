@@ -169,7 +169,7 @@ export function ForgotPasswordPage({ onToast }) {
                     ? "border-rose-500 bg-rose-50/30 text-rose-900 focus:ring-2 focus:ring-rose-500/20"
                     : "border-[#e2e2e2] text-[#191919] focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
                 }`}
-                placeholder="registered@email.com or phone"
+                placeholder="Enter your registered email or mobile number"
                 value={form.username}
                 onChange={updateForm("username")}
               />
@@ -235,7 +235,7 @@ export function ForgotPasswordPage({ onToast }) {
                     ? "border-rose-500 bg-rose-50/30 text-rose-900 focus:ring-2 focus:ring-rose-500/20"
                     : "border-[#e2e2e2] text-[#191919] focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
                 }`}
-                placeholder="Token from email or backend"
+                placeholder="Enter reset token from email or server"
                 value={form.token}
                 onChange={updateForm("token")}
               />
@@ -262,7 +262,7 @@ export function ForgotPasswordPage({ onToast }) {
                     ? "border-rose-500 bg-rose-50/30 text-rose-900 focus:ring-2 focus:ring-rose-500/20"
                     : "border-[#e2e2e2] text-[#191919] focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
                 }`}
-                placeholder="Min 6 characters"
+                placeholder="Enter new password (min 6 characters)"
                 value={form.password}
                 onChange={updateForm("password")}
               />
@@ -296,7 +296,7 @@ export function ForgotPasswordPage({ onToast }) {
                     ? "border-rose-500 bg-rose-50/30 text-rose-900 focus:ring-2 focus:ring-rose-500/20"
                     : "border-[#e2e2e2] text-[#191919] focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
                 }`}
-                placeholder="Re-enter new password"
+                placeholder="Re-enter new password to confirm"
                 value={form.confirmPassword}
                 onChange={updateForm("confirmPassword")}
               />

@@ -8,14 +8,18 @@
 
 html {
   scroll-behavior: smooth;
-  font-family: "Poppins", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", Poppins, sans-serif;
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
 body {
   margin: 0;
   min-width: 320px;
   background: #f1f5f9;
-  font-family: "Poppins", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", Poppins, sans-serif;
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
 button,
@@ -206,12 +210,7 @@ button:active {
   }
 }
 
-@media (max-width: 1180px) {
-  table,
-  .wide-grid {
-    min-width: 900px;
-  }
-}
+
 
 
 @media(min-width:2000px){

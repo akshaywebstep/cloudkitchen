@@ -26,50 +26,12 @@ import {
   Layers,
 } from "lucide-react";
 import { getApiBaseUrl, getStoredToken, getApiErrorMessage } from "../../../api";
+import { resolveSelectedBranchId } from "../../../utils/helpers";
+import { usePermissions } from "../../../utils/permissions";
 import { Loader } from "../../ui/Loader";
 import { Pagination } from "../../ui/Pagination";
 import { PageHeader } from "../../ui/PageHeader";
 import { AppSelect } from "../../ui/AppSelect";
-
-// Initial mock fallback if server list is empty initially
-const INITIAL_WASTE_LOGS = [
-  {
-    id: 101,
-    inventoryItemId: 1,
-    stockId: 17,
-    itemName: "Tomato",
-    quantityWasted: 10,
-    unitCost: 40,
-    unit: "KG",
-    reason: "EXPIRED",
-    notes: "Tomato batch expired on 20 Aug, discarded completely.",
-    createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
-  },
-  {
-    id: 102,
-    inventoryItemId: 2,
-    stockId: 18,
-    itemName: "Paneer (Fresh Cottage Cheese)",
-    quantityWasted: 3.5,
-    unitCost: 240,
-    unit: "KG",
-    reason: "SPOILED",
-    notes: "Curdled texture upon opening seal.",
-    createdAt: new Date(Date.now() - 3600000 * 14).toISOString(),
-  },
-  {
-    id: 103,
-    inventoryItemId: 3,
-    stockId: 19,
-    itemName: "Butter Chicken Prep Batch",
-    quantityWasted: 2,
-    unitCost: 280,
-    unit: "PORTION",
-    reason: "OVERPRODUCTION",
-    notes: "Surplus quantity prepared for cancelled order.",
-    createdAt: new Date(Date.now() - 3600000 * 28).toISOString(),
-  },
-];
 
 const REASON_OPTIONS = [
   { value: "ALL", label: "All Reasons" },
@@ -82,14 +44,9 @@ const REASON_OPTIONS = [
 ];
 
 export function WasteManagementPage({ apiState, onToast }) {
-  const [wasteLogs, setWasteLogs] = useState(() => {
-    try {
-      const saved = localStorage.getItem("ck_waste_logs");
-      if (saved) return JSON.parse(saved);
-    } catch (_) {}
-    return INITIAL_WASTE_LOGS;
-  });
+  const { canCreate, canUpdate, canDelete } = usePermissions(apiState);
 
+  const [wasteLogs, setWasteLogs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -100,20 +57,24 @@ export function WasteManagementPage({ apiState, onToast }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLog, setSelectedLog] = useState(null); // null = create, object = edit
 
-  // Active Branch ID
+  // Active Branch ID dynamically resolved
   const activeBranchId = useMemo(() => {
-    return apiState?.selectedBranchId || apiState?.branches?.[0]?.id || 2;
+    return resolveSelectedBranchId(apiState?.branches || [], apiState?.selectedBranchId);
   }, [apiState?.selectedBranchId, apiState?.branches]);
 
-  // Sync to local storage
+  // Clear any legacy mock cache on mount
   useEffect(() => {
     try {
-      localStorage.setItem("ck_waste_logs", JSON.stringify(wasteLogs));
+      localStorage.removeItem("ck_waste_logs");
     } catch (_) {}
-  }, [wasteLogs]);
+  }, []);
 
   // Fetch Waste logs from backend API
   const fetchWasteLogs = async (isSilent = false) => {
+    if (!activeBranchId) {
+      setWasteLogs([]);
+      return;
+    }
     if (!isSilent) setLoading(true);
     else setRefreshing(true);
 
@@ -152,14 +113,15 @@ export function WasteManagementPage({ apiState, onToast }) {
           ? parsed.wasteLogs
           : Array.isArray(parsed?.wastes)
           ? parsed.wastes
-          : null;
+          : [];
 
-        if (list && list.length > 0) {
-          setWasteLogs(list);
-        }
+        setWasteLogs(list || []);
+      } else {
+        setWasteLogs([]);
       }
     } catch (error) {
       console.warn("Waste API error:", error);
+      setWasteLogs([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -299,43 +261,43 @@ export function WasteManagementPage({ apiState, onToast }) {
         title="Waste Management"
         subtitle="Record food waste, expired inventory items, and discarded batches to audit and minimize kitchen cost loss."
         actions={
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
             <button
               type="button"
               onClick={() => fetchWasteLogs(true)}
               disabled={refreshing || loading}
-              className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700 transition hover:bg-slate-100 active:scale-95 disabled:opacity-50 shadow-2xs"
+              className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3.5 sm:px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-100 active:scale-95 disabled:opacity-50 shadow-2xs"
             >
               <RefreshCw size={14} className={refreshing ? "animate-spin text-[#8D0606]" : ""} />
               <span>Refresh</span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedLog(null);
-                setIsModalOpen(true);
-              }}
-              className="flex items-center gap-2 rounded-full bg-[#8D0606] px-6 py-3 text-xs font-bold text-white shadow-md shadow-rose-950/20 transition hover:bg-[#780404] active:scale-98"
-            >
-              <Plus size={16} strokeWidth={2.5} />
-              <span>Create Waste Entry</span>
-            </button>
+            {canCreate("wasteManagement") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedLog(null);
+                  setIsModalOpen(true);
+                }}
+                className="flex items-center gap-1.5 rounded-full bg-[#8D0606] px-4 sm:px-5 py-2 text-xs font-bold text-white shadow-md shadow-rose-950/20 transition hover:bg-[#780404] active:scale-98"
+              >
+                <Plus size={15} strokeWidth={2.5} />
+                <span>Create Waste Entry</span>
+              </button>
+            )}
           </div>
         }
       />
 
-
-
       {/* Filter and Search Bar */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           {/* Search */}
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
             <input
               type="text"
-              placeholder="Search waste logs by item name, stock ID, reason, or notes..."
+              placeholder="Search waste records by item name, reason, or batch ID..."
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
@@ -346,8 +308,8 @@ export function WasteManagementPage({ apiState, onToast }) {
           </div>
 
           {/* Reason Filter */}
-          <div className="flex items-center gap-2.5">
-            <div className="w-48">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex-1 sm:w-48">
               <AppSelect
                 value={reasonFilter}
                 onChange={(val) => {
@@ -378,9 +340,9 @@ export function WasteManagementPage({ apiState, onToast }) {
       {/* Table Container */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xs">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-600 border-collapse">
+          <table className="w-full min-w-[950px] text-left text-xs text-slate-600 border-collapse">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+              <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-extrabold uppercase tracking-wider text-slate-500 whitespace-nowrap">
                 <th className="pl-6 pr-3 py-3.5">#</th>
                 <th className="px-4 py-3.5">Inventory Item</th>
                 <th className="px-4 py-3.5">Stock Batch</th>
@@ -429,21 +391,21 @@ export function WasteManagementPage({ apiState, onToast }) {
                   return (
                     <tr key={log.id} className="transition duration-150 hover:bg-slate-50/80">
                       {/* Index */}
-                      <td className="pl-6 pr-3 py-4 font-bold text-xs text-[#8D0606]">
+                      <td className="pl-6 pr-3 py-4 font-bold text-xs text-[#8D0606] whitespace-nowrap">
                         #{itemIndex}
                       </td>
 
                       {/* Inventory Item */}
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
                           <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-purple-50 text-purple-700 border border-purple-100 font-bold text-xs shadow-2xs">
                             <Boxes size={16} />
                           </div>
                           <div>
-                            <p className="font-bold text-slate-900 text-sm truncate max-w-[180px]">
+                            <p className="font-bold text-slate-900 text-sm truncate max-w-[200px]">
                               {itemName}
                             </p>
-                            <span className="text-[10px] font-mono text-slate-400 font-semibold">
+                            <span className="text-[10.5px] font-mono text-slate-400 font-semibold block">
                               Item ID: #{log.inventoryItemId || log.id}
                             </span>
                           </div>
@@ -451,32 +413,32 @@ export function WasteManagementPage({ apiState, onToast }) {
                       </td>
 
                       {/* Stock Batch */}
-                      <td className="px-4 py-4">
-                        <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-mono font-bold text-slate-700">
-                          <Layers size={12} className="text-slate-400" />
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-mono font-bold text-slate-700 whitespace-nowrap">
+                          <Layers size={13} className="text-slate-400 shrink-0" />
                           <span>Stock #{log.stockId || "—"}</span>
                         </span>
                       </td>
 
                       {/* Quantity Wasted */}
-                      <td className="px-4 py-4 font-bold text-slate-900 text-sm">
+                      <td className="px-4 py-4 font-bold text-slate-900 text-sm whitespace-nowrap">
                         {qty} <span className="text-[11px] text-slate-400 font-semibold uppercase">{log.unit || "units"}</span>
                       </td>
 
                       {/* Unit Cost */}
-                      <td className="px-4 py-4 font-semibold text-slate-700">
+                      <td className="px-4 py-4 font-semibold text-slate-700 whitespace-nowrap">
                         ₹{unitPrice.toLocaleString()}
                       </td>
 
                       {/* Total Loss */}
-                      <td className="px-4 py-4 font-black text-rose-700 text-sm">
+                      <td className="px-4 py-4 font-black text-rose-700 text-sm whitespace-nowrap">
                         ₹{totalLoss.toLocaleString()}
                       </td>
 
                       {/* Reason */}
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-4 whitespace-nowrap">
                         <span
-                          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${reasonBadge.bg}`}
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-bold whitespace-nowrap ${reasonBadge.bg}`}
                         >
                           <span className={`size-1.5 rounded-full ${reasonBadge.dot}`} />
                           <span>{reasonBadge.label}</span>
@@ -484,7 +446,7 @@ export function WasteManagementPage({ apiState, onToast }) {
                       </td>
 
                       {/* Notes */}
-                      <td className="px-4 py-4 text-xs text-slate-600 max-w-[180px] truncate" title={log.notes}>
+                      <td className="px-4 py-4 text-xs text-slate-600 max-w-[200px] truncate" title={log.notes}>
                         {log.notes || "—"}
                       </td>
 
@@ -547,6 +509,7 @@ function WasteCreateModal({ branchId, apiState, onClose, onSuccess, onToast }) {
   const [saving, setSaving] = useState(false);
   const [loadingIngredients, setLoadingIngredients] = useState(true);
   const [ingredients, setIngredients] = useState([]);
+  const [apiError, setApiError] = useState("");
 
   // Form State matching exact POST payload:
   // { inventoryItemId, stockId, quantityWasted, unitCost, reason, notes }
@@ -554,7 +517,7 @@ function WasteCreateModal({ branchId, apiState, onClose, onSuccess, onToast }) {
   const [stockId, setStockId] = useState("");
   const [quantityWasted, setQuantityWasted] = useState("");
   const [unitCost, setUnitCost] = useState("");
-  const [reason, setReason] = useState("EXPIRED");
+  const [reason, setReason] = useState("");
   const [notes, setNotes] = useState("");
 
   // Fetch branch ingredients (including expired query)
@@ -593,81 +556,74 @@ function WasteCreateModal({ branchId, apiState, onClose, onSuccess, onToast }) {
           ? parsed.ingredients
           : [];
 
-        // If expired list was empty, also try standard ingredients list
-        if (!rawList || rawList.length === 0) {
-          const resAll = await fetch(
-            `${getApiBaseUrl()}/kitchen/branch/${branchId}/ingredient`,
-            requestOptions
-          );
-          const textAll = await resAll.text();
-          let parsedAll = null;
-          try {
-            parsedAll = textAll ? JSON.parse(textAll) : null;
-          } catch (_) {}
-          rawList = Array.isArray(parsedAll?.data)
-            ? parsedAll.data
-            : Array.isArray(parsedAll)
-            ? parsedAll
-            : Array.isArray(parsedAll?.ingredients)
-            ? parsedAll.ingredients
-            : [];
-        }
-
-        // Normalize ingredients array to support item.stock and item.stocks
+      
+        // Normalize ingredients array to support item.ingredient, item.stock, item.stocks, etc.
         const list = (rawList && rawList.length > 0 ? rawList : []).map((item) => {
           const rawBatches = Array.isArray(item.stock)
             ? item.stock
             : Array.isArray(item.stocks)
             ? item.stocks
+            : Array.isArray(item.batches)
+            ? item.batches
             : [];
 
           const batches = rawBatches.map((b) => ({
             id: b.id,
-            quantity: Number(b.quantity ?? b.stock ?? 0),
-            stock: Number(b.quantity ?? b.stock ?? 0),
-            expiryDate: b.expiryDate || b.expireAt || "",
-            expireAt: b.expiryDate || b.expireAt || "",
-            batchNumber: b.batchNumber || null,
-            unitCost: Number(b.unitCost || item.cost || item.unitCost || 40),
+            quantity: Number(b.quantity ?? b.stock ?? b.currentStock ?? 0),
+            stock: Number(b.quantity ?? b.stock ?? b.currentStock ?? 0),
+            expiryDate: b.expiryDate || b.expireAt || b.expiry_date || "",
+            expireAt: b.expiryDate || b.expireAt || b.expiry_date || "",
+            batchNumber: b.batchNumber || b.batchNo || null,
+            unitCost: Number(b.unitCost || b.cost || b.price || item.cost || item.unitCost || 0),
           }));
+
+          // If no inner batches array but item has stock / expiry info directly
+          if (batches.length === 0 && (item.expiryDate || item.expireAt || item.currentStock !== undefined || item.stock !== undefined)) {
+            batches.push({
+              id: item.stockId || item.id,
+              quantity: Number(item.currentStock ?? item.stock ?? item.quantity ?? 0),
+              stock: Number(item.currentStock ?? item.stock ?? item.quantity ?? 0),
+              expiryDate: item.expiryDate || item.expireAt || "",
+              expireAt: item.expiryDate || item.expireAt || "",
+              batchNumber: item.batchNumber || null,
+              unitCost: Number(item.unitCost || item.cost || 0),
+            });
+          }
+
+          const name =
+            item.ingredient?.name ||
+            item.name ||
+            item.ingredientName ||
+            item.title ||
+            (item.ingredientId ? `Ingredient #${item.ingredientId}` : `Item #${item.id}`);
+
+          const category =
+            item.ingredient?.category ||
+            item.category ||
+            item.ingredientCategory ||
+            "General";
+
+          const unit = item.unit || item.ingredient?.unit || "KG";
+          const currentStock = Number(item.currentStock ?? item.stock ?? item.quantity ?? 0);
+          const hasExpiredBatches = batches.some((b) => {
+            const exp = b.expiryDate || b.expireAt;
+            return exp && new Date(exp) < new Date();
+          });
 
           return {
             id: item.id,
-            name: item.ingredient?.name || item.name || `Ingredient #${item.ingredientId || item.id}`,
-            category: item.ingredient?.category || item.category || "General",
-            unit: item.unit || item.ingredient?.unit || "KG",
-            currentStock: Number(item.currentStock ?? item.stock ?? 0),
+            ingredientId: item.ingredientId || item.ingredient?.id,
+            name,
+            category,
+            unit,
+            currentStock,
             stocks: batches,
+            hasExpiredBatches,
           };
         });
 
-        // Fallback default list if no ingredients returned yet
-        if (!list || list.length === 0) {
-          list.push({
-            id: 35,
-            name: "Red Tomato",
-            category: "Vegetable",
-            unit: "KG",
-            currentStock: 50,
-            stocks: [
-              { id: 8, quantity: 50, stock: 50, expiryDate: "2026-08-20T00:00:00.000Z", expireAt: "2026-08-20T00:00:00.000Z", batchNumber: null, unitCost: 40 },
-            ],
-          });
-        }
-
-        setIngredients(list);
-
-        // Pre-select first item and first batch
-        if (list.length > 0) {
-          const first = list[0];
-          setInventoryItemId(String(first.id));
-          if (Array.isArray(first.stocks) && first.stocks.length > 0) {
-            const firstStock = first.stocks[0];
-            setStockId(String(firstStock.id));
-            setQuantityWasted(String(firstStock.quantity || firstStock.stock || ""));
-            setUnitCost(String(firstStock.unitCost || 40));
-          }
-        }
+        console.log("Normalized isExpired ingredients list for dropdown:", list);
+        setIngredients(list || []);
       } catch (err) {
         console.warn("Failed to fetch branch ingredients:", err);
       } finally {
@@ -688,36 +644,25 @@ function WasteCreateModal({ branchId, apiState, onClose, onSuccess, onToast }) {
     if (Array.isArray(selectedIngredient.stocks) && selectedIngredient.stocks.length > 0) {
       return selectedIngredient.stocks;
     }
-    return [{ id: Number(stockId) || 8, quantity: 10, stock: 10, unitCost: Number(unitCost) || 40 }];
-  }, [selectedIngredient, stockId, unitCost]);
+    return [];
+  }, [selectedIngredient]);
 
   // When ingredient selection changes
   const handleIngredientChange = (newInvId) => {
     setInventoryItemId(newInvId);
-    const found = ingredients.find((i) => String(i.id) === String(newInvId));
-    if (found && Array.isArray(found.stocks) && found.stocks.length > 0) {
-      const firstStock = found.stocks[0];
-      setStockId(String(firstStock.id));
-      setQuantityWasted(String(firstStock.quantity || firstStock.stock || ""));
-      setUnitCost(String(firstStock.unitCost || 40));
-    } else {
-      setStockId("");
-      setQuantityWasted("");
-      setUnitCost("40");
-    }
+    setStockId("");
+    setQuantityWasted("");
+    setUnitCost("");
+    if (apiError) setApiError("");
   };
 
   // When stock batch selection changes
   const handleStockChange = (newStockId) => {
     setStockId(newStockId);
+    if (apiError) setApiError("");
     const foundStock = availableStocks.find((s) => String(s.id) === String(newStockId));
-    if (foundStock) {
-      if (foundStock.quantity !== undefined || foundStock.stock !== undefined) {
-        setQuantityWasted(String(foundStock.quantity ?? foundStock.stock ?? ""));
-      }
-      if (foundStock.unitCost) {
-        setUnitCost(String(foundStock.unitCost));
-      }
+    if (foundStock && foundStock.unitCost !== undefined && foundStock.unitCost !== null) {
+      setUnitCost(String(foundStock.unitCost));
     }
   };
 
@@ -736,8 +681,13 @@ function WasteCreateModal({ branchId, apiState, onClose, onSuccess, onToast }) {
       onToast?.({ message: "Please enter a valid quantity wasted greater than 0.", type: "error" });
       return;
     }
+    if (!reason) {
+      onToast?.({ message: "Please select a waste reason.", type: "error" });
+      return;
+    }
 
     setSaving(true);
+    setApiError("");
 
     const payload = {
       inventoryItemId: Number(inventoryItemId),
@@ -784,11 +734,20 @@ function WasteCreateModal({ branchId, apiState, onClose, onSuccess, onToast }) {
     } catch (error) {
       console.error("Waste create error:", error);
       const msg = getApiErrorMessage(error, "Failed to create waste record");
+      setApiError(msg);
       onToast?.({ message: msg, type: "error" });
     } finally {
       setSaving(false);
     }
   };
+
+  useEffect(() => {
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = orig;
+    };
+  }, []);
 
   const totalCalculatedLoss = (Number(quantityWasted) || 0) * (Number(unitCost) || 0);
 
@@ -826,6 +785,14 @@ function WasteCreateModal({ branchId, apiState, onClose, onSuccess, onToast }) {
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+          {/* Inline API Error Alert Banner */}
+          {apiError && (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-xs font-semibold text-rose-700 flex items-center gap-2 animate-in fade-in">
+              <AlertCircle size={16} className="shrink-0 text-rose-600" />
+              <span>{apiError}</span>
+            </div>
+          )}
+
           {/* Inventory Item Selection */}
           <div>
             <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-600">
@@ -839,12 +806,13 @@ function WasteCreateModal({ branchId, apiState, onClose, onSuccess, onToast }) {
               <AppSelect
                 value={inventoryItemId}
                 onChange={handleIngredientChange}
-                options={ingredients.map((item) => {
-                  return {
+                options={[
+                  { value: "", label: "Select inventory item..." },
+                  ...ingredients.map((item) => ({
                     value: String(item.id),
-                    label: `${item.name} (${item.category}) — ${item.currentStock || 0} ${item.unit} in stock`,
-                  };
-                })}
+                    label: `${item.name}${item.category ? ` (${item.category})` : ""} — ${item.currentStock || 0} ${item.unit} in stock${item.hasExpiredBatches ? " ⚠️ [Expired Batches]" : ""}`,
+                  })),
+                ]}
               />
             )}
           </div>
@@ -864,18 +832,28 @@ function WasteCreateModal({ branchId, apiState, onClose, onSuccess, onToast }) {
             <AppSelect
               value={stockId}
               onChange={handleStockChange}
-              options={availableStocks.map((s) => {
-                const expDate = s.expiryDate || s.expireAt;
-                const expStr = expDate ? new Date(expDate).toLocaleDateString() : "No Exp Date";
-                const isExpired = expDate && new Date(expDate) < new Date();
-                const batchNumStr = s.batchNumber ? `Batch #${s.batchNumber} (ID: ${s.id})` : `Batch #${s.id}`;
-                const qty = s.quantity ?? s.stock ?? 0;
+              options={[
+                {
+                  value: "",
+                  label: selectedIngredient
+                    ? availableStocks.length
+                      ? "Select stock batch..."
+                      : "No stock batches found for this item"
+                    : "Select an inventory item first...",
+                },
+                ...availableStocks.map((s) => {
+                  const expDate = s.expiryDate || s.expireAt;
+                  const expStr = expDate ? new Date(expDate).toLocaleDateString() : "No Exp Date";
+                  const isExpired = expDate && new Date(expDate) < new Date();
+                  const batchNumStr = s.batchNumber ? `Batch #${s.batchNumber} (ID: ${s.id})` : `Batch #${s.id}`;
+                  const qty = s.quantity ?? s.stock ?? 0;
 
-                return {
-                  value: String(s.id),
-                  label: `${batchNumStr} — Available: ${qty} ${selectedIngredient?.unit || ""} (Exp: ${expStr})${isExpired ? " [EXPIRED]" : ""}`,
-                };
-              })}
+                  return {
+                    value: String(s.id),
+                    label: `${batchNumStr} — Available: ${qty} ${selectedIngredient?.unit || ""} (Exp: ${expStr})${isExpired ? " [EXPIRED]" : ""}`,
+                  };
+                }),
+              ]}
             />
           </div>
 
@@ -908,9 +886,12 @@ function WasteCreateModal({ branchId, apiState, onClose, onSuccess, onToast }) {
                 step="any"
                 min="0.01"
                 required
-                placeholder="e.g. 10"
+                placeholder="Enter quantity wasted (e.g. 10)"
                 value={quantityWasted}
-                onChange={(e) => setQuantityWasted(e.target.value)}
+                onChange={(e) => {
+                  setQuantityWasted(e.target.value);
+                  if (apiError) setApiError("");
+                }}
                 className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-800 outline-none transition focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
               />
             </div>
@@ -924,9 +905,12 @@ function WasteCreateModal({ branchId, apiState, onClose, onSuccess, onToast }) {
                 step="any"
                 min="0"
                 required
-                placeholder="e.g. 40"
+                placeholder="Enter unit cost in ₹ (e.g. 40)"
                 value={unitCost}
-                onChange={(e) => setUnitCost(e.target.value)}
+                onChange={(e) => {
+                  setUnitCost(e.target.value);
+                  if (apiError) setApiError("");
+                }}
                 className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-800 outline-none transition focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
               />
             </div>
@@ -939,8 +923,12 @@ function WasteCreateModal({ branchId, apiState, onClose, onSuccess, onToast }) {
             </label>
             <AppSelect
               value={reason}
-              onChange={(val) => setReason(val)}
+              onChange={(val) => {
+                setReason(val);
+                if (apiError) setApiError("");
+              }}
               options={[
+                { value: "", label: "Select waste reason..." },
                 { value: "EXPIRED", label: "EXPIRED (Passed Expiry Date)" },
                 { value: "OVERPRODUCTION", label: "OVERPRODUCTION (Surplus / Batch Overcooked)" },
                 { value: "SPOILED", label: "SPOILED (Quality Deterioration)" },
@@ -958,7 +946,7 @@ function WasteCreateModal({ branchId, apiState, onClose, onSuccess, onToast }) {
             </label>
             <textarea
               rows={2}
-              placeholder="e.g. Tomato batch expired on 20 Aug, discarded completely."
+              placeholder="Enter remarks or reason for waste (e.g. Batch expired, discarded)"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-white p-3 text-xs font-semibold text-slate-800 outline-none transition focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
