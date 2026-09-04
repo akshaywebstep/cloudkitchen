@@ -18,6 +18,7 @@ import { Branches } from '../pages/Branches';
 import { Cuisines } from '../pages/Cuisines';
 import { MenuCategories } from '../pages/MenuCategories';
 import { Ingredients } from '../pages/Ingredients';
+import { WasteManagement } from '../pages/WasteManagement';
 import { Subscriptions } from '../pages/Subscriptions';
 import { useApp } from '../context/AppContext';
 import { Loader2, ShieldCheck } from 'lucide-react';
@@ -97,6 +98,7 @@ export const AppRoutes = () => {
                 <Route path="cuisines" element={<Cuisines />} />
                 <Route path="menu-categories" element={<MenuCategories />} />
                 <Route path="ingredients" element={<Ingredients />} />
+                <Route path="waste" element={<WasteManagement />} />
                 <Route path="orders" element={<Order />} />
                 <Route path="foods" element={<Foods />} />
                 <Route path="menu-items" element={<Foods />} />

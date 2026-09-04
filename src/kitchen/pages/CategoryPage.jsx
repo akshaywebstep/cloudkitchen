@@ -292,23 +292,44 @@ export function CategoryPage({ apiState, refreshKitchenData, onToast }) {
       { name: "ALL", label: "All Items", count: allDishes.length },
     ];
 
+    const seen = new Set();
+
     (apiCategories || [])
       .filter((c) => c && (c.status === undefined || c.status === "ACTIVE"))
       .forEach((c) => {
-        const name = c.name || c.title;
-        if (name?.trim()) {
+        const name = (c.name || c.title || "").trim();
+        if (name && !seen.has(name.toLowerCase())) {
+          seen.add(name.toLowerCase());
           const count = allDishes.filter((d) => {
             const dCat = typeof d.category === "object" ? d.category?.name : d.category;
-            return dCat && (dCat.toLowerCase() === name.trim().toLowerCase() || String(d.categoryId) === String(c.id));
+            return dCat && (dCat.toLowerCase() === name.toLowerCase() || String(d.categoryId) === String(c.id));
           }).length;
           list.push({
-            name: name.trim(),
-            label: name.trim(),
+            name,
+            label: name,
             id: c.id,
             count,
           });
         }
       });
+
+    // Also extract unique categories dynamically from all live branch dishes
+    allDishes.forEach((d) => {
+      const dCat = typeof d.category === "object" ? d.category?.name : d.category;
+      const trimmed = (dCat || "").trim();
+      if (trimmed && !seen.has(trimmed.toLowerCase())) {
+        seen.add(trimmed.toLowerCase());
+        const count = allDishes.filter((dish) => {
+          const itemCat = typeof dish.category === "object" ? dish.category?.name : dish.category;
+          return itemCat && itemCat.toLowerCase() === trimmed.toLowerCase();
+        }).length;
+        list.push({
+          name: trimmed,
+          label: trimmed,
+          count,
+        });
+      }
+    });
 
     return list;
   }, [apiCategories, allDishes]);

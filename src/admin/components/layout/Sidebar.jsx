@@ -12,6 +12,7 @@ import {
   Utensils,
   FolderTree,
   Boxes,
+  Trash2,
   Sparkles,
   LogOut
 } from 'lucide-react';
@@ -31,6 +32,7 @@ export const Sidebar = () => {
     { name: 'Menu Categories', path: '/admin/menu-categories', icon: FolderTree },
     { name: 'Menu Items', path: '/admin/foods', icon: ChefHat },
     { name: 'Ingredients', path: '/admin/ingredients', icon: Boxes },
+    { name: 'Waste Management', path: '/admin/waste', icon: Trash2 },
     { name: 'Subscriptions', path: '/admin/subscriptions', icon: Sparkles },
     { name: 'Order', path: '/admin/orders', icon: ShoppingBag, hasSub: true, badge: '' },
     { name: 'logout', path: null, icon: LogOut, isLogout: true },

@@ -406,6 +406,7 @@ export default function App() {
         />
         <Route path="/kitchen/register" element={<Navigate to="/kitchen/subscription" replace />} />
         <Route path="/kitchen/forgot-password" element={<ForgotPasswordPage onToast={triggerToast} />} />
+        <Route path="/kitchen/reset-password" element={<ForgotPasswordPage onToast={triggerToast} />} />
 
         {/* ═══════════ 3. KITCHEN OPERATIONAL PORTAL (/kitchen/*) ═══════════ */}
         <Route
@@ -478,6 +479,7 @@ export default function App() {
         <Route path="/subscription" element={<Navigate to="/kitchen/subscription" replace />} />
         <Route path="/register" element={<Navigate to="/kitchen/subscription" replace />} />
         <Route path="/forgot-password" element={<Navigate to="/kitchen/forgot-password" replace />} />
+        <Route path="/reset-password" element={<Navigate to="/kitchen/reset-password" replace />} />
         <Route path="/dashboard" element={<Navigate to="/kitchen/dashboard" replace />} />
         <Route path="/orders" element={<Navigate to="/kitchen/orders" replace />} />
         <Route path="/menu" element={<Navigate to="/kitchen/menu" replace />} />

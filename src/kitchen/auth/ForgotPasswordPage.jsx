@@ -1,5 +1,5 @@
-import React, { useState, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useState, useRef, useEffect } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Mail, KeyRound, Lock, Eye, EyeOff, ArrowRight, ArrowLeft, CheckCircle, AlertCircle, ShieldCheck } from "lucide-react";
 import { AuthLayout } from "./AuthLayout";
 import { api, getApiErrorMessage } from "../../api";
@@ -7,6 +7,7 @@ import { Loader } from "../../components/ui/Loader";
 
 export function ForgotPasswordPage({ onToast }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [step, setStep] = useState(1); // Step 1: Request token, Step 2: Reset password
   const [form, setForm] = useState({
     username: "",
@@ -19,6 +20,19 @@ export function ForgotPasswordPage({ onToast }) {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
+
+  // Read ?token= from URL on mount
+  useEffect(() => {
+    const urlToken = searchParams.get("token");
+    if (urlToken) {
+      setForm((f) => ({ ...f, token: urlToken }));
+      setStep(2);
+      onToast?.({
+        message: "Reset token detected! Please enter your new password.",
+        type: "info",
+      });
+    }
+  }, [searchParams]);
 
   const refs = {
     username: useRef(null),
@@ -90,8 +104,10 @@ export function ForgotPasswordPage({ onToast }) {
     setErrors({});
     try {
       const response = await api.forgotPassword(form.username.trim());
-      const resetToken = response?.data?.resetToken || response?.resetToken || "";
-      
+      const tokenMatch = response?.data?.resetLink?.match(/token=([a-f0-9]+)/i);
+      const resetToken =
+        tokenMatch ? tokenMatch[1] : response?.data?.resetToken || response?.resetToken || response?.token || "";
+
       if (resetToken) {
         setForm((f) => ({ ...f, token: resetToken }));
         onToast?.({
@@ -100,16 +116,15 @@ export function ForgotPasswordPage({ onToast }) {
         });
       } else {
         onToast?.({
-          message: "Password reset token requested. Enter your token below.",
+          message: response?.message || "Password reset token sent to your email. Enter it below.",
           type: "info",
         });
       }
       setStep(2);
     } catch (error) {
-      const msg = getApiErrorMessage(error, "Unable to request token from backend. Proceeding to reset form for manual token entry.");
-      onToast?.({ message: msg, type: "warning" });
-      // Proceed to Step 2 so the user is never stuck
-      setStep(2);
+      const msg = getApiErrorMessage(error, "Failed to request password reset token.");
+      setErrors({ username: msg, api: msg });
+      onToast?.({ message: msg, type: "error" });
     } finally {
       setBusy(false);
     }

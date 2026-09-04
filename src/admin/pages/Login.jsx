@@ -163,11 +163,14 @@ export const Login = () => {
 
       if (res && res.status === true) {
         toast.success(res.message || `Password reset link sent to ${resetEmail}!`);
-        const token = res.data?.resetToken;
+        const tokenMatch = res.data?.resetLink?.match(/token=([a-f0-9]+)/i);
+        const token = tokenMatch ? tokenMatch[1] : res.data?.resetToken || res.data?.token || '';
         setIsForgotModalOpen(false);
         setResetEmail('');
         if (token) {
           navigate(`/admin/reset-password?token=${token}`);
+        } else {
+          navigate('/admin/reset-password');
         }
       } else {
         const fieldErrors = extractFieldErrors(res);

@@ -141,21 +141,34 @@ export const Order = () => {
     }
   };
 
-  const handleUpdateStatus = async (orderId, rawId, newStatus) => {
-    try {
-      await updateOrderStatusApi(rawId || orderId, newStatus);
-      toast.success(`Order ${orderId} updated to "${newStatus}"!`);
-    } catch (err) {
-      toast.success(`Order ${orderId} updated to "${newStatus}"!`);
-    }
+  const [statusUpdatingId, setStatusUpdatingId] = useState(null);
 
-    setOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
-    );
-    if (selectedOrder && selectedOrder.id === orderId) {
-      setSelectedOrder((prev) => ({ ...prev, status: newStatus }));
+  const handleUpdateStatus = async (orderId, rawId, newStatus) => {
+    const targetId = rawId || orderId;
+    setStatusUpdatingId(targetId);
+    showLoading(`Updating order #${targetId} status to ${newStatus}...`);
+
+    try {
+      const res = await updateOrderStatusApi(targetId, newStatus);
+      if (res && res.status === false) {
+        toast.error(res.message || `Failed to update Order #${targetId}`);
+        return;
+      }
+      toast.success(res?.message || `Order #${targetId} updated to "${newStatus}"!`);
+
+      setOrders((prev) =>
+        prev.map((o) => (o.rawId === targetId || o.id === orderId ? { ...o, status: newStatus } : o))
+      );
+      if (selectedOrder && (selectedOrder.rawId === targetId || selectedOrder.id === orderId)) {
+        setSelectedOrder((prev) => ({ ...prev, status: newStatus }));
+      }
+      fetchOrders();
+    } catch (err) {
+      toast.error(err?.message || `Failed to update order status.`);
+    } finally {
+      setStatusUpdatingId(null);
+      hideLoading();
     }
-    fetchOrders();
   };
 
   // Fetch single order by ID and open detail modal
@@ -418,15 +431,28 @@ export const Order = () => {
                         <div className="font-bold text-slate-700 dark:text-slate-300">{ord.date}</div>
                       </td>
 
-                      {/* Status */}
+                      {/* Status (Interactive Update) */}
                       <td className="p-4">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider border ${getStatusBadge(
-                            ord.status
-                          )}`}
-                        >
-                          {statusLabel(ord.status)}
-                        </span>
+                        <div className="relative inline-flex items-center">
+                          <select
+                            value={ord.status}
+                            onChange={(e) => handleUpdateStatus(ord.id, ord.rawId, e.target.value)}
+                            disabled={statusUpdatingId === ord.rawId}
+                            className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border cursor-pointer focus:outline-none transition-all ${getStatusBadge(
+                              ord.status
+                            )} disabled:opacity-50`}
+                            title="Click to update order status"
+                          >
+                            {ORDER_STATUSES.map((st) => (
+                              <option key={st} value={st} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold">
+                                {statusLabel(st)}
+                              </option>
+                            ))}
+                          </select>
+                          {statusUpdatingId === ord.rawId && (
+                            <Loader2 className="w-3.5 h-3.5 text-[#8C0D0D] animate-spin absolute right-2 pointer-events-none" />
+                          )}
+                        </div>
                       </td>
 
                       {/* Actions */}

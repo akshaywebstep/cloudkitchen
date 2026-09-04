@@ -2,9 +2,13 @@ import axios from 'axios';
 
 // Get base URL from environment variables with fallback
 const getBaseUrl = () => {
-  const envUrl = import.meta.env?.VITE_API_BASE_URL || import.meta.env?.API_BASE_URL || 'https://dev2.screeningstar.co.in';
+  let envUrl = import.meta.env?.VITE_API_BASE_URL || import.meta.env?.API_BASE_URL || 'https://dev2.screeningstar.co.in/api/v1';
   // Remove trailing slashes
-  return envUrl.replace(/\/+$/, '');
+  envUrl = envUrl.replace(/\/+$/, '');
+  if (!envUrl.endsWith('/api/v1')) {
+    envUrl = `${envUrl}/api/v1`;
+  }
+  return envUrl;
 };
 
 const API_BASE_URL = getBaseUrl();
@@ -1013,7 +1017,7 @@ export const getOrderByIdApi = async (id) => {
 };
 
 /**
- * Update Order Status API (PUT /admin/order/:id)
+ * Update Order Status API (PATCH /admin/order/:id/status)
  * @param {string|number} id - Order ID
  * @param {string|Object} data - Update payload or status string
  * @returns {Promise<Object>} Response object { status, message, data }
@@ -1022,13 +1026,32 @@ export const updateOrderStatusApi = async (id, data) => {
   try {
     const token = localStorage.getItem('admin_token');
     const payload = typeof data === 'string' ? { status: data } : data;
-    const response = await apiClient.put(`/admin/order/${id}`, payload, {
+    const response = await apiClient.patch(`/admin/order/${id}/status`, payload, {
       headers: { Authorization: `Bearer ${token}` },
     });
     return response.data;
   } catch (error) {
     if (error.response && error.response.data) return error.response.data;
     return { status: false, message: error.message || 'Failed to update order status.' };
+  }
+};
+
+/**
+ * Bulk Update Order Status API (PATCH /admin/order/bulk-status)
+ * @param {Array<string|number>} orderIds - Array of Order IDs
+ * @param {string} status - New order status
+ * @returns {Promise<Object>} Response object { status, message, data }
+ */
+export const updateOrderBulkStatusApi = async (orderIds, status) => {
+  try {
+    const token = localStorage.getItem('admin_token');
+    const response = await apiClient.patch('/admin/order/bulk-status', { orderIds, status }, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.data;
+  } catch (error) {
+    if (error.response && error.response.data) return error.response.data;
+    return { status: false, message: error.message || 'Failed to update bulk order status.' };
   }
 };
 
@@ -1156,6 +1179,43 @@ export const getDashboardStatsApi = async () => {
   } catch (error) {
     if (error.response && error.response.data) return error.response.data;
     return { status: false, message: error.message || 'Failed to fetch dashboard stats.' };
+  }
+};
+
+/**
+ * Fetch Admin Waste Logs API (GET /admin/waste)
+ * @param {Object} [params] - Query parameters { kitchenId, branchId, reason, page, limit, search }
+ * @returns {Promise<Object>} Response object { status, message, summary, data, meta }
+ */
+export const getWasteLogsApi = async (params = {}) => {
+  try {
+    const token = localStorage.getItem('admin_token');
+    const response = await apiClient.get('/admin/waste', {
+      headers: { Authorization: `Bearer ${token}` },
+      params,
+    });
+    return response.data;
+  } catch (error) {
+    if (error.response && error.response.data) return error.response.data;
+    return { status: false, message: error.message || 'Failed to fetch waste logs.' };
+  }
+};
+
+/**
+ * Fetch Waste Log by ID API (GET /admin/waste/:id)
+ * @param {string|number} id - Waste log ID
+ * @returns {Promise<Object>} Response object { status, message, data }
+ */
+export const getWasteLogByIdApi = async (id) => {
+  try {
+    const token = localStorage.getItem('admin_token');
+    const response = await apiClient.get(`/admin/waste/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.data;
+  } catch (error) {
+    if (error.response && error.response.data) return error.response.data;
+    return { status: false, message: error.message || 'Failed to fetch waste log details.' };
   }
 };
 
