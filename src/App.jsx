@@ -24,7 +24,7 @@ import { LandingPage } from "./landing/LandingPage";
 // 2. Kitchen Portal Module
 import { Sidebar } from "./kitchen/layout/Sidebar";
 import { Topbar } from "./kitchen/layout/Topbar";
-import { LoginPage, RegisterPage, ForgotPasswordPage } from "./kitchen/auth/DesktopAuthPage";
+import { LoginPage, RegisterPage, ForgotPasswordPage, ResetPasswordPage } from "./kitchen/auth/DesktopAuthPage";
 import { SetupFlowPage } from "./kitchen/setup/SetupFlowPage";
 import { DashboardPage } from "./kitchen/pages/DashboardPage";
 import { OrderListPage } from "./kitchen/pages/OrderListPage";
@@ -406,7 +406,7 @@ export default function App() {
         />
         <Route path="/kitchen/register" element={<Navigate to="/kitchen/subscription" replace />} />
         <Route path="/kitchen/forgot-password" element={<ForgotPasswordPage onToast={triggerToast} />} />
-        <Route path="/kitchen/reset-password" element={<ForgotPasswordPage onToast={triggerToast} />} />
+        <Route path="/kitchen/reset-password" element={<ResetPasswordPage onToast={triggerToast} />} />
 
         {/* ═══════════ 3. KITCHEN OPERATIONAL PORTAL (/kitchen/*) ═══════════ */}
         <Route
@@ -478,8 +478,8 @@ export default function App() {
         <Route path="/login" element={<Navigate to="/kitchen/login" replace />} />
         <Route path="/subscription" element={<Navigate to="/kitchen/subscription" replace />} />
         <Route path="/register" element={<Navigate to="/kitchen/subscription" replace />} />
-        <Route path="/forgot-password" element={<Navigate to="/kitchen/forgot-password" replace />} />
-        <Route path="/reset-password" element={<Navigate to="/kitchen/reset-password" replace />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage onToast={triggerToast} />} />
+        <Route path="/reset-password" element={<ResetPasswordPage onToast={triggerToast} />} />
         <Route path="/dashboard" element={<Navigate to="/kitchen/dashboard" replace />} />
         <Route path="/orders" element={<Navigate to="/kitchen/orders" replace />} />
         <Route path="/menu" element={<Navigate to="/kitchen/menu" replace />} />

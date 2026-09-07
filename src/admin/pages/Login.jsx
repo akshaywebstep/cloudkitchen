@@ -16,7 +16,8 @@ import {
   Briefcase,
   UserCheck,
   AlertCircle,
-  AlertTriangle
+  AlertTriangle,
+  CheckCircle2
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
@@ -52,6 +53,7 @@ export const Login = () => {
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [forgotErrors, setForgotErrors] = useState({});
+  const [forgotSuccess, setForgotSuccess] = useState(false);
 
   const demoRoles = [
     { id: 'admin', label: 'Super Admin', email: 'akshaywebstep@gmail.com', pass: '12345678', icon: Zap },
@@ -163,15 +165,7 @@ export const Login = () => {
 
       if (res && res.status === true) {
         toast.success(res.message || `Password reset link sent to ${resetEmail}!`);
-        const tokenMatch = res.data?.resetLink?.match(/token=([a-f0-9]+)/i);
-        const token = tokenMatch ? tokenMatch[1] : res.data?.resetToken || res.data?.token || '';
-        setIsForgotModalOpen(false);
-        setResetEmail('');
-        if (token) {
-          navigate(`/admin/reset-password?token=${token}`);
-        } else {
-          navigate('/admin/reset-password');
-        }
+        setForgotSuccess(true);
       } else {
         const fieldErrors = extractFieldErrors(res);
         if (Object.keys(fieldErrors).length > 0) {
@@ -266,6 +260,7 @@ export const Login = () => {
                 type="button"
                 onClick={() => {
                   setForgotErrors({});
+                  setForgotSuccess(false);
                   setResetEmail(email || 'akshaywebstep@gmail.com');
                   setIsForgotModalOpen(true);
                 }}
@@ -366,50 +361,88 @@ export const Login = () => {
                 </button>
               </div>
 
-              <form onSubmit={handleForgotSubmit} noValidate className="p-6 space-y-4 text-xs font-semibold">
-                <div>
-                  <label className="block text-slate-700 uppercase tracking-wider mb-1 font-extrabold">
-                    Account Email Address *
-                  </label>
-                  <input
-                    id="login-resetEmail"
-                    type="email"
-                    placeholder="akshaywebstep@gmail.com"
-                    value={resetEmail}
-                    onChange={(e) => {
-                      setResetEmail(e.target.value);
-                      if (forgotErrors.resetEmail) setForgotErrors({});
-                    }}
-                    className={`w-full px-4 py-2.5 rounded-xl border text-slate-900 text-sm font-medium transition-all ${
-                      forgotErrors.resetEmail
-                        ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/40 text-rose-900'
-                        : 'border-slate-200 bg-slate-50'
-                    }`}
-                  />
-                  {forgotErrors.resetEmail && (
-                    <p className="text-xs font-bold text-rose-600 mt-1.5 flex items-center gap-1.5">
-                      <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                      {forgotErrors.resetEmail}
+              {forgotSuccess ? (
+                <div className="p-6 space-y-4 text-center">
+                  <div className="mx-auto w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-base font-bold text-slate-900">Reset Link Sent!</h3>
+                    <p className="text-xs text-slate-600 font-medium leading-relaxed max-w-sm mx-auto">
+                      A password reset link has been sent to <strong className="text-slate-900">{resetEmail}</strong>.
+                      Please check your email inbox (and spam folder) and click the reset link to choose a new password.
                     </p>
-                  )}
-                </div>
+                  </div>
 
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => setIsForgotModalOpen(false)}
-                    className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2.5 rounded-xl bg-brand-800 hover:bg-brand-900 text-white font-extrabold shadow-brand cursor-pointer"
-                  >
-                    Send Reset Link
-                  </button>
+                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-left text-xs text-slate-600 space-y-1">
+                    <span className="font-bold text-slate-800 block text-[11px] uppercase tracking-wider">Next Steps:</span>
+                    <p className="text-[11.5px] leading-relaxed">
+                      1. Open your email inbox and click on the reset link.
+                      <br />
+                      2. The link will open <code>/admin/reset-password?token=...</code> to enter a new password.
+                    </p>
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsForgotModalOpen(false);
+                        setForgotSuccess(false);
+                        setResetEmail('');
+                      }}
+                      className="w-full py-2.5 rounded-xl bg-brand-800 hover:bg-brand-900 text-white font-extrabold text-xs shadow-brand transition cursor-pointer"
+                    >
+                      Back to Sign In
+                    </button>
+                  </div>
                 </div>
-              </form>
+              ) : (
+                <form onSubmit={handleForgotSubmit} noValidate className="p-6 space-y-4 text-xs font-semibold">
+                  <div>
+                    <label className="block text-slate-700 uppercase tracking-wider mb-1 font-extrabold">
+                      Account Email Address *
+                    </label>
+                    <input
+                      id="login-resetEmail"
+                      type="email"
+                      placeholder="akshaywebstep@gmail.com"
+                      value={resetEmail}
+                      onChange={(e) => {
+                        setResetEmail(e.target.value);
+                        if (forgotErrors.resetEmail) setForgotErrors({});
+                      }}
+                      className={`w-full px-4 py-2.5 rounded-xl border text-slate-900 text-sm font-medium transition-all ${
+                        forgotErrors.resetEmail
+                          ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/40 text-rose-900'
+                          : 'border-slate-200 bg-slate-50'
+                      }`}
+                    />
+                    {forgotErrors.resetEmail && (
+                      <p className="text-xs font-bold text-rose-600 mt-1.5 flex items-center gap-1.5">
+                        <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                        {forgotErrors.resetEmail}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setIsForgotModalOpen(false)}
+                      className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2.5 rounded-xl bg-brand-800 hover:bg-brand-900 text-white font-extrabold shadow-brand cursor-pointer"
+                    >
+                      Send Reset Link
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>,
           document.body

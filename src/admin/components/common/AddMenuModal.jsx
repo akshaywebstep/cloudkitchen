@@ -37,6 +37,7 @@ import {
   formatRecipeQty,
   calculateStockCapacity
 } from '../../utils/recipeHelper';
+import { STANDARD_MEASURE_UNITS, findUnitOption } from '../../../constants/measureUnits';
 
 export const AddMenuModal = () => {
   const { isAddMenuOpen, setIsAddMenuOpen } = useApp();
@@ -66,7 +67,7 @@ export const AddMenuModal = () => {
   const [selectedIngredients, setSelectedIngredients] = useState([]);
   const [tempIngredientId, setTempIngredientId] = useState('');
   const [tempQuantity, setTempQuantity] = useState('');
-  const [tempUnit, setTempUnit] = useState('gm');
+  const [tempUnit, setTempUnit] = useState('GM');
 
   const [errors, setErrors] = useState({});
 
@@ -420,21 +421,7 @@ export const AddMenuModal = () => {
     label: `${i.name} (${i.unit || 'Qty'})`,
   }));
 
-  const unitOptions = [
-    { value: 'gm', label: 'gm (Gram)' },
-    { value: 'kg', label: 'kg (Kilogram)' },
-    { value: 'ml', label: 'ml (Milliliter)' },
-    { value: 'ltr', label: 'ltr (Liter)' },
-    { value: 'pcs', label: 'pcs (Pieces)' },
-    { value: 'tbsp', label: 'tbsp (Tablespoon)' },
-    { value: 'tsp', label: 'tsp (Teaspoon)' },
-    { value: 'cup', label: 'cup (Cup)' },
-    { value: 'pinch', label: 'pinch (Pinch)' },
-    { value: 'slice', label: 'slice (Slice)' },
-    { value: 'packet', label: 'packet (Packet)' },
-    { value: 'can', label: 'can (Can)' },
-    { value: 'bottle', label: 'bottle (Bottle)' },
-  ];
+  const unitOptions = STANDARD_MEASURE_UNITS;
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-200">
@@ -805,8 +792,8 @@ export const AddMenuModal = () => {
               <div className="w-full sm:w-28">
                 <Select
                   options={unitOptions}
-                  value={unitOptions.find((opt) => String(opt.value).toLowerCase() === String(tempUnit).toLowerCase()) || { value: tempUnit, label: tempUnit }}
-                  onChange={(opt) => setTempUnit(opt ? opt.value : 'gm')}
+                  value={findUnitOption(tempUnit)}
+                  onChange={(opt) => setTempUnit(opt ? opt.value : 'GM')}
                   placeholder="Select unit..."
                   styles={customSelectStyles}
                   isSearchable={true}
@@ -899,16 +886,20 @@ export const AddMenuModal = () => {
                               className="w-16 px-1.5 py-1 text-center text-xs font-black bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#8C0D0D]"
                               title="Edit quantity"
                             />
-                            <input
-                              type="text"
-                              placeholder="Unit"
-                              value={item.unit}
+                            <select
+                              value={findUnitOption(item.unit).value}
                               onChange={(e) =>
                                 handleUpdateIngredient(item.id, 'unit', e.target.value)
                               }
-                              className="w-14 px-1.5 py-1 text-center text-[11px] font-extrabold bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 focus:outline-none focus:border-[#8C0D0D] uppercase"
-                              title="Edit unit (e.g. GM, ML, PCS)"
-                            />
+                              className="px-1.5 py-1 text-center text-[11px] font-extrabold bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 focus:outline-none focus:border-[#8C0D0D] uppercase cursor-pointer"
+                              title="Edit unit"
+                            >
+                              {unitOptions.map((u) => (
+                                <option key={u.value} value={u.value}>
+                                  {u.label}
+                                </option>
+                              ))}
+                            </select>
                           </div>
                           <button
                             type="button"

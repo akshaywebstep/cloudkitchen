@@ -7,9 +7,13 @@ export const normalizeUnit = (unit = '') => {
   const u = String(unit).trim().toUpperCase();
   if (['G', 'GM', 'GRAM', 'GRAMS'].includes(u)) return 'GM';
   if (['KG', 'KGS', 'KILOGRAM', 'KILOGRAMS'].includes(u)) return 'KG';
+  if (['MG', 'MILLIGRAM', 'MILLIGRAMS'].includes(u)) return 'MG';
   if (['ML', 'MILLILITER', 'MILLILITERS'].includes(u)) return 'ML';
   if (['L', 'LTR', 'LITER', 'LITERS', 'LITRE', 'LITRES'].includes(u)) return 'LITER';
-  if (['PCS', 'PC', 'PIECE', 'PIECES', 'PORTION', 'PORTIONS', 'NOS', 'NO'].includes(u)) return 'PCS';
+  if (['PCS', 'PC', 'PIECE', 'PIECES'].includes(u)) return 'PIECE';
+  if (['ITEM', 'ITEMS', 'NOS', 'NO'].includes(u)) return 'ITEM';
+  if (['PORTION', 'PORTIONS'].includes(u)) return 'PORTION';
+  if (['SERVING', 'SERVINGS'].includes(u)) return 'SERVING';
   return u || 'GM';
 };
 

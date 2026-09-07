@@ -37,6 +37,8 @@ import {
   getRecipeConversionHint,
   getRecipeSanityWarning,
   calculateStockYield,
+  STANDARD_MEASURE_UNITS,
+  findUnitOption,
 } from "../../utils/helpers";
 import { usePermissions } from "../../utils/permissions";
 
@@ -265,19 +267,7 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
     };
   }, [imagePreviewUrl]);
 
-  const unitOptions = [
-    "KG",
-    "GM",
-    "LITER",
-    "ML",
-    "PIECE",
-    "PACKET",
-    "BOX",
-    "BOTTLE",
-    "CAN",
-    "PORTION",
-    "SERVING",
-  ].map((unit) => ({ value: unit, label: unit }));
+  const unitOptions = STANDARD_MEASURE_UNITS;
 
   // Multiple recipe ingredients state
   const [recipeIngredients, setRecipeIngredients] = useState(() => {
@@ -1232,7 +1222,7 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
                         <Select
                           styles={selectStyles(false)}
                           options={unitOptions}
-                          value={unitOptions.find((u) => u.value === currentUnit) || { value: currentUnit, label: currentUnit }}
+                          value={findUnitOption(currentUnit)}
                           onChange={(opt) => updateIngredientRow(index, "unit", opt?.value || "KG")}
                           menuPortalTarget={document.body}
                         />

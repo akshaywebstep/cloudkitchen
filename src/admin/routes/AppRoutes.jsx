@@ -82,6 +82,7 @@ export const AppRoutes = () => {
     <Routes>
       {/* Public Unauthenticated Admin Routes */}
       <Route path="login" element={<LoginRoute />} />
+      <Route path="forgot-password" element={<LoginRoute />} />
       <Route path="reset-password" element={<ResetPassword />} />
 
       {/* Main Admin Application Routes (Protected inside MainLayout) */}

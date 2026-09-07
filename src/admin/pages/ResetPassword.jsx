@@ -12,9 +12,10 @@ export const ResetPassword = () => {
   const toast = useToast();
   const { showLoading, hideLoading } = useLoading();
 
-  const [token, setToken] = useState('');
-  const [password, setPassword] = useState('12345678');
-  const [confirmPassword, setConfirmPassword] = useState('12345678');
+  const tokenFromUrl = searchParams.get('token') || '';
+  const [token, setToken] = useState(tokenFromUrl);
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState({});
@@ -118,34 +119,48 @@ export const ResetPassword = () => {
           </div>
         ) : (
           <form onSubmit={handleResetSubmit} noValidate className="space-y-5 text-xs font-semibold">
-            {/* Token Field */}
-            <div>
-              <label className="block text-slate-700 uppercase tracking-wider mb-1.5 font-extrabold text-[11px]">
-                Reset Token *
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Paste your reset token here"
-                  value={token}
-                  onChange={(e) => {
-                    setToken(e.target.value);
-                    if (errors.token) setErrors((prev) => ({ ...prev, token: null }));
-                  }}
-                  className={`w-full px-4 py-3 rounded-2xl border text-slate-900 text-xs focus:outline-none font-mono font-medium transition-all ${
-                    errors.token
-                      ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/40 text-rose-900'
-                      : 'border-slate-200 bg-slate-50 focus:border-brand-800 focus:bg-white'
-                  }`}
-                />
-              </div>
-              {errors.token && (
-                <p className="text-xs font-bold text-rose-600 mt-1.5 flex items-center gap-1.5">
-                  <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                  {errors.token}
+            {/* Token Status / Field */}
+            {token ? (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-3.5 text-xs text-emerald-800 space-y-1">
+                <div className="flex items-center gap-2 font-bold text-emerald-950">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Reset Token Detected from URL</span>
+                </div>
+                <p className="text-emerald-700 font-medium text-[11px] truncate" title={token}>
+                  Token: <span className="font-mono text-[10.5px]">{token.slice(0, 16)}...{token.slice(-8)}</span>
                 </p>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-800 space-y-2">
+                <div className="flex items-center gap-2 font-bold text-amber-900">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>No Reset Token Found in URL</span>
+                </div>
+                <p className="text-amber-700 text-[11px] leading-relaxed">
+                  Please open the reset link received in your email (e.g. <code>/admin/reset-password?token=...</code>) or paste your token below:
+                </p>
+                <div className="relative mt-2">
+                  <input
+                    type="text"
+                    placeholder="Paste your reset token here..."
+                    value={token}
+                    onChange={(e) => {
+                      setToken(e.target.value);
+                      if (errors.token) setErrors((prev) => ({ ...prev, token: null }));
+                    }}
+                    className={`w-full px-3 py-2 rounded-xl border bg-white text-xs font-mono outline-none ${
+                      errors.token ? 'border-rose-500 bg-rose-50' : 'border-slate-300 focus:border-brand-800'
+                    }`}
+                  />
+                </div>
+                {errors.token && (
+                  <p className="text-xs font-bold text-rose-600 mt-1 flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                    {errors.token}
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* New Password Field */}
             <div>

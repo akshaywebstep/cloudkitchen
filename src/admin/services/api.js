@@ -471,6 +471,48 @@ export const deleteBranchApi = async (id) => {
 };
 
 /**
+ * Master Location APIs
+ */
+export const getCountriesApi = async (params = {}) => {
+  try {
+    const token = localStorage.getItem('admin_token');
+    const response = await apiClient.get('/master/country', {
+      params: { page: 1, limit: 100, ...params },
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    return response.data;
+  } catch (error) {
+    return error.response?.data || { status: false, data: [] };
+  }
+};
+
+export const getStatesApi = async (countryId, params = {}) => {
+  try {
+    const token = localStorage.getItem('admin_token');
+    const response = await apiClient.get('/master/state', {
+      params: { countryId, page: 1, limit: 100, ...params },
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    return response.data;
+  } catch (error) {
+    return error.response?.data || { status: false, data: [] };
+  }
+};
+
+export const getCitiesApi = async (countryId, stateId, params = {}) => {
+  try {
+    const token = localStorage.getItem('admin_token');
+    const response = await apiClient.get('/master/city', {
+      params: { countryId, stateId, page: 1, limit: 500, ...params },
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    return response.data;
+  } catch (error) {
+    return error.response?.data || { status: false, data: [] };
+  }
+};
+
+/**
  * Save Kitchen Inventory API (Assign ingredients & units per branch)
  * @param {string|number} kitchenId
  * @param {string|number} branchId

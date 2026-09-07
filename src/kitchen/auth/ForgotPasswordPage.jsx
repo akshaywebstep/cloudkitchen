@@ -1,157 +1,56 @@
-import React, { useState, useRef, useEffect } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Mail, KeyRound, Lock, Eye, EyeOff, ArrowRight, ArrowLeft, CheckCircle, AlertCircle, ShieldCheck } from "lucide-react";
+import React, { useState, useRef } from "react";
+import { Link } from "react-router-dom";
+import { Mail, KeyRound, ArrowRight, ArrowLeft, CheckCircle2, AlertCircle } from "lucide-react";
 import { AuthLayout } from "./AuthLayout";
 import { api, getApiErrorMessage } from "../../api";
 import { Loader } from "../../components/ui/Loader";
 
 export function ForgotPasswordPage({ onToast }) {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const [step, setStep] = useState(1); // Step 1: Request token, Step 2: Reset password
-  const [form, setForm] = useState({
-    username: "",
-    token: "",
-    password: "",
-    confirmPassword: "",
-  });
-
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [username, setUsername] = useState("");
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [sentEmail, setSentEmail] = useState("");
 
-  // Read ?token= from URL on mount
-  useEffect(() => {
-    const urlToken = searchParams.get("token");
-    if (urlToken) {
-      setForm((f) => ({ ...f, token: urlToken }));
-      setStep(2);
-      onToast?.({
-        message: "Reset token detected! Please enter your new password.",
-        type: "info",
-      });
-    }
-  }, [searchParams]);
+  const usernameRef = useRef(null);
 
-  const refs = {
-    username: useRef(null),
-    token: useRef(null),
-    password: useRef(null),
-    confirmPassword: useRef(null),
-  };
-
-  const updateForm = (key) => (e) => {
-    setForm((f) => ({ ...f, [key]: e.target.value }));
-    if (errors[key]) setErrors((err) => ({ ...err, [key]: "" }));
-  };
-
-  // Validate Step 1 (Request Token)
-  const validateStep1 = () => {
+  const validate = () => {
     const newErrors = {};
-    if (!form.username.trim()) {
+    if (!username.trim()) {
       newErrors.username = "Email or Phone number is required";
     }
     setErrors(newErrors);
 
-    if (newErrors.username && refs.username.current) {
-      refs.username.current.scrollIntoView({ behavior: "smooth", block: "center" });
-      refs.username.current.focus();
+    if (newErrors.username && usernameRef.current) {
+      usernameRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      usernameRef.current.focus();
       return false;
     }
     return true;
   };
 
-  // Validate Step 2 (Reset Password)
-  const validateStep2 = () => {
-    const newErrors = {};
-    if (!form.token.trim()) {
-      newErrors.token = "Reset Token is required";
-    }
-    if (!form.password) {
-      newErrors.password = "New password is required";
-    } else if (form.password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
-    }
-    if (!form.confirmPassword) {
-      newErrors.confirmPassword = "Please confirm your password";
-    } else if (form.confirmPassword !== form.password) {
-      newErrors.confirmPassword = "Passwords do not match";
-    }
-
-    setErrors(newErrors);
-
-    const errorKeys = Object.keys(newErrors);
-    if (errorKeys.length > 0) {
-      const firstError = errorKeys[0];
-      const targetRef = refs[firstError];
-      if (targetRef && targetRef.current) {
-        targetRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-        targetRef.current.focus();
-      }
-      return false;
-    }
-
-    return true;
-  };
-
-  // Request Reset Token
-  const handleRequestToken = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validateStep1()) return;
+    if (!validate()) return;
 
     setBusy(true);
     setErrors({});
+
     try {
-      const response = await api.forgotPassword(form.username.trim());
-      const tokenMatch = response?.data?.resetLink?.match(/token=([a-f0-9]+)/i);
-      const resetToken =
-        tokenMatch ? tokenMatch[1] : response?.data?.resetToken || response?.resetToken || response?.token || "";
-
-      if (resetToken) {
-        setForm((f) => ({ ...f, token: resetToken }));
-        onToast?.({
-          message: "Reset token received! Enter your new password below.",
-          type: "success",
-        });
-      } else {
-        onToast?.({
-          message: response?.message || "Password reset token sent to your email. Enter it below.",
-          type: "info",
-        });
-      }
-      setStep(2);
-    } catch (error) {
-      const msg = getApiErrorMessage(error, "Failed to request password reset token.");
-      setErrors({ username: msg, api: msg });
-      onToast?.({ message: msg, type: "error" });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  // Submit Password Reset
-  const handleResetPassword = async (e) => {
-    e.preventDefault();
-    if (!validateStep2()) return;
-
-    setBusy(true);
-    setErrors({});
-    try {
-      await api.resetPassword({
-        token: form.token.trim(),
-        password: form.password,
-        confirmPassword: form.confirmPassword,
-      });
+      const response = await api.forgotPassword(username.trim());
+      // Notice: We do NOT take the token directly from the response!
+      // The token must come strictly from the reset link sent to the user's email.
+      const email = response?.data?.email || username.trim();
+      setSentEmail(email);
+      setIsSubmitted(true);
 
       onToast?.({
-        message: "Password reset successful! You can now log in with your new password.",
+        message: response?.message || `Password reset link sent to ${email}.`,
         type: "success",
       });
-      navigate("/kitchen/login");
     } catch (error) {
-      const msg = getApiErrorMessage(error, "Password reset failed. Please check your reset token.");
-      setErrors((prev) => ({ ...prev, api: msg }));
+      const msg = getApiErrorMessage(error, "Failed to send password reset link.");
+      setErrors({ username: msg, api: msg });
       onToast?.({ message: msg, type: "error" });
     } finally {
       setBusy(false);
@@ -160,33 +59,78 @@ export function ForgotPasswordPage({ onToast }) {
 
   return (
     <AuthLayout
-      title={step === 1 ? "Forgot Password" : "Reset Password"}
+      title="Forgot Password"
       subtitle={
-        step === 1
-          ? "Enter your email or phone to receive a password reset token"
-          : "Enter the reset token and choose a new secure password"
+        isSubmitted
+          ? "Check your email for the password reset link"
+          : "Enter your email or phone to receive a password reset link"
       }
-      icon={step === 1 ? KeyRound : ShieldCheck}
+      icon={KeyRound}
     >
-      {step === 1 ? (
-        <form onSubmit={handleRequestToken} className="space-y-5" noValidate>
+      {isSubmitted ? (
+        <div className="space-y-5 text-center py-4">
+          <div className="mx-auto w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-emerald-600">
+            <CheckCircle2 size={32} />
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Reset Link Sent!</h3>
+            <p className="text-xs text-slate-600 dark:text-slate-400 font-medium max-w-sm mx-auto leading-relaxed">
+              We have sent a password reset link to <strong className="text-slate-900 dark:text-white">{sentEmail}</strong>.
+              Please check your inbox (and spam folder) and click the link to reset your password.
+            </p>
+          </div>
+
+          <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 text-left text-xs text-slate-600 dark:text-slate-300 space-y-1">
+            <span className="font-bold text-slate-800 dark:text-slate-200 block">Next Steps:</span>
+            <p className="text-[11.5px] leading-relaxed">
+              1. Open your email inbox and click on the password reset link.
+              <br />
+              2. The link will take you to <code>/reset-password?token=...</code> to set a new password.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3 pt-2 justify-center">
+            <Link
+              to="/kitchen/login"
+              className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-[#8D0606] text-white text-xs font-bold hover:bg-[#720505] transition"
+            >
+              Back to Login
+            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                setIsSubmitted(false);
+                setUsername("");
+              }}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+            >
+              Send to another email
+            </button>
+          </div>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-5" noValidate>
           <div>
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[#444]">
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300">
               Email or Phone Number *
             </label>
             <div className="relative">
-              <Mail className="absolute left-4 top-3.5 text-[#999]" size={19} />
+              <Mail className="absolute left-4 top-3.5 text-slate-400" size={19} />
               <input
-                ref={refs.username}
+                ref={usernameRef}
                 type="text"
-                className={`h-12 w-full rounded-xl border bg-white pl-12 pr-4 text-sm font-medium outline-none transition duration-200 ${
+                className={`h-12 w-full rounded-xl border bg-white dark:bg-slate-900 pl-12 pr-4 text-sm font-medium outline-none transition duration-200 ${
                   errors.username
                     ? "border-rose-500 bg-rose-50/30 text-rose-900 focus:ring-2 focus:ring-rose-500/20"
-                    : "border-[#e2e2e2] text-[#191919] focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
+                    : "border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
                 }`}
                 placeholder="Enter your registered email or mobile number"
-                value={form.username}
-                onChange={updateForm("username")}
+                value={username}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  if (errors.username) setErrors((err) => ({ ...err, username: "" }));
+                }}
               />
             </div>
             {errors.username && (
@@ -205,160 +149,31 @@ export function ForgotPasswordPage({ onToast }) {
           <button
             type="submit"
             disabled={busy}
-            className="flex py-3 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#8D0606] to-[#b80808] text-sm font-semibold text-white shadow-[0_10px_25px_rgba(141,6,6,0.3)] transition hover:from-[#7a0505] hover:to-[#a10707] disabled:opacity-60"
+            className="flex py-3 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#8D0606] to-[#b80808] text-sm font-semibold text-white shadow-[0_10px_25px_rgba(141,6,6,0.3)] transition hover:from-[#7a0505] hover:to-[#a10707] disabled:opacity-60 cursor-pointer"
           >
             {busy ? (
-              <Loader variant="button" text="Requesting Token..." />
+              <Loader variant="button" text="Sending Reset Link..." />
             ) : (
               <>
-                <span>REQUEST RESET TOKEN</span>
+                <span>SEND RESET LINK</span>
                 <ArrowRight size={18} />
               </>
             )}
           </button>
 
-          <div className="flex justify-between gap-2 pt-2 text-center">
-            <button
-              type="button"
-              onClick={() => setStep(2)}
-              className="text-xs font-semibold text-[#8D0606] hover:underline"
-            >
-              Already have a reset token? Skip to Reset Form &rarr;
-            </button>
+          <div className="flex justify-between items-center gap-2 pt-2 text-center">
             <Link
-              to="/login"
-              className="inline-flex items-center justify-center gap-2 text-xs font-semibold text-[#777] hover:text-[#191919]"
+              to="/kitchen/login"
+              className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900"
             >
               <ArrowLeft size={16} /> Back to Login
             </Link>
-          </div>
-        </form>
-      ) : (
-        <form onSubmit={handleResetPassword} className="space-y-4" noValidate>
-          {/* Token field */}
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#444]">
-              Reset Token *
-            </label>
-            <div className="relative">
-              <KeyRound className="absolute left-4 top-3.5 text-[#999]" size={19} />
-              <input
-                ref={refs.token}
-                type="text"
-                className={`h-12 w-full rounded-xl border bg-white pl-12 pr-4 text-sm font-medium outline-none transition duration-200 ${
-                  errors.token
-                    ? "border-rose-500 bg-rose-50/30 text-rose-900 focus:ring-2 focus:ring-rose-500/20"
-                    : "border-[#e2e2e2] text-[#191919] focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
-                }`}
-                placeholder="Enter reset token from email or server"
-                value={form.token}
-                onChange={updateForm("token")}
-              />
-            </div>
-            {errors.token && (
-              <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-rose-600">
-                <AlertCircle size={13} className="shrink-0" /> {errors.token}
-              </p>
-            )}
-          </div>
-
-          {/* New Password */}
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#444]">
-              New Password *
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-4 top-3.5 text-[#999]" size={19} />
-              <input
-                ref={refs.password}
-                type={showPassword ? "text" : "password"}
-                className={`h-12 w-full rounded-xl border bg-white pl-12 pr-11 text-sm font-medium outline-none transition duration-200 ${
-                  errors.password
-                    ? "border-rose-500 bg-rose-50/30 text-rose-900 focus:ring-2 focus:ring-rose-500/20"
-                    : "border-[#e2e2e2] text-[#191919] focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
-                }`}
-                placeholder="Enter new password (min 6 characters)"
-                value={form.password}
-                onChange={updateForm("password")}
-              />
-              <button
-                type="button"
-                className="absolute right-3.5 top-3.5 text-[#999] hover:text-[#333]"
-                onClick={() => setShowPassword((v) => !v)}
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-            {errors.password && (
-              <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-rose-600">
-                <AlertCircle size={13} className="shrink-0" /> {errors.password}
-              </p>
-            )}
-          </div>
-
-          {/* Confirm Password */}
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[#444]">
-              Confirm New Password *
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-4 top-3.5 text-[#999]" size={19} />
-              <input
-                ref={refs.confirmPassword}
-                type={showConfirmPassword ? "text" : "password"}
-                className={`h-12 w-full rounded-xl border bg-white pl-12 pr-11 text-sm font-medium outline-none transition duration-200 ${
-                  errors.confirmPassword
-                    ? "border-rose-500 bg-rose-50/30 text-rose-900 focus:ring-2 focus:ring-rose-500/20"
-                    : "border-[#e2e2e2] text-[#191919] focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
-                }`}
-                placeholder="Re-enter new password to confirm"
-                value={form.confirmPassword}
-                onChange={updateForm("confirmPassword")}
-              />
-              <button
-                type="button"
-                className="absolute right-3.5 top-3.5 text-[#999] hover:text-[#333]"
-                onClick={() => setShowConfirmPassword((v) => !v)}
-              >
-                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-            {errors.confirmPassword && (
-              <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-rose-600">
-                <AlertCircle size={13} className="shrink-0" /> {errors.confirmPassword}
-              </p>
-            )}
-          </div>
-
-          {errors.api && (
-            <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-700">
-              {errors.api}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={busy}
-            className="flex py-3 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#8D0606] to-[#b80808] text-sm font-semibold text-white shadow-[0_10px_25px_rgba(141,6,6,0.3)] transition hover:from-[#7a0505] hover:to-[#a10707] disabled:opacity-60"
-          >
-            {busy ? (
-              <Loader variant="button" text="Resetting Password..." />
-            ) : (
-              <>
-                <span>CONFIRM NEW PASSWORD</span>
-                <CheckCircle size={18} />
-              </>
-            )}
-          </button>
-
-          <div className="pt-2 text-center">
-            <button
-              type="button"
-              onClick={() => setStep(1)}
+            <Link
+              to="/reset-password"
               className="text-xs font-semibold text-[#8D0606] hover:underline"
             >
-              ← Back to Step 1 (Request Token)
-            </button>
+              Have a token? Reset here &rarr;
+            </Link>
           </div>
         </form>
       )}

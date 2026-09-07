@@ -45,21 +45,9 @@ import {
   getKitchenInventoryApi,
 } from '../services/api';
 import { extractFieldErrors, getErrorMessage } from '../utils/errorHelper';
+import { STANDARD_MEASURE_UNITS } from '../../constants/measureUnits';
 
-const INVENTORY_UNITS = [
-  { value: 'KG', label: 'KG (Kilograms)' },
-  { value: 'GM', label: 'GM (Grams)' },
-  { value: 'LITER', label: 'LITER (Liters)' },
-  { value: 'ML', label: 'ML (Milliliters)' },
-  { value: 'ITEM', label: 'ITEM (Pieces / Units)' },
-  { value: 'PIECE', label: 'PIECE' },
-  { value: 'DOZEN', label: 'DOZEN' },
-  { value: 'PACKET', label: 'PACKET' },
-  { value: 'BOX', label: 'BOX' },
-  { value: 'BOTTLE', label: 'BOTTLE' },
-  { value: 'CAN', label: 'CAN' },
-  { value: 'PORTION', label: 'PORTION' },
-];
+const INVENTORY_UNITS = STANDARD_MEASURE_UNITS;
 
 export const Ingredients = () => {
   const toast = useToast();
@@ -87,21 +75,14 @@ export const Ingredients = () => {
 
   const [form, setForm] = useState({
     name: '',
-    category: 'Vegetable',
+    category: '',
     image: '',
     imageFile: null,
     status: 'ACTIVE',
   });
 
   // Dynamic Category Options
-  const [categoryOptions, setCategoryOptions] = useState([
-    { value: 'Vegetable', label: 'Vegetable' },
-    { value: 'Meat', label: 'Meat & Poultry' },
-    { value: 'Dairy', label: 'Dairy & Cheese' },
-    { value: 'Spices', label: 'Spices & Flavors' },
-    { value: 'Oils', label: 'Oils & Condiments' },
-    { value: 'Grains', label: 'Grains & Pasta' },
-  ]);
+  const [categoryOptions, setCategoryOptions] = useState([]);
 
   // Kitchens and Branches for Inventory Addition
   const [kitchens, setKitchens] = useState([]);
@@ -221,27 +202,23 @@ export const Ingredients = () => {
 
   // ── API Calls ──────────────────────────────────────────────
 
-  // 1. Fetch Dynamic Categories from GET /admin/menu
+  // 1. Fetch Dynamic Categories strictly from GET /admin/menu (Menu Categories List)
   const fetchDynamicCategories = async () => {
     try {
       const res = await getMenuCategoriesApi({ limit: 200 });
       const rawCats = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
       if (rawCats.length > 0) {
-        const catMap = new Map();
-        rawCats.forEach((c) => {
-          if (c.name) catMap.set(c.name.toLowerCase(), c.name);
-          if (Array.isArray(c.subCategories)) {
-            c.subCategories.forEach((sc) => {
-              if (sc.name) catMap.set(sc.name.toLowerCase(), sc.name);
-            });
-          }
-        });
-        setCategoryOptions((prev) => {
-          const combined = new Map();
-          prev.forEach((o) => combined.set(o.value.toLowerCase(), o.label));
-          catMap.forEach((name, key) => combined.set(key, name));
-          return Array.from(combined.values()).map((name) => ({ value: name, label: name }));
-        });
+        const uniqueCats = new Map();
+        rawCats
+          .filter((c) => c && (c.status === undefined || c.status === 'ACTIVE') && c.name)
+          .forEach((c) => {
+            const name = c.name.trim();
+            if (name && !uniqueCats.has(name.toLowerCase())) {
+              uniqueCats.set(name.toLowerCase(), { value: name, label: name, id: c.id });
+            }
+          });
+        const list = Array.from(uniqueCats.values());
+        setCategoryOptions(list);
       }
     } catch (err) {
       console.warn('Failed to fetch dynamic categories in ingredients:', err);
@@ -264,19 +241,6 @@ export const Ingredients = () => {
           updatedAt: item.updatedAt,
         }));
         setIngredients(formatted);
-
-        // Merge any ingredient categories
-        setCategoryOptions((prev) => {
-          const existing = new Set(prev.map((o) => o.value.toLowerCase()));
-          const extra = [];
-          res.data.forEach((item) => {
-            if (item.category && !existing.has(item.category.toLowerCase())) {
-              existing.add(item.category.toLowerCase());
-              extra.push({ value: item.category, label: item.category });
-            }
-          });
-          return extra.length ? [...prev, ...extra] : prev;
-        });
       }
     } catch (err) {
       console.error('Error fetching ingredients:', err);
@@ -496,7 +460,7 @@ export const Ingredients = () => {
     hideLoading();
     const target = res?.status === true && res.data ? res.data : ing;
     setEditingIngredient(target);
-    const cat = target.category || 'Vegetable';
+    const cat = target.category || (categoryOptions[0]?.value || '');
     setCategoryOptions((prev) => {
       if (cat && !prev.some((o) => o.value.toLowerCase() === cat.toLowerCase())) {
         return [...prev, { value: cat, label: cat }];
@@ -592,7 +556,7 @@ export const Ingredients = () => {
             <button
               onClick={() => {
                 setEditingIngredient(null);
-                setForm({ name: '', category: 'Vegetable', image: '', imageFile: null, status: 'ACTIVE' });
+                setForm({ name: '', category: categoryOptions[0]?.value || '', image: '', imageFile: null, status: 'ACTIVE' });
                 setErrors({});
                 setIsModalOpen(true);
               }}
@@ -1478,7 +1442,7 @@ export const Ingredients = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1 font-extrabold">
-                      Category (Dynamic)
+                      Category
                     </label>
                     <CreatableSelect
                       options={categoryOptions}

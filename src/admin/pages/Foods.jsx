@@ -50,6 +50,7 @@ import {
   formatRecipeQty,
   calculateStockCapacity
 } from '../utils/recipeHelper';
+import { STANDARD_MEASURE_UNITS, findUnitOption } from '../../constants/measureUnits';
 
 export const Foods = () => {
   const { setIsAddMenuOpen } = useApp();
@@ -80,7 +81,7 @@ export const Foods = () => {
   const [editingIngredients, setEditingIngredients] = useState([]);
   const [tempEditIngId, setTempEditIngId] = useState('');
   const [tempEditQty, setTempEditQty] = useState('');
-  const [tempEditUnit, setTempEditUnit] = useState('gm');
+  const [tempEditUnit, setTempEditUnit] = useState('GM');
   const [editErrors, setEditErrors] = useState({});
 
   useEffect(() => {
@@ -517,14 +518,14 @@ export const Foods = () => {
       {
         id: ingObj.id,
         name: ingObj.name,
-        unit: tempEditUnit || ingObj.unit || 'gm',
+        unit: tempEditUnit || ingObj.unit || 'GM',
         quantity: parsedQty,
       },
     ]);
 
     setTempEditIngId('');
     setTempEditQty('');
-    setTempEditUnit('gm');
+    setTempEditUnit('GM');
   };
 
   const handleUpdateEditIngredient = (id, field, value) => {
@@ -1188,14 +1189,19 @@ export const Foods = () => {
                       />
                     </div>
 
-                    <div className="w-full sm:w-24">
-                      <input
-                        type="text"
-                        placeholder="Unit (gm)"
-                        value={tempEditUnit}
+                    <div className="w-full sm:w-28">
+                      <select
+                        value={findUnitOption(tempEditUnit).value}
                         onChange={(e) => setTempEditUnit(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:border-[#8C0D0D]"
-                      />
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:border-[#8C0D0D] cursor-pointer"
+                        title="Select Unit"
+                      >
+                        {STANDARD_MEASURE_UNITS.map((u) => (
+                          <option key={u.value} value={u.value}>
+                            {u.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
                     <button
@@ -1283,16 +1289,20 @@ export const Foods = () => {
                                     className="w-16 px-1.5 py-1 text-center text-xs font-black bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#8C0D0D]"
                                     title="Edit quantity"
                                   />
-                                  <input
-                                    type="text"
-                                    placeholder="Unit"
-                                    value={item.unit}
+                                  <select
+                                    value={findUnitOption(item.unit).value}
                                     onChange={(e) =>
                                       handleUpdateEditIngredient(item.id, 'unit', e.target.value)
                                     }
-                                    className="w-14 px-1.5 py-1 text-center text-[11px] font-extrabold bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 focus:outline-none focus:border-[#8C0D0D] uppercase"
-                                    title="Edit unit (e.g. GM, ML, PCS)"
-                                  />
+                                    className="px-1.5 py-1 text-center text-[11px] font-extrabold bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 focus:outline-none focus:border-[#8C0D0D] uppercase cursor-pointer"
+                                    title="Edit unit"
+                                  >
+                                    {STANDARD_MEASURE_UNITS.map((u) => (
+                                      <option key={u.value} value={u.value}>
+                                        {u.label}
+                                      </option>
+                                    ))}
+                                  </select>
                                 </div>
                                 <button
                                   type="button"

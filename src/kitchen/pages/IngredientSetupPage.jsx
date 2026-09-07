@@ -37,6 +37,7 @@ import { ApiCount } from "../../components/ui/ApiCount";
 import { api, getApiErrorMessage } from "../../api";
 import { resolveSelectedBranchId } from "../../utils/helpers";
 import { usePermissions } from "../../utils/permissions";
+import { STANDARD_MEASURE_UNITS, findUnitOption } from "../../constants/measureUnits";
 
 // ---------------------------------------------------------------------------
 // Shared styling for react-select dropdowns
@@ -98,22 +99,7 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
   const selectedBranchId = resolveSelectedBranchId(branches, apiState?.selectedBranchId);
   const firstBranchId = selectedBranchId || (branchOptions[0]?.value ? String(branchOptions[0].value) : "");
 
-  const unitOptions = [
-    "KG",
-    "GM",
-    "MG",
-    "LITER",
-    "ML",
-    "ITEM",
-    "PIECE",
-    "DOZEN",
-    "PACKET",
-    "BOX",
-    "BOTTLE",
-    "CAN",
-    "PORTION",
-    "SERVING",
-  ].map((unit) => ({ value: unit, label: unit }));
+  const unitOptions = STANDARD_MEASURE_UNITS;
 
   // Tab mode in Add Panel: 'master' | 'custom'
   const [activeTab, setActiveTab] = useState("master");
@@ -1133,7 +1119,7 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                 <Select
                   styles={selectStyles(false)}
                   options={unitOptions}
-                  value={findOption(unitOptions, defaultMasterUnit)}
+                  value={findUnitOption(defaultMasterUnit)}
                   onChange={(opt) => {
                     const newUnit = opt?.value || "KG";
                     setDefaultMasterUnit(newUnit);
@@ -1266,7 +1252,7 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                 <Select
                   styles={selectStyles(!!errors.unit)}
                   options={unitOptions}
-                  value={findOption(unitOptions, customForm.unit)}
+                  value={findUnitOption(customForm.unit)}
                   onChange={(opt) =>
                     setCustomForm((f) => ({ ...f, unit: opt?.value || "KG" }))
                   }

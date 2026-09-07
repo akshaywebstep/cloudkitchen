@@ -615,21 +615,21 @@ export const Kitchens = () => {
     const targetKitchen = activeBranchesModal;
 
     const payload = {
-      userId: targetKitchen.id,
-      name: branchForm.name,
-      addressLine1: branchForm.addressLine1,
-      addressLine2: branchForm.addressLine2 || '',
-      landmark: branchForm.landmark || '',
-      area: branchForm.area || '',
-      pincode: branchForm.pincode || '177001',
+      userId: Number(targetKitchen.id),
+      name: branchForm.name?.trim() || '',
+      addressLine1: branchForm.addressLine1?.trim() || '',
+      addressLine2: branchForm.addressLine2 ? branchForm.addressLine2.trim() : '',
+      landmark: branchForm.landmark ? branchForm.landmark.trim() : '',
+      area: branchForm.area ? branchForm.area.trim() : '',
+      pincode: branchForm.pincode ? branchForm.pincode.trim() : '177001',
       countryId: Number(branchForm.countryId) || 101,
       stateId: Number(branchForm.stateId) || 4020,
       cityId: Number(branchForm.cityId) || 132063,
       contactTitle: branchForm.contactTitle || 'MR',
-      contactFirstName: branchForm.contactFirstName,
-      contactLastName: branchForm.contactLastName,
-      contactEmail: branchForm.contactEmail || targetKitchen.email || 'akshay.contact@gmail.com',
-      contactPhone: branchForm.contactPhone || targetKitchen.phone || '7404113228',
+      contactFirstName: branchForm.contactFirstName?.trim() || '',
+      contactLastName: branchForm.contactLastName?.trim() || '',
+      contactEmail: branchForm.contactEmail ? branchForm.contactEmail.trim() : (targetKitchen.email || 'akshay.contact@gmail.com'),
+      contactPhone: branchForm.contactPhone ? branchForm.contactPhone.trim() : (targetKitchen.phone || '7404113228'),
       cuisines: (branchForm.selectedCuisineIds || []).map((id) => ({ id: Number(id) })),
     };
 

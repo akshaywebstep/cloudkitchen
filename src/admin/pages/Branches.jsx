@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import Select from 'react-select';
 import {
@@ -34,7 +34,10 @@ import {
   createBranchApi,
   updateBranchApi,
   getKitchensApi,
-  getCuisinesApi
+  getCuisinesApi,
+  getCountriesApi,
+  getStatesApi,
+  getCitiesApi,
 } from '../services/api';
 import { extractFieldErrors, getErrorMessage } from '../utils/errorHelper';
 
@@ -215,12 +218,61 @@ export const Branches = () => {
 
   const [form, setForm] = useState(initialForm);
 
+  const [countries, setCountries] = useState([]);
+  const [states, setStates] = useState([]);
+  const [cities, setCities] = useState([]);
+  const [loadingCountries, setLoadingCountries] = useState(false);
+  const [loadingStates, setLoadingStates] = useState(false);
+  const [loadingCities, setLoadingCities] = useState(false);
+
   const titleOptions = [
     { value: 'MR', label: 'Mr.' },
     { value: 'MS', label: 'Ms.' },
     { value: 'MRS', label: 'Mrs.' },
     { value: 'DR', label: 'Dr.' },
   ];
+
+  const countryOptions = useMemo(() => {
+    if (countries.length > 0) {
+      return countries.map((c) => ({
+        value: Number(c.id),
+        label: c.name || `Country ${c.id}`,
+      }));
+    }
+    if (form.countryId) {
+      const label = Number(form.countryId) === 101 ? 'India' : `Country #${form.countryId}`;
+      return [{ value: Number(form.countryId), label }];
+    }
+    return [{ value: 101, label: 'India' }];
+  }, [countries, form.countryId]);
+
+  const stateOptions = useMemo(() => {
+    if (states.length > 0) {
+      return states.map((s) => ({
+        value: Number(s.id),
+        label: s.name || `State ${s.id}`,
+      }));
+    }
+    if (form.stateId) {
+      const label = Number(form.stateId) === 4020 ? 'Himachal Pradesh' : `State #${form.stateId}`;
+      return [{ value: Number(form.stateId), label }];
+    }
+    return [];
+  }, [states, form.stateId]);
+
+  const cityOptions = useMemo(() => {
+    if (cities.length > 0) {
+      return cities.map((c) => ({
+        value: Number(c.id),
+        label: c.name || `City ${c.id}`,
+      }));
+    }
+    if (form.cityId) {
+      const label = Number(form.cityId) === 132063 ? 'Hamirpur' : `City #${form.cityId}`;
+      return [{ value: Number(form.cityId), label }];
+    }
+    return [];
+  }, [cities, form.cityId]);
 
   const customSelectStyles = {
     control: (base, state) => ({
@@ -317,12 +369,14 @@ export const Branches = () => {
     }),
   };
 
-  // Fetch Kitchens and Cuisines metadata for dropdowns
+  // Fetch Kitchens, Cuisines, and Countries metadata for dropdowns
   const fetchDropdowns = async () => {
     try {
-      const [kitRes, cuisineRes] = await Promise.all([
+      setLoadingCountries(true);
+      const [kitRes, cuisineRes, countryRes] = await Promise.all([
         getKitchensApi(),
         getCuisinesApi({ limit: 200 }),
+        getCountriesApi({ limit: 100 }),
       ]);
 
       if (kitRes?.status === true && Array.isArray(kitRes.data)) {
@@ -331,14 +385,71 @@ export const Branches = () => {
       if (cuisineRes?.status === true && Array.isArray(cuisineRes.data)) {
         setCuisines(cuisineRes.data);
       }
+      if (countryRes?.status === true && Array.isArray(countryRes.data)) {
+        setCountries(countryRes.data);
+      }
     } catch (err) {
       console.error('Error loading dropdown data:', err);
+    } finally {
+      setLoadingCountries(false);
     }
   };
 
   useEffect(() => {
     fetchDropdowns();
   }, []);
+
+  // Fetch States when Country changes
+  useEffect(() => {
+    let active = true;
+    const loadStates = async () => {
+      if (!form.countryId) {
+        setStates([]);
+        return;
+      }
+      setLoadingStates(true);
+      try {
+        const res = await getStatesApi(form.countryId);
+        if (active && res?.status === true && Array.isArray(res.data)) {
+          setStates(res.data);
+        }
+      } catch (err) {
+        console.error('Failed to load states:', err);
+      } finally {
+        if (active) setLoadingStates(false);
+      }
+    };
+    loadStates();
+    return () => {
+      active = false;
+    };
+  }, [form.countryId]);
+
+  // Fetch Cities when Country or State changes
+  useEffect(() => {
+    let active = true;
+    const loadCities = async () => {
+      if (!form.countryId || !form.stateId) {
+        setCities([]);
+        return;
+      }
+      setLoadingCities(true);
+      try {
+        const res = await getCitiesApi(form.countryId, form.stateId);
+        if (active && res?.status === true && Array.isArray(res.data)) {
+          setCities(res.data);
+        }
+      } catch (err) {
+        console.error('Failed to load cities:', err);
+      } finally {
+        if (active) setLoadingCities(false);
+      }
+    };
+    loadCities();
+    return () => {
+      active = false;
+    };
+  }, [form.countryId, form.stateId]);
 
   // Fetch Branches with Server-Side Pagination and Filtering
   const fetchBranches = async () => {
@@ -459,24 +570,24 @@ export const Branches = () => {
     setErrors({});
     showLoading(editingBranch ? `Updating branch #${editingBranch.id}...` : 'Creating new branch...');
 
-    // Exact Payload structure requested by user
+    // Exact Payload structure requested by user (16 fields, no extra keys)
     const payload = {
       userId: Number(form.userId),
-      name: form.name,
-      addressLine1: form.addressLine1,
-      addressLine2: form.addressLine2 || '',
-      landmark: form.landmark || '',
-      area: form.area || '',
-      pincode: form.pincode || '177001',
+      name: form.name?.trim() || '',
+      addressLine1: form.addressLine1?.trim() || '',
+      addressLine2: form.addressLine2 ? form.addressLine2.trim() : '',
+      landmark: form.landmark ? form.landmark.trim() : '',
+      area: form.area ? form.area.trim() : '',
+      pincode: form.pincode ? form.pincode.trim() : '177001',
       countryId: Number(form.countryId) || 101,
       stateId: Number(form.stateId) || 4020,
       cityId: Number(form.cityId) || 132063,
       contactTitle: form.contactTitle || 'MR',
-      contactFirstName: form.contactFirstName,
-      contactLastName: form.contactLastName,
-      contactEmail: form.contactEmail || 'akshay.contact@gmail.com',
-      contactPhone: form.contactPhone,
-      cuisines: form.selectedCuisineIds.map((id) => ({ id: Number(id) })),
+      contactFirstName: form.contactFirstName?.trim() || '',
+      contactLastName: form.contactLastName?.trim() || '',
+      contactEmail: form.contactEmail ? form.contactEmail.trim() : 'akshay.contact@gmail.com',
+      contactPhone: form.contactPhone?.trim() || '',
+      cuisines: (form.selectedCuisineIds || []).map((id) => ({ id: Number(id) })),
     };
 
     const res = editingBranch
@@ -1080,6 +1191,74 @@ export const Branches = () => {
                       value={form.pincode}
                       onChange={(e) => setForm({ ...form, pincode: e.target.value })}
                       className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm font-medium"
+                    />
+                  </div>
+                </div>
+
+                {/* Country, State, City Selection (Displays Names, Stores IDs) */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1 font-extrabold text-xs">
+                      Country
+                    </label>
+                    <Select
+                      options={countryOptions}
+                      value={countryOptions.find((opt) => Number(opt.value) === Number(form.countryId)) || null}
+                      onChange={(opt) => {
+                        setForm((prev) => ({
+                          ...prev,
+                          countryId: opt ? Number(opt.value) : '',
+                          stateId: '',
+                          cityId: '',
+                        }));
+                      }}
+                      isLoading={loadingCountries}
+                      placeholder="Select Country..."
+                      styles={customSelectStyles}
+                      isSearchable={true}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1 font-extrabold text-xs">
+                      State
+                    </label>
+                    <Select
+                      options={stateOptions}
+                      value={stateOptions.find((opt) => Number(opt.value) === Number(form.stateId)) || null}
+                      onChange={(opt) => {
+                        setForm((prev) => ({
+                          ...prev,
+                          stateId: opt ? Number(opt.value) : '',
+                          cityId: '',
+                        }));
+                      }}
+                      isLoading={loadingStates}
+                      placeholder={loadingStates ? 'Loading states...' : 'Select State...'}
+                      styles={customSelectStyles}
+                      isSearchable={true}
+                      isDisabled={!form.countryId}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1 font-extrabold text-xs">
+                      City
+                    </label>
+                    <Select
+                      options={cityOptions}
+                      value={cityOptions.find((opt) => Number(opt.value) === Number(form.cityId)) || null}
+                      onChange={(opt) => {
+                        setForm((prev) => ({
+                          ...prev,
+                          cityId: opt ? Number(opt.value) : '',
+                        }));
+                      }}
+                      isLoading={loadingCities}
+                      placeholder={loadingCities ? 'Loading cities...' : 'Select City...'}
+                      styles={customSelectStyles}
+                      isSearchable={true}
+                      isDisabled={!form.stateId}
                     />
                   </div>
                 </div>
