@@ -153,6 +153,9 @@ export const getKitchensApi = async (params = {}) => {
  */
 export const getKitchenByIdApi = async (id) => {
   try {
+    if (!id) {
+      return { status: false, message: "Kitchen ID is required" };
+    }
     const token = localStorage.getItem('admin_token');
     const response = await apiClient.get(`/admin/kitchen/${id}`, {
       headers: {
@@ -573,6 +576,26 @@ export const getKitchenInventoryApi = async (kitchenId, branchId) => {
   } catch (error) {
     if (error.response && error.response.data) return error.response.data;
     return { status: false, message: error.message || 'Failed to fetch inventory.' };
+  }
+};
+
+/**
+ * Fetch Admin Inventory (with stockLogs & batches) API
+ * Supports params like { ingredientId, kitchenId, branchId, limit, page }
+ * @param {Object} [params]
+ * @returns {Promise<Object>} Response object
+ */
+export const getAdminInventoryApi = async (params = {}) => {
+  try {
+    const token = localStorage.getItem('admin_token');
+    const response = await apiClient.get('/admin/inventory', {
+      headers: { Authorization: `Bearer ${token}` },
+      params,
+    });
+    return response.data;
+  } catch (error) {
+    if (error.response && error.response.data) return error.response.data;
+    return { status: false, message: error.message || 'Failed to fetch admin inventory logs.' };
   }
 };
 

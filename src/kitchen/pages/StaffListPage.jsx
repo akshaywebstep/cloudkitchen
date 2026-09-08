@@ -1109,7 +1109,7 @@ function StaffFormModal({ staff, roles, branches, activeBranchId, onClose, onSuc
                   </span>
                 </div>
                 <p className="text-xs font-bold text-slate-900 truncate mt-0.5">
-                  {branches.find((b) => String(b.id) === String(activeBranchId))?.name || `Branch Outlet #${activeBranchId || "1"}`}
+                  {branches.find((b) => String(b.id) === String(activeBranchId))?.name || (activeBranchId ? `Branch Outlet #${activeBranchId}` : "No Branch Configured")}
                 </p>
               </div>
             </div>

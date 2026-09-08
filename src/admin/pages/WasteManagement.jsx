@@ -33,7 +33,7 @@ import {
   getWasteLogsApi,
   getWasteLogByIdApi,
   getKitchensApi,
-  getBranchesApi,
+  getKitchenByIdApi,
 } from '../services/api';
 
 const REASON_OPTIONS = [
@@ -147,12 +147,18 @@ export const WasteManagement = () => {
         return;
       }
       try {
-        const res = await getBranchesApi({ kitchenId: selectedKitchenId, limit: 100 });
-        const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        const res = await getKitchenByIdApi(selectedKitchenId);
+        const list = Array.isArray(res?.data?.branches)
+          ? res.data.branches
+          : Array.isArray(res?.branches)
+          ? res.branches
+          : [];
         setBranches(list);
         setSelectedBranchId('');
       } catch (err) {
         console.error('Failed to load branches:', err);
+        setBranches([]);
+        setSelectedBranchId('');
       }
     }
     loadBranches();

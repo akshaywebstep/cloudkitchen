@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import Select from 'react-select';
 import CreatableSelect from 'react-select/creatable';
@@ -27,6 +28,13 @@ import {
   AlertOctagon,
   TrendingDown,
   Sparkles,
+  History,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Trash2,
+  Receipt,
+  ArrowRight,
+  ExternalLink,
 } from 'lucide-react';
 import { EmptyState } from '../components/common/EmptyState';
 import { Pagination } from '../components/common/Pagination';
@@ -40,9 +48,10 @@ import {
   updateIngredientApi,
   getMenuCategoriesApi,
   getKitchensApi,
-  getBranchesApi,
+  getKitchenByIdApi,
   saveKitchenInventoryApi,
   getKitchenInventoryApi,
+  getAdminInventoryApi,
 } from '../services/api';
 import { extractFieldErrors, getErrorMessage } from '../utils/errorHelper';
 import { STANDARD_MEASURE_UNITS } from '../../constants/measureUnits';
@@ -50,6 +59,7 @@ import { STANDARD_MEASURE_UNITS } from '../../constants/measureUnits';
 const INVENTORY_UNITS = STANDARD_MEASURE_UNITS;
 
 export const Ingredients = () => {
+  const navigate = useNavigate();
   const toast = useToast();
   const { theme } = useTheme();
   const { showLoading, hideLoading } = useLoading();
@@ -104,6 +114,16 @@ export const Ingredients = () => {
   const [invErrors, setInvErrors] = useState({});
   const [submittingInventory, setSubmittingInventory] = useState(false);
 
+  // Stock Movement Logs Modal State
+  const [stockLogsModalOpen, setStockLogsModalOpen] = useState(false);
+  const [selectedLogIngredient, setSelectedLogIngredient] = useState(null);
+  const [loadingIngredientLogs, setLoadingIngredientLogs] = useState(false);
+  const [ingredientInventories, setIngredientInventories] = useState([]);
+  const [logKitchenFilter, setLogKitchenFilter] = useState('ALL');
+  const [logBranchFilter, setLogBranchFilter] = useState('ALL');
+  const [logTypeFilter, setLogTypeFilter] = useState('ALL');
+  const [logSearch, setLogSearch] = useState('');
+
   // Branch Inventory View tab state
   const [selectedInvKitchen, setSelectedInvKitchen] = useState('');
   const [invBranches, setInvBranches] = useState([]);
@@ -111,6 +131,11 @@ export const Ingredients = () => {
   const [branchInventory, setBranchInventory] = useState([]);
   const [loadingBranchInv, setLoadingBranchInv] = useState(false);
   const [branchInvSearch, setBranchInvSearch] = useState('');
+
+  const currentKitchen = useMemo(() => {
+    return kitchens.find((k) => String(k.id) === String(selectedInvKitchen));
+  }, [kitchens, selectedInvKitchen]);
+  const currentKitchenName = currentKitchen?.kitchenName || currentKitchen?.email || (selectedInvKitchen ? `Kitchen #${selectedInvKitchen}` : '');
 
   const handleImageFileChange = (e) => {
     const file = e.target.files?.[0];
@@ -267,32 +292,65 @@ export const Ingredients = () => {
     fetchKitchens();
   }, []);
 
+  // Handler when kitchen changes in tab
+  const handleTabKitchenChange = (kitchenId) => {
+    setSelectedInvKitchen(kitchenId);
+    setSelectedInvBranch('');
+    setInvBranches([]);
+    setBranchInventory([]);
+  };
+
+  // Handler when kitchen changes in modal
+  const handleModalKitchenChange = (kitchenId) => {
+    setInvForm((p) => ({ ...p, kitchenId, branchId: '' }));
+    setBranches([]);
+  };
+
   // Load branches when Modal kitchen changes
   useEffect(() => {
+    let isCancelled = false;
     async function loadModalBranches() {
       if (!invForm.kitchenId) {
         setBranches([]);
+        setInvForm((p) => ({ ...p, branchId: '' }));
         return;
       }
       setLoadingBranches(true);
       try {
-        const res = await getBranchesApi({ kitchenId: invForm.kitchenId, limit: 100 });
-        const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        const res = await getKitchenByIdApi(invForm.kitchenId);
+        if (isCancelled) return;
+        const list = Array.isArray(res?.data?.branches)
+          ? res.data.branches
+          : Array.isArray(res?.branches)
+            ? res.branches
+            : [];
         setBranches(list);
-        if (list.length > 0 && !invForm.branchId) {
-          setInvForm((p) => ({ ...p, branchId: String(list[0].id) }));
+        if (list.length > 0) {
+          setInvForm((p) => {
+            const hasCurrent = list.some((b) => String(b.id) === String(p.branchId));
+            return { ...p, branchId: hasCurrent ? p.branchId : String(list[0].id) };
+          });
+        } else {
+          setInvForm((p) => ({ ...p, branchId: '' }));
         }
       } catch (err) {
+        if (isCancelled) return;
         console.error('Failed to load branches:', err);
+        setBranches([]);
+        setInvForm((p) => ({ ...p, branchId: '' }));
       } finally {
-        setLoadingBranches(false);
+        if (!isCancelled) setLoadingBranches(false);
       }
     }
     loadModalBranches();
+    return () => {
+      isCancelled = true;
+    };
   }, [invForm.kitchenId]);
 
   // Load branches when Branch Inventory Tab kitchen changes
   useEffect(() => {
+    let isCancelled = false;
     async function loadTabBranches() {
       if (!selectedInvKitchen) {
         setInvBranches([]);
@@ -300,32 +358,48 @@ export const Ingredients = () => {
         setBranchInventory([]);
         return;
       }
+      setLoadingBranchInv(true);
       try {
-        const res = await getBranchesApi({ kitchenId: selectedInvKitchen, limit: 100 });
-        const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        const res = await getKitchenByIdApi(selectedInvKitchen);
+        if (isCancelled) return;
+        const list = Array.isArray(res?.data?.branches)
+          ? res.data.branches
+          : Array.isArray(res?.branches)
+            ? res.branches
+            : [];
         setInvBranches(list);
         if (list.length > 0) {
+          // Always pick the first branch of the new kitchen
           setSelectedInvBranch(String(list[0].id));
         } else {
           setSelectedInvBranch('');
           setBranchInventory([]);
         }
       } catch (err) {
+        if (isCancelled) return;
         console.error('Failed to load tab branches:', err);
+        setInvBranches([]);
+        setSelectedInvBranch('');
+        setBranchInventory([]);
+      } finally {
+        if (!isCancelled) setLoadingBranchInv(false);
       }
     }
     loadTabBranches();
+    return () => {
+      isCancelled = true;
+    };
   }, [selectedInvKitchen]);
 
   // Fetch branch inventory when Tab Kitchen & Branch are selected
-  const fetchBranchInventory = async () => {
-    if (!selectedInvKitchen || !selectedInvBranch) {
+  const fetchBranchInventory = async (kId = selectedInvKitchen, bId = selectedInvBranch) => {
+    if (!kId || !bId) {
       setBranchInventory([]);
       return;
     }
     setLoadingBranchInv(true);
     try {
-      const res = await getKitchenInventoryApi(selectedInvKitchen, selectedInvBranch);
+      const res = await getKitchenInventoryApi(kId, bId);
       if (res?.status === true && Array.isArray(res.data)) {
         setBranchInventory(res.data);
       } else {
@@ -340,19 +414,26 @@ export const Ingredients = () => {
   };
 
   useEffect(() => {
-    if (activeTab === 'branch-inventory') {
-      fetchBranchInventory();
+    if (activeTab === 'branch-inventory' && selectedInvKitchen && selectedInvBranch) {
+      // Strictly verify that selectedInvBranch actually belongs to the loaded invBranches
+      const branchBelongsToKitchen = invBranches.some(
+        (b) => String(b.id) === String(selectedInvBranch)
+      );
+      if (branchBelongsToKitchen) {
+        fetchBranchInventory(selectedInvKitchen, selectedInvBranch);
+      }
     }
-  }, [activeTab, selectedInvKitchen, selectedInvBranch]);
+  }, [activeTab, selectedInvKitchen, selectedInvBranch, invBranches]);
 
   // ── Open Inventory Addition Modal ───────────────────────────
   const openInventoryModal = (ing = null) => {
     const targetIngId = ing ? String(ing.id) : ingredients[0]?.id ? String(ingredients[0].id) : '';
-    const initialKitchenId = kitchens[0]?.id ? String(kitchens[0].id) : '';
+    const initialKitchenId = selectedInvKitchen || (kitchens[0]?.id ? String(kitchens[0].id) : '');
+    const initialBranchId = selectedInvBranch || '';
 
     setInvForm({
       kitchenId: initialKitchenId,
-      branchId: '',
+      branchId: initialBranchId,
       ingredientId: targetIngId,
       unit: 'KG',
       alertQuantity: 5,
@@ -370,7 +451,11 @@ export const Ingredients = () => {
     const newErrors = {};
 
     if (!invForm.kitchenId) newErrors.kitchenId = 'Please select a kitchen hub.';
-    if (!invForm.branchId) newErrors.branchId = 'Please select an outlet branch.';
+    if (!invForm.branchId) {
+      newErrors.branchId = branches.length === 0
+        ? 'Please add a branch for this kitchen first!'
+        : 'Please select an outlet branch.';
+    }
     if (!invForm.ingredientId) newErrors.ingredientId = 'Please select an ingredient.';
     if (!invForm.unit) newErrors.unit = 'Unit is required.';
 
@@ -444,6 +529,261 @@ export const Ingredients = () => {
     const q = branchInvSearch.toLowerCase();
     return name.toLowerCase().includes(q) || cat.toLowerCase().includes(q);
   });
+
+  // ── Stock Movement Logs Logic ──────────────────────────────
+  const getLogCategory = (type) => {
+    const t = String(type || '').toUpperCase();
+    if (t.includes('INWARD') || t.includes('ADD') || t.includes('RESTOCK') || t.includes('PURCHASE')) return 'INWARD';
+    if (t.includes('CONSUMED') || t.includes('OUTWARD') || t.includes('ORDER') || t.includes('RECIPE') || t.includes('USAGE')) return 'CONSUMED';
+    if (t.includes('WASTE') || t.includes('DAMAGE') || t.includes('EXPIRE') || t.includes('SPOIL')) return 'WASTE';
+    if (t.includes('ADJUST')) return 'ADJUSTMENT';
+    return 'OTHER';
+  };
+
+  const extractLogBatch = (log) => {
+    if (!log) return null;
+    if (log.batchNumber) return log.batchNumber;
+    if (log.stock?.batchNumber) return log.stock.batchNumber;
+    if (typeof log.notes === 'string') {
+      const match = log.notes.match(/batch\s*[:#-]?\s*([a-zA-Z0-9_-]+)/i);
+      if (match && match[1]) return match[1];
+    }
+    return null;
+  };
+
+  const formatLogTimestamp = (dateString) => {
+    if (!dateString) return '—';
+    try {
+      const d = new Date(dateString);
+      if (isNaN(d.getTime())) return String(dateString);
+      const datePart = d.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+      const timePart = d.toLocaleTimeString('en-IN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      });
+      return `${datePart}, ${timePart}`;
+    } catch (_) {
+      return String(dateString);
+    }
+  };
+
+  const openStockLogs = async (ing, specificBranchId = null, specificKitchenId = null) => {
+    if (!ing) return;
+    setSelectedLogIngredient(ing);
+    setStockLogsModalOpen(true);
+    setLoadingIngredientLogs(true);
+    const initialBranch = specificBranchId ? String(specificBranchId) : 'ALL';
+    const initialKitchen = specificKitchenId ? String(specificKitchenId) : 'ALL';
+    setLogBranchFilter(initialBranch);
+    setLogKitchenFilter(initialKitchen);
+    setLogTypeFilter('ALL');
+    setLogSearch('');
+    setIngredientInventories([]);
+    try {
+      const res = await getAdminInventoryApi({ ingredientId: ing.id, limit: 100 });
+      if (res?.status === true && Array.isArray(res.data)) {
+        setIngredientInventories(res.data);
+      } else {
+        setIngredientInventories([]);
+      }
+    } catch (err) {
+      console.error('Failed to load ingredient stock logs:', err);
+      toast.error('Failed to load stock movement history.');
+      setIngredientInventories([]);
+    } finally {
+      setLoadingIngredientLogs(false);
+    }
+  };
+
+  const closeStockLogsModal = () => {
+    setStockLogsModalOpen(false);
+    setSelectedLogIngredient(null);
+    setIngredientInventories([]);
+    setLogSearch('');
+    setLogTypeFilter('ALL');
+    setLogBranchFilter('ALL');
+    setLogKitchenFilter('ALL');
+  };
+
+  // Aggregated logs across filtered kitchen/branch for selected ingredient
+  const allIngredientLogs = useMemo(() => {
+    const list = [];
+    ingredientInventories.forEach((inv) => {
+      if (logKitchenFilter !== 'ALL' && String(inv.kitchenId) !== String(logKitchenFilter)) {
+        return;
+      }
+      if (logBranchFilter !== 'ALL' && String(inv.branchId) !== String(logBranchFilter)) {
+        return;
+      }
+      const logs = Array.isArray(inv.stockLogs) ? inv.stockLogs : [];
+      logs.forEach((log) => {
+        list.push({
+          ...log,
+          kitchenId: inv.kitchenId,
+          kitchenName: inv.kitchen?.kitchenName || (inv.kitchenId ? `Kitchen #${inv.kitchenId}` : 'Kitchen Hub'),
+          branchId: inv.branchId,
+          branchName: inv.branch?.name || (inv.branchId ? `Branch #${inv.branchId}` : 'Branch Outlet'),
+          branchAddress: inv.branch?.addressLine1 || '',
+          ingredientUnit: inv.unit || selectedLogIngredient?.unit || 'KG',
+          inventoryTotalStock: inv.totalStock,
+          currentStock: log.currentStock !== undefined && log.currentStock !== null ? log.currentStock : inv.totalStock,
+          inventoryItem: inv,
+        });
+      });
+    });
+    list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    return list;
+  }, [ingredientInventories, logKitchenFilter, logBranchFilter, selectedLogIngredient]);
+
+  // Distinct kitchens for the kitchen filter dropdown
+  const availableKitchensForIngredient = useMemo(() => {
+    const map = new Map();
+    ingredientInventories.forEach((inv) => {
+      const kId = String(inv.kitchenId || inv.kitchen?.id || '');
+      if (kId && !map.has(kId)) {
+        map.set(kId, {
+          id: kId,
+          name: inv.kitchen?.kitchenName || `Kitchen #${kId}`,
+          totalStock: 0,
+        });
+      }
+      if (kId && map.has(kId)) {
+        map.get(kId).totalStock += Number(inv.totalStock || 0);
+      }
+    });
+    return Array.from(map.values());
+  }, [ingredientInventories]);
+
+  // Distinct branch options for branch filter dropdown (scoped to selected kitchen)
+  const availableBranchesForIngredient = useMemo(() => {
+    const map = new Map();
+    ingredientInventories.forEach((inv) => {
+      const kId = String(inv.kitchenId || inv.kitchen?.id || '');
+      if (logKitchenFilter !== 'ALL' && kId !== String(logKitchenFilter)) {
+        return;
+      }
+      const bId = String(inv.branchId || inv.branch?.id || '');
+      if (bId && !map.has(bId)) {
+        map.set(bId, {
+          id: bId,
+          kitchenId: kId,
+          name: inv.branch?.name || `Branch #${bId}`,
+          kitchenName: inv.kitchen?.kitchenName || `Kitchen #${kId}`,
+          totalStock: inv.totalStock ?? 0,
+          unit: inv.unit || 'KG',
+          logsCount: (inv.stockLogs || []).length,
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [ingredientInventories, logKitchenFilter]);
+
+  // Selected branch inventory object if specific branch is filtered
+  const selectedBranchInv = useMemo(() => {
+    if (logBranchFilter !== 'ALL') {
+      return ingredientInventories.find((inv) => String(inv.branchId) === String(logBranchFilter)) || null;
+    }
+    return null;
+  }, [ingredientInventories, logBranchFilter]);
+
+  // Selected kitchen inventory items if specific kitchen is filtered
+  const selectedKitchenInvItems = useMemo(() => {
+    if (logKitchenFilter !== 'ALL') {
+      return ingredientInventories.filter((inv) => String(inv.kitchenId) === String(logKitchenFilter));
+    }
+    return [];
+  }, [ingredientInventories, logKitchenFilter]);
+
+  // Total stock for current scope (branch, kitchen, or all)
+  const totalStockForScope = useMemo(() => {
+    if (selectedBranchInv) {
+      return Number(selectedBranchInv.totalStock || 0);
+    }
+    if (logKitchenFilter !== 'ALL') {
+      return selectedKitchenInvItems.reduce((sum, inv) => sum + Number(inv.totalStock || 0), 0);
+    }
+    return ingredientInventories.reduce((sum, inv) => sum + Number(inv.totalStock || 0), 0);
+  }, [selectedBranchInv, logKitchenFilter, selectedKitchenInvItems, ingredientInventories]);
+
+  // Overall total stock across all branches for this ingredient
+  const totalStockAcrossBranches = useMemo(() => {
+    return ingredientInventories.reduce((sum, inv) => sum + Number(inv.totalStock || 0), 0);
+  }, [ingredientInventories]);
+
+  // Filtered modal logs
+  const filteredStockLogs = useMemo(() => {
+    return allIngredientLogs.filter((log) => {
+      if (logTypeFilter !== 'ALL') {
+        const cat = getLogCategory(log.type);
+        if (logTypeFilter !== cat) return false;
+      }
+
+      if (logSearch.trim()) {
+        const q = logSearch.toLowerCase().trim();
+        const notesStr = String(log.notes || '').toLowerCase();
+        const batchStr = String(extractLogBatch(log) || log.batchNumber || '').toLowerCase();
+        const orderStr = String(log.orderId || log.order?.id || log.order?.orderNumber || '').toLowerCase();
+        const branchStr = String(log.branchName || '').toLowerCase();
+        const kitchenStr = String(log.kitchenName || '').toLowerCase();
+        const typeStr = String(log.type || '').toLowerCase();
+
+        return (
+          notesStr.includes(q) ||
+          batchStr.includes(q) ||
+          orderStr.includes(q) ||
+          branchStr.includes(q) ||
+          kitchenStr.includes(q) ||
+          typeStr.includes(q)
+        );
+      }
+
+      return true;
+    });
+  }, [allIngredientLogs, logTypeFilter, logSearch]);
+
+  // Modal KPI summary
+  const stockLogsSummary = useMemo(() => {
+    let inwardTotal = 0;
+    let consumedTotal = 0;
+    let wasteTotal = 0;
+    let inwardCount = 0;
+    let consumedCount = 0;
+    let wasteCount = 0;
+    let adjCount = 0;
+
+    allIngredientLogs.forEach((l) => {
+      const cat = getLogCategory(l.type);
+      const qty = Math.abs(Number(l.quantity) || 0);
+      if (cat === 'INWARD') {
+        inwardTotal += qty;
+        inwardCount++;
+      } else if (cat === 'CONSUMED') {
+        consumedTotal += qty;
+        consumedCount++;
+      } else if (cat === 'WASTE') {
+        wasteTotal += qty;
+        wasteCount++;
+      } else if (cat === 'ADJUSTMENT') {
+        adjCount++;
+      }
+    });
+
+    return {
+      inwardTotal,
+      consumedTotal,
+      wasteTotal,
+      inwardCount,
+      consumedCount,
+      wasteCount,
+      adjCount,
+      totalCount: allIngredientLogs.length,
+    };
+  }, [allIngredientLogs]);
 
   // ── View / Edit / Create Ingredient ────────────────────────
   const openView = async (id) => {
@@ -587,7 +927,7 @@ export const Ingredients = () => {
           onClick={() => {
             setActiveTab('branch-inventory');
             if (kitchens.length > 0 && !selectedInvKitchen) {
-              setSelectedInvKitchen(String(kitchens[0].id));
+              handleTabKitchenChange(String(kitchens[0].id));
             }
           }}
           className={`px-5 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
@@ -751,14 +1091,24 @@ export const Ingredients = () => {
 
                         <button
                           onClick={() => openView(ing.id)}
-                          className="flex-1 py-1.5 px-2 rounded-xl bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-900 hover:text-white text-xs font-bold transition-all border border-slate-200 dark:border-slate-700 shadow-xs flex items-center justify-center gap-1 cursor-pointer"
+                          className="py-1.5 px-2 rounded-xl bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-900 hover:text-white text-xs font-bold transition-all border border-slate-200 dark:border-slate-700 shadow-xs flex items-center justify-center gap-1 cursor-pointer"
+                          title="View Ingredient Details"
                         >
                           <Eye className="w-3.5 h-3.5" />
                           <span>View</span>
                         </button>
                         <button
+                          onClick={() => openStockLogs(ing, selectedInvBranch || null, selectedInvKitchen || null)}
+                          className="flex-1 py-1.5 px-2 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 hover:bg-blue-600 hover:text-white text-xs font-bold transition-all border border-blue-200 dark:border-blue-800 shadow-xs flex items-center justify-center gap-1 cursor-pointer active:scale-95"
+                          title="View Stock Movement Logs"
+                        >
+                          <History className="w-3.5 h-3.5" />
+                          <span>Logs</span>
+                        </button>
+                        <button
                           onClick={() => openEdit(ing)}
-                          className="flex-1 py-1.5 px-2 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 hover:bg-amber-600 hover:text-white text-xs font-bold transition-all border border-amber-200 dark:border-amber-800 flex items-center justify-center gap-1 cursor-pointer active:scale-95"
+                          className="py-1.5 px-2 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 hover:bg-amber-600 hover:text-white text-xs font-bold transition-all border border-amber-200 dark:border-amber-800 flex items-center justify-center gap-1 cursor-pointer active:scale-95"
+                          title="Edit Ingredient"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                           <span>Edit</span>
@@ -828,6 +1178,13 @@ export const Ingredients = () => {
                                   <span>+ Inventory</span>
                                 </button>
                                 <button
+                                  onClick={() => openStockLogs(ing, selectedInvBranch || null, selectedInvKitchen || null)}
+                                  className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 hover:bg-blue-600 hover:text-white transition-colors border border-blue-200 dark:border-blue-800 cursor-pointer shadow-sm active:scale-95"
+                                  title="View Stock Logs"
+                                >
+                                  <History className="w-4 h-4" />
+                                </button>
+                                <button
                                   onClick={() => openView(ing.id)}
                                   className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300 hover:bg-slate-900 hover:text-white transition-colors cursor-pointer"
                                   title="View Details"
@@ -890,7 +1247,7 @@ export const Ingredients = () => {
                 </label>
                 <select
                   value={selectedInvKitchen}
-                  onChange={(e) => setSelectedInvKitchen(e.target.value)}
+                  onChange={(e) => handleTabKitchenChange(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:border-[#8C0D0D]"
                 >
                   <option value="">-- Choose Kitchen --</option>
@@ -910,10 +1267,18 @@ export const Ingredients = () => {
                 <select
                   value={selectedInvBranch}
                   onChange={(e) => setSelectedInvBranch(e.target.value)}
-                  disabled={!selectedInvKitchen || invBranches.length === 0}
+                  disabled={!selectedInvKitchen || loadingBranchInv || invBranches.length === 0}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold focus:outline-none focus:border-[#8C0D0D] disabled:opacity-50"
                 >
-                  <option value="">-- Choose Branch --</option>
+                  <option value="">
+                    {loadingBranchInv
+                      ? 'Loading branches...'
+                      : !selectedInvKitchen
+                      ? '-- Choose Kitchen First --'
+                      : invBranches.length === 0
+                      ? 'No branch found for this kitchen'
+                      : '-- Choose Branch --'}
+                  </option>
                   {invBranches.map((b) => (
                     <option key={b.id} value={b.id}>
                       {b.name || `Branch #${b.id}`}
@@ -940,9 +1305,39 @@ export const Ingredients = () => {
               </div>
             </div>
 
+            {/* Warning banner when selected kitchen has no branches */}
+            {selectedInvKitchen && !loadingBranchInv && invBranches.length === 0 && (
+              <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-900 dark:text-amber-200 animate-fade-in">
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-black text-xs">
+                      {currentKitchenName ? `"${currentKitchenName}"` : 'This Kitchen Hub'} has no branches yet!
+                    </h4>
+                    <p className="text-[11px] font-medium text-amber-700 dark:text-amber-400 mt-0.5">
+                      You must add a branch for this kitchen first before you can allocate or manage ingredients for its outlets.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate('/admin/branches')}
+                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black shadow-sm flex items-center gap-1.5 shrink-0 self-start sm:self-center transition-all active:scale-95 cursor-pointer"
+                >
+                  <GitBranch className="w-4 h-4" />
+                  <span>+ Add Branch First</span>
+                </button>
+              </div>
+            )}
+
             <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
               <div className="text-xs font-bold text-slate-500">
-                {selectedInvBranch ? (
+                {selectedInvKitchen && !loadingBranchInv && invBranches.length === 0 ? (
+                  <span className="text-rose-600 dark:text-rose-400 font-extrabold flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4" />
+                    Please add a branch first before allocating ingredients
+                  </span>
+                ) : selectedInvBranch ? (
                   <span>
                     Showing live inventory for branch <strong className="text-slate-800 dark:text-slate-200">#{selectedInvBranch}</strong>
                   </span>
@@ -952,7 +1347,7 @@ export const Ingredients = () => {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={fetchBranchInventory}
+                  onClick={() => fetchBranchInventory(selectedInvKitchen, selectedInvBranch)}
                   disabled={!selectedInvBranch || loadingBranchInv}
                   className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
@@ -960,7 +1355,13 @@ export const Ingredients = () => {
                   <span>Refresh Inventory</span>
                 </button>
                 <button
-                  onClick={() => openInventoryModal()}
+                  onClick={() => {
+                    if (invBranches.length === 0) {
+                      toast.error('Please add a branch for this kitchen first!');
+                      return;
+                    }
+                    openInventoryModal();
+                  }}
                   disabled={!selectedInvBranch}
                   className="px-4 py-2 rounded-xl bg-[#8C0D0D] text-white hover:bg-rose-900 text-xs font-extrabold shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
@@ -985,7 +1386,8 @@ export const Ingredients = () => {
                       <th className="p-4">Current Stock</th>
                       <th className="p-4">Alert Threshold</th>
                       <th className="p-4">Stock Status</th>
-                      <th className="p-4 pr-6">Batches Logged</th>
+                      <th className="p-4">Batches Logged</th>
+                      <th className="p-4 pr-6 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs font-medium text-slate-700 dark:text-slate-300">
@@ -1049,7 +1451,7 @@ export const Ingredients = () => {
                               </span>
                             )}
                           </td>
-                          <td className="p-4 pr-6">
+                          <td className="p-4">
                             {batches.length > 0 ? (
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 {batches.slice(0, 2).map((b) => (
@@ -1070,6 +1472,28 @@ export const Ingredients = () => {
                               <span className="text-slate-400 text-xs italic">No stock batch</span>
                             )}
                           </td>
+                          <td className="p-4 pr-6 text-right">
+                            <button
+                              onClick={() => {
+                                openStockLogs(
+                                  {
+                                    id: item.ingredientId || ing.id,
+                                    name: ing.name || `Inventory #${item.id}`,
+                                    category: ing.category || 'General',
+                                    image: ing.image || '',
+                                    unit: item.unit || 'KG',
+                                  },
+                                  item.branchId || selectedInvBranch || null,
+                                  item.kitchenId || selectedInvKitchen || null
+                                );
+                              }}
+                              className="px-2.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 hover:bg-blue-600 hover:text-white text-xs font-bold transition-all border border-blue-200 dark:border-blue-800 flex items-center gap-1 cursor-pointer ml-auto active:scale-95 shadow-2xs"
+                              title="View Stock Movement Logs"
+                            >
+                              <History className="w-3.5 h-3.5" />
+                              <span>Logs</span>
+                            </button>
+                          </td>
                         </tr>
                       );
                     })}
@@ -1079,13 +1503,32 @@ export const Ingredients = () => {
             </div>
           ) : (
             <EmptyState
-              title={selectedInvBranch ? 'No inventory items in this branch' : 'Choose Kitchen & Branch'}
+              title={
+                selectedInvKitchen && !loadingBranchInv && invBranches.length === 0
+                  ? 'No Branches in this Kitchen Hub'
+                  : selectedInvBranch
+                  ? 'No inventory items in this branch'
+                  : 'Choose Kitchen & Branch'
+              }
               description={
-                selectedInvBranch
+                selectedInvKitchen && !loadingBranchInv && invBranches.length === 0
+                  ? `${currentKitchenName ? `"${currentKitchenName}"` : 'This kitchen hub'} does not have any branches yet. You must add a branch first before you can allocate ingredients to it.`
+                  : selectedInvBranch
                   ? 'No raw ingredients have been assigned to this outlet yet. Click "+ Add to Inventory" to allocate ingredients.'
                   : 'Please pick a Kitchen Hub and Branch outlet from the selectors above.'
               }
-              onReset={() => openInventoryModal()}
+              resetLabel={
+                selectedInvKitchen && !loadingBranchInv && invBranches.length === 0
+                  ? '+ Add Branch First'
+                  : '+ Add to Inventory'
+              }
+              onReset={() => {
+                if (selectedInvKitchen && !loadingBranchInv && invBranches.length === 0) {
+                  navigate('/admin/branches');
+                } else {
+                  openInventoryModal();
+                }
+              }}
             />
           )}
         </div>
@@ -1124,7 +1567,7 @@ export const Ingredients = () => {
                   </label>
                   <select
                     value={invForm.kitchenId}
-                    onChange={(e) => setInvForm({ ...invForm, kitchenId: e.target.value, branchId: '' })}
+                    onChange={(e) => handleModalKitchenChange(e.target.value)}
                     className={`w-full px-4 py-2.5 rounded-xl border text-xs font-bold transition-all ${
                       invErrors.kitchenId
                         ? 'border-rose-500 bg-rose-50/40 text-rose-900'
@@ -1154,7 +1597,7 @@ export const Ingredients = () => {
                   <select
                     value={invForm.branchId}
                     onChange={(e) => setInvForm({ ...invForm, branchId: e.target.value })}
-                    disabled={!invForm.kitchenId || branches.length === 0}
+                    disabled={!invForm.kitchenId || loadingBranches || branches.length === 0}
                     className={`w-full px-4 py-2.5 rounded-xl border text-xs font-bold transition-all disabled:opacity-50 ${
                       invErrors.branchId
                         ? 'border-rose-500 bg-rose-50/40 text-rose-900'
@@ -1162,7 +1605,13 @@ export const Ingredients = () => {
                     }`}
                   >
                     <option value="">
-                      {loadingBranches ? 'Loading branches...' : branches.length === 0 ? 'No branches found' : '-- Select Branch --'}
+                      {loadingBranches
+                        ? 'Loading branches...'
+                        : !invForm.kitchenId
+                        ? '-- Select Kitchen Hub First --'
+                        : branches.length === 0
+                        ? 'No branches found for this kitchen'
+                        : '-- Select Branch --'}
                     </option>
                     {branches.map((b) => (
                       <option key={b.id} value={b.id}>
@@ -1170,6 +1619,30 @@ export const Ingredients = () => {
                       </option>
                     ))}
                   </select>
+
+                  {/* Warning message when kitchen has no branches */}
+                  {invForm.kitchenId && !loadingBranches && branches.length === 0 && (
+                    <div className="mt-2.5 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 space-y-2 text-amber-900 dark:text-amber-200 animate-fade-in">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                        <p className="text-xs font-extrabold leading-snug">
+                          You must add a branch for this kitchen first before you can allocate ingredients to it.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsInventoryModalOpen(false);
+                          navigate('/admin/branches');
+                        }}
+                        className="w-full py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                      >
+                        <GitBranch className="w-3.5 h-3.5" />
+                        <span>Go to Branches to Add Branch</span>
+                      </button>
+                    </div>
+                  )}
+
                   {invErrors.branchId && (
                     <p className="text-xs font-bold text-rose-600 mt-1 flex items-center gap-1">
                       <AlertCircle className="w-3.5 h-3.5 shrink-0" />
@@ -1355,17 +1828,30 @@ export const Ingredients = () => {
                     </span>
                   </div>
                 </div>
-                <div className="flex justify-between items-center pt-2 border-t border-slate-100 dark:border-slate-800">
-                  <button
-                    onClick={() => {
-                      setViewingIngredient(null);
-                      openInventoryModal(viewingIngredient);
-                    }}
-                    className="px-4 py-2 rounded-xl bg-rose-50 text-[#8C0D0D] font-extrabold text-xs hover:bg-[#8C0D0D] hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <PackagePlus className="w-4 h-4" />
-                    <span>+ Add to Inventory</span>
-                  </button>
+                <div className="flex justify-between items-center pt-2 border-t border-slate-100 dark:border-slate-800 flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        const target = viewingIngredient;
+                        setViewingIngredient(null);
+                        openStockLogs(target, selectedInvBranch || null, selectedInvKitchen || null);
+                      }}
+                      className="px-3.5 py-2 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 font-extrabold text-xs hover:bg-blue-600 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer border border-blue-200 dark:border-blue-800"
+                    >
+                      <History className="w-4 h-4" />
+                      <span>Stock Logs</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setViewingIngredient(null);
+                        openInventoryModal(viewingIngredient);
+                      }}
+                      className="px-3.5 py-2 rounded-xl bg-rose-50 text-[#8C0D0D] font-extrabold text-xs hover:bg-[#8C0D0D] hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <PackagePlus className="w-4 h-4" />
+                      <span>+ Add to Inventory</span>
+                    </button>
+                  </div>
                   <button
                     onClick={() => setViewingIngredient(null)}
                     className="px-5 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-sm cursor-pointer"
@@ -1548,6 +2034,453 @@ export const Ingredients = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {/* ─── STOCK MOVEMENT AUDIT LOGS MODAL (ADMIN) ─── */}
+      {stockLogsModalOpen && selectedLogIngredient &&
+        createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+            <div className="relative flex flex-col w-full max-w-5xl max-h-[92vh] rounded-3xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-modal-pop">
+              
+              {/* Modal Header */}
+              <div className="bg-gradient-to-r from-[#8C0D0D] via-[#6a0808] to-[#420404] text-white p-5 sm:p-6 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="grid size-11 place-items-center rounded-2xl bg-white/10 text-white border border-white/20 shadow-sm shrink-0">
+                    <History size={22} className="text-amber-300" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-base sm:text-lg font-black tracking-tight truncate">
+                        Stock Movement Audit Logs
+                      </h3>
+                      <span className="rounded-md bg-white/15 px-2 py-0.5 text-[10.5px] font-extrabold uppercase tracking-wider text-white border border-white/20">
+                        {selectedLogIngredient.category || 'General'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-rose-200 mt-0.5 font-medium truncate flex items-center gap-2 flex-wrap">
+                      <span>Ingredient: <strong className="text-white font-bold">{selectedLogIngredient.name}</strong></span>
+                      <span>•</span>
+                      <span>ID #{selectedLogIngredient.id}</span>
+                      {selectedBranchInv ? (
+                        <>
+                          <span>•</span>
+                          <span className="text-amber-200">
+                            Scope: <strong className="text-white font-bold">{selectedBranchInv.branch?.name || `Branch #${selectedBranchInv.branchId}`} ({selectedBranchInv.kitchen?.kitchenName || `Kitchen #${selectedBranchInv.kitchenId}`})</strong>
+                          </span>
+                          <span>•</span>
+                          <span className="text-emerald-200">
+                            Live Stock: <strong className="text-white font-black">{totalStockForScope} {selectedBranchInv.unit || selectedLogIngredient.unit || 'KG'}</strong>
+                          </span>
+                        </>
+                      ) : logKitchenFilter !== 'ALL' ? (
+                        <>
+                          <span>•</span>
+                          <span className="text-amber-200">
+                            Hub: <strong className="text-white font-bold">{availableKitchensForIngredient.find((k) => k.id === logKitchenFilter)?.name || `Kitchen #${logKitchenFilter}`}</strong>
+                          </span>
+                          <span>•</span>
+                          <span className="text-emerald-200">
+                            Live Stock: <strong className="text-white font-black">{totalStockForScope} {selectedLogIngredient.unit || 'KG'}</strong>
+                          </span>
+                        </>
+                      ) : ingredientInventories.length > 0 ? (
+                        <>
+                          <span>•</span>
+                          <span className="text-amber-200">
+                            Live Stock: <strong className="text-white font-black">{totalStockAcrossBranches} {selectedLogIngredient.unit || 'KG'}</strong> across {availableBranchesForIngredient.length} outlet{availableBranchesForIngredient.length === 1 ? '' : 's'}
+                          </span>
+                        </>
+                      ) : null}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={closeStockLogsModal}
+                  className="grid size-9 place-items-center rounded-xl border border-white/20 bg-white/10 text-white hover:bg-white/25 transition shrink-0 cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Kitchen & Outlet Filter Bar */}
+              {ingredientInventories.length > 0 && (
+                <div className="px-5 sm:px-6 pt-3 pb-2.5 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between flex-wrap gap-3 text-xs">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {/* Kitchen Hub Selector */}
+                    <div className="flex items-center gap-1.5">
+                      <Building2 size={13} className="text-slate-400 shrink-0" />
+                      <span className="font-extrabold text-slate-600 dark:text-slate-300 text-[11px] uppercase tracking-wider">Kitchen Hub:</span>
+                      <select
+                        value={logKitchenFilter}
+                        onChange={(e) => {
+                          const newK = e.target.value;
+                          setLogKitchenFilter(newK);
+                          setLogBranchFilter('ALL');
+                        }}
+                        className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold outline-none focus:border-[#8C0D0D]"
+                      >
+                        <option value="ALL">All Kitchen Hubs ({availableKitchensForIngredient.length})</option>
+                        {availableKitchensForIngredient.map((k) => (
+                          <option key={k.id} value={k.id}>
+                            {k.name} ({k.totalStock} {selectedLogIngredient.unit || 'KG'})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Outlet Branch Selector */}
+                    <div className="flex items-center gap-1.5">
+                      <GitBranch size={13} className="text-slate-400 shrink-0" />
+                      <span className="font-extrabold text-slate-600 dark:text-slate-300 text-[11px] uppercase tracking-wider">Outlet Branch:</span>
+                      <select
+                        value={logBranchFilter}
+                        onChange={(e) => setLogBranchFilter(e.target.value)}
+                        className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold outline-none focus:border-[#8C0D0D]"
+                      >
+                        <option value="ALL">All Branch Outlets ({availableBranchesForIngredient.length})</option>
+                        {availableBranchesForIngredient.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name} {logKitchenFilter === 'ALL' ? `(${b.kitchenName})` : ''} — {b.totalStock} {b.unit}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                    Showing <strong className="text-slate-900 dark:text-white">{filteredStockLogs.length}</strong> movements for selected scope
+                  </div>
+                </div>
+              )}
+
+              {/* KPI Summary Cards */}
+              <div className="px-5 sm:px-6 pt-4 shrink-0">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 p-3">
+                    <div className="flex items-center justify-between text-slate-400 text-xs font-bold uppercase tracking-wider">
+                      <span>Total Movements</span>
+                      <History size={13} />
+                    </div>
+                    <p className="text-base sm:text-lg font-black text-slate-900 dark:text-white mt-1">
+                      {stockLogsSummary.totalCount}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-emerald-200/80 dark:border-emerald-900/40 bg-emerald-50/40 dark:bg-emerald-950/20 p-3">
+                    <div className="flex items-center justify-between text-emerald-700 dark:text-emerald-400 text-xs font-bold uppercase tracking-wider">
+                      <span>Total Inward</span>
+                      <ArrowDownLeft size={14} className="text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                    <p className="text-base sm:text-lg font-black text-emerald-800 dark:text-emerald-300 mt-1">
+                      +{stockLogsSummary.inwardTotal} <span className="text-xs font-semibold">{selectedLogIngredient.unit || 'KG'}</span>
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-blue-200/80 dark:border-blue-900/40 bg-blue-50/40 dark:bg-blue-950/20 p-3">
+                    <div className="flex items-center justify-between text-blue-700 dark:text-blue-400 text-xs font-bold uppercase tracking-wider">
+                      <span>Consumed / Orders</span>
+                      <ArrowUpRight size={14} className="text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <p className="text-base sm:text-lg font-black text-blue-800 dark:text-blue-300 mt-1">
+                      -{stockLogsSummary.consumedTotal} <span className="text-xs font-semibold">{selectedLogIngredient.unit || 'KG'}</span>
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-rose-200/80 dark:border-rose-900/40 bg-rose-50/40 dark:bg-rose-950/20 p-3">
+                    <div className="flex items-center justify-between text-rose-700 dark:text-rose-400 text-xs font-bold uppercase tracking-wider">
+                      <span>Recorded Waste</span>
+                      <Trash2 size={13} className="text-rose-600 dark:text-rose-400" />
+                    </div>
+                    <p className="text-base sm:text-lg font-black text-rose-800 dark:text-rose-300 mt-1">
+                      -{stockLogsSummary.wasteTotal} <span className="text-xs font-semibold">{selectedLogIngredient.unit || 'KG'}</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filters & Search Toolbar */}
+              <div className="px-5 sm:px-6 pt-4 pb-2 border-b border-slate-100 dark:border-slate-800 shrink-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  {/* Search */}
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3.5 top-2.5 text-slate-400" size={14} />
+                    <input
+                      type="text"
+                      placeholder="Search by notes, batch #, order ID, outlet..."
+                      value={logSearch}
+                      onChange={(e) => setLogSearch(e.target.value)}
+                      className="h-9 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-9 pr-8 text-xs font-medium text-slate-800 dark:text-slate-100 outline-none transition focus:border-[#8C0D0D]"
+                    />
+                    {logSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setLogSearch('')}
+                        className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600"
+                      >
+                        <X size={13} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Filter Pills */}
+                  <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+                    {[
+                      { id: 'ALL', label: `All (${stockLogsSummary.totalCount})` },
+                      { id: 'INWARD', label: `Inward (${stockLogsSummary.inwardCount})` },
+                      { id: 'CONSUMED', label: `Consumed (${stockLogsSummary.consumedCount})` },
+                      { id: 'WASTE', label: `Waste (${stockLogsSummary.wasteCount})` },
+                    ].map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => setLogTypeFilter(f.id)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+                          logTypeFilter === f.id
+                            ? 'bg-[#8C0D0D] text-white shadow-xs'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Logs Content Table (Scrollable) */}
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 min-h-0">
+                {loadingIngredientLogs ? (
+                  <div className="py-16 text-center">
+                    <RefreshCw size={24} className="text-[#8C0D0D] animate-spin mx-auto mb-3" />
+                    <p className="text-xs font-extrabold text-slate-700 dark:text-slate-300">
+                      Loading stock movement logs...
+                    </p>
+                  </div>
+                ) : ingredientInventories.length === 0 ? (
+                  <div className="py-14 text-center">
+                    <div className="mx-auto mb-3 grid size-12 place-items-center rounded-2xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 border border-amber-200 dark:border-amber-800">
+                      <Boxes size={22} />
+                    </div>
+                    <h4 className="text-sm font-black text-slate-800 dark:text-white">
+                      Not Assigned to Branch Inventory Yet
+                    </h4>
+                    <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1 mb-4">
+                      "{selectedLogIngredient.name}" is currently a master catalog ingredient and has not been allocated to any kitchen branch outlet yet.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const target = selectedLogIngredient;
+                        closeStockLogsModal();
+                        openInventoryModal(target);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-[#8C0D0D] text-white text-xs font-black shadow hover:bg-rose-900 transition flex items-center gap-1.5 mx-auto cursor-pointer"
+                    >
+                      <PackagePlus size={14} />
+                      <span>+ Allocate to Branch Inventory</span>
+                    </button>
+                  </div>
+                ) : filteredStockLogs.length === 0 ? (
+                  <div className="py-14 text-center">
+                    <div className="mx-auto mb-3 grid size-12 place-items-center rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 border border-blue-200 dark:border-blue-800">
+                      <History size={22} />
+                    </div>
+                    <h4 className="text-sm font-bold text-slate-800 dark:text-white">
+                      No Movement Logs Found
+                    </h4>
+                    <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
+                      {logSearch || logTypeFilter !== 'ALL' || logBranchFilter !== 'ALL'
+                        ? 'No stock movements match your search or filters. Try clearing filters.'
+                        : 'No stock movements have been recorded yet for this ingredient.'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs bg-white dark:bg-slate-900">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/80 text-[10.5px] font-extrabold uppercase tracking-wider text-slate-400">
+                          <th className="py-3 px-4">Date & Time</th>
+                          <th className="py-3 px-4">Kitchen / Branch Outlet</th>
+                          <th className="py-3 px-4">Type</th>
+                          <th className="py-3 px-4">Quantity</th>
+                          <th className="py-3 px-4">Stock Impact</th>
+                          <th className="py-3 px-4">Batch #</th>
+                          <th className="py-3 px-4">Purpose / Usage Details</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {filteredStockLogs.map((log) => {
+                          const typeStr = String(log.type || '').toUpperCase();
+                          const cat = getLogCategory(log.type);
+                          const isInward = cat === 'INWARD';
+                          const isConsumed = cat === 'CONSUMED';
+                          const isWaste = cat === 'WASTE';
+                          const unit = log.ingredientUnit || selectedLogIngredient.unit || 'KG';
+                          const qtyNum = Math.abs(Number(log.quantity) || 0);
+                          const displayBatch = extractLogBatch(log);
+
+                          return (
+                            <tr key={log.id || `${log.createdAt}-${Math.random()}`} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition">
+                              {/* Date & Time */}
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-300">
+                                  <Clock size={12} className="text-slate-400 shrink-0" />
+                                  <span>{formatLogTimestamp(log.createdAt)}</span>
+                                </div>
+                              </td>
+
+                              {/* Kitchen / Branch Outlet */}
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <div>
+                                  <span className="font-extrabold text-slate-800 dark:text-slate-100 text-xs block">
+                                    {log.branchName}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 font-semibold">
+                                    {log.kitchenName}
+                                  </span>
+                                </div>
+                              </td>
+
+                              {/* Movement Type */}
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <span
+                                  className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10.5px] font-bold border ${
+                                    isInward
+                                      ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                                      : isConsumed
+                                      ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+                                      : isWaste
+                                      ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border-rose-200 dark:border-rose-900/50'
+                                      : 'bg-purple-50 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+                                  }`}
+                                >
+                                  {isInward ? (
+                                    <ArrowDownLeft size={11} className="text-emerald-600 dark:text-emerald-400" />
+                                  ) : isConsumed ? (
+                                    <ArrowUpRight size={11} className="text-blue-600 dark:text-blue-400" />
+                                  ) : isWaste ? (
+                                    <Trash2 size={11} className="text-rose-600 dark:text-rose-400" />
+                                  ) : (
+                                    <RefreshCw size={11} className="text-purple-600 dark:text-purple-400" />
+                                  )}
+                                  <span>{typeStr}</span>
+                                </span>
+                              </td>
+
+                              {/* Quantity */}
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <span
+                                  className={`text-xs font-black ${
+                                    isInward
+                                      ? 'text-emerald-700 dark:text-emerald-400'
+                                      : isConsumed
+                                      ? 'text-blue-700 dark:text-blue-400'
+                                      : isWaste
+                                      ? 'text-rose-700 dark:text-rose-400'
+                                      : 'text-slate-800 dark:text-slate-200'
+                                  }`}
+                                >
+                                  {isInward ? '+' : '-'}{qtyNum} {unit}
+                                </span>
+                              </td>
+
+                              {/* Stock Impact (Previous -> Current) */}
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <div className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 px-2 py-1 text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                                  <span className="text-slate-400 font-medium">{log.previousStock ?? 0}</span>
+                                  <ArrowRight size={10} className="text-slate-400" />
+                                  <span className="text-slate-900 dark:text-white">{log.currentStock ?? 0}</span>
+                                  <span className="text-[9.5px] text-slate-400 uppercase">{unit}</span>
+                                </div>
+                              </td>
+
+                              {/* Batch # */}
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                {displayBatch ? (
+                                  <span className="rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10.5px] font-bold text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
+                                    Batch #{displayBatch}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-300 dark:text-slate-600 font-bold">—</span>
+                                )}
+                              </td>
+
+                              {/* Details / Purpose */}
+                              <td className="py-3.5 px-4">
+                                <div className="space-y-1 max-w-xs sm:max-w-md">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    {log.orderId || log.order ? (
+                                      <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800 px-1.5 py-0.5 text-[10.5px] font-bold">
+                                        <Receipt size={11} className="text-blue-600 dark:text-blue-400" />
+                                        <span>Order #{log.orderId || log.order?.id}</span>
+                                      </span>
+                                    ) : null}
+
+                                    {log.wasteLogId || log.wasteLog ? (
+                                      <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-900/50 px-1.5 py-0.5 text-[10.5px] font-bold">
+                                        <Trash2 size={11} className="text-rose-600 dark:text-rose-400" />
+                                        <span>Waste #{log.wasteLogId || log.wasteLog?.id}</span>
+                                      </span>
+                                    ) : null}
+
+                                    {log.createdBy && (
+                                      <span className="text-[10px] font-medium text-slate-400">
+                                        By: {log.createdBy}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {log.notes ? (
+                                    <p className="text-xs text-slate-600 dark:text-slate-400 font-medium break-words leading-relaxed">
+                                      {log.notes}
+                                    </p>
+                                  ) : (
+                                    <span className="text-slate-300 dark:text-slate-600 text-xs italic">Standard inventory movement</span>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 sm:p-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 flex items-center justify-between flex-wrap gap-3 shrink-0">
+                <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold">
+                  Live audit trail tracked across all cloud kitchen hubs & outlets.
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const target = selectedLogIngredient;
+                      closeStockLogsModal();
+                      openInventoryModal(target);
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-[#8C0D0D] dark:text-rose-300 border border-rose-200 dark:border-rose-900/50 font-extrabold text-xs hover:bg-[#8C0D0D] hover:text-white transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    <PackagePlus size={14} />
+                    <span>+ Add to Branch Inventory</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeStockLogsModal}
+                    className="px-5 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-xs hover:bg-slate-800 transition cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+
             </div>
           </div>,
           document.body

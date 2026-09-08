@@ -24,6 +24,7 @@ import {
   Check,
   RefreshCw,
   Boxes,
+  AlertTriangle,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../../components/ui/PageHeader";
@@ -59,8 +60,10 @@ export function CategoryPage({ apiState, refreshKitchenData, onToast }) {
   };
 
   // Active branch from header context
-  const activeBranchId = resolveSelectedBranchId(apiState?.branches || [], apiState?.selectedBranchId);
-  const selectedBranch = (apiState?.branches || []).find((b) => String(b.id) === String(activeBranchId));
+  const branches = apiState?.branches || [];
+  const hasBranches = branches.length > 0;
+  const activeBranchId = hasBranches ? resolveSelectedBranchId(branches, apiState?.selectedBranchId) : "";
+  const selectedBranch = hasBranches ? branches.find((b) => String(b.id) === String(activeBranchId)) : null;
 
   const [menuItems, setMenuItems] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -391,7 +394,11 @@ export function CategoryPage({ apiState, refreshKitchenData, onToast }) {
       {/* Top Banner */}
       <PageHeader
         badge="Menu & Food Catalog"
-        activeBadge={`${selectedBranch?.name || `Branch #${activeBranchId || "1"}`} (${meta.total || allDishes.length} Items)`}
+        activeBadge={
+          hasBranches
+            ? `${selectedBranch?.name || `Branch #${activeBranchId}`} (${meta.total || allDishes.length} Items)`
+            : "No Branches Configured"
+        }
         title="Dishes & Categories"
         subtitle="Manage live menu items, recipes, prices, and monitor ingredient stock status across kitchen branches."
         actions={
@@ -409,7 +416,16 @@ export function CategoryPage({ apiState, refreshKitchenData, onToast }) {
             {canCreate("menu") && (
               <button
                 className="flex items-center gap-2 rounded-full bg-gradient-to-r from-[#8D0606] to-[#b80808] px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-rose-950/20 transition hover:from-[#7a0505] hover:to-[#a10707] active:scale-98"
-                onClick={() => navigate("/kitchen/add-menu")}
+                onClick={() => {
+                  if (!hasBranches) {
+                    onToast?.({
+                      message: "Please add at least one kitchen branch first before adding menu food items.",
+                      type: "warning",
+                    });
+                    return;
+                  }
+                  navigate("/kitchen/add-menu");
+                }}
                 type="button"
               >
                 <Plus size={15} />
@@ -421,33 +437,57 @@ export function CategoryPage({ apiState, refreshKitchenData, onToast }) {
       />
 
       {/* Target Branch Header Indicator */}
-      <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs">
-        <div className="flex items-center gap-3 min-w-0 flex-1">
-          <div className="grid size-9 place-items-center rounded-xl bg-rose-50 text-[#8D0606] border border-rose-100 shadow-2xs shrink-0">
-            <Building2 size={16} />
+      {!hasBranches ? (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 rounded-2xl border border-amber-200 bg-amber-50/70 p-4 shadow-2xs text-amber-900">
+          <div className="flex items-start sm:items-center gap-3 min-w-0">
+            <div className="grid size-9 place-items-center rounded-xl bg-amber-100 text-amber-700 border border-amber-200 shrink-0">
+              <AlertTriangle size={18} />
+            </div>
+            <div className="min-w-0">
+              <h4 className="text-xs font-bold text-amber-900">No Kitchen Branches Found</h4>
+              <p className="text-[11px] font-medium text-amber-700 mt-0.5">
+                You must configure at least one kitchen branch before managing menu items or recipes.
+              </p>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-bold text-slate-800 whitespace-nowrap">Active Kitchen Branch:</span>
-              <span className="rounded-md bg-rose-50 px-2 py-0.5 text-xs font-bold text-[#8D0606] border border-rose-100 whitespace-nowrap">
-                {selectedBranch?.name || `Branch #${activeBranchId || "1"}`}
+          <button
+            type="button"
+            onClick={() => navigate("/kitchen/branches")}
+            className="flex items-center gap-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-1.5 text-xs font-bold shadow-xs transition shrink-0"
+          >
+            <Plus size={14} />
+            <span>Add Branch First</span>
+          </button>
+        </div>
+      ) : (
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="grid size-9 place-items-center rounded-xl bg-rose-50 text-[#8D0606] border border-rose-100 shadow-2xs shrink-0">
+                <Building2 size={16} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-bold text-slate-800 whitespace-nowrap">Active Kitchen Branch:</span>
+                  <span className="rounded-md bg-rose-50 px-2 py-0.5 text-xs font-bold text-[#8D0606] border border-rose-100 whitespace-nowrap">
+                    {selectedBranch?.name || `Branch #${activeBranchId}`}
+                  </span>
+                </div>
+                <p className="text-[11px] font-medium text-slate-400 truncate mt-0.5">
+                  Displaying recipe catalog and pricing for this branch.
+                </p>
+              </div>
+            </div>
+
+            <div className="hidden sm:flex items-center gap-2 shrink-0">
+              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-100 whitespace-nowrap">
+                {activeInStockCount} Available
+              </span>
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600 border border-slate-200 whitespace-nowrap">
+                {meta.total || allDishes.length} Total Recipes
               </span>
             </div>
-            <p className="text-[11px] font-medium text-slate-400 truncate mt-0.5">
-              Displaying recipe catalog and pricing for this branch.
-            </p>
           </div>
-        </div>
-
-        <div className="hidden sm:flex items-center gap-2 shrink-0">
-          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-100 whitespace-nowrap">
-            {activeInStockCount} Available
-          </span>
-          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600 border border-slate-200 whitespace-nowrap">
-            {meta.total || allDishes.length} Total Recipes
-          </span>
-        </div>
-      </div>
+      )}
 
       {/* Category Pills Slider */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
@@ -728,6 +768,25 @@ export function CategoryPage({ apiState, refreshKitchenData, onToast }) {
             />
           </div>
         )
+        ) : !hasBranches ? (
+          /* Empty State: No Kitchen Branches Configured */
+          <div className="flex flex-col items-center justify-center rounded-2xl bg-white p-12 text-center border border-dashed border-amber-300 shadow-2xs">
+            <div className="grid size-12 place-items-center rounded-xl bg-amber-50 text-amber-600 mb-2.5 border border-amber-200">
+              <AlertTriangle size={24} />
+            </div>
+            <h3 className="text-sm font-bold text-slate-900">No Branches Configured</h3>
+            <p className="mt-1 text-xs text-slate-500 max-w-md">
+              There are currently no branches configured for this kitchen. Please create a branch first to view and manage menu dishes and recipes.
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate("/kitchen/branches")}
+              className="mt-4 flex items-center gap-1.5 rounded-xl bg-[#8D0606] hover:bg-[#7a0505] text-white px-4 py-2 text-xs font-bold shadow-xs transition"
+            >
+              <Plus size={14} />
+              <span>Add Branch First</span>
+            </button>
+          </div>
       ) : (
         /* Empty State */
         <div className="flex flex-col items-center justify-center rounded-2xl bg-white p-12 text-center border border-slate-200 shadow-2xs">

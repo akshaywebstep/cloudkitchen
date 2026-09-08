@@ -925,7 +925,7 @@ function CreateOrderModal({ branchId, branches, menus, onClose, onSuccess, onToa
                     Active Kitchen Branch
                   </span>
                   <p className="text-xs font-bold text-slate-900 truncate">
-                    {branches.find((b) => String(b.id) === String(branchId))?.name || `Branch Outlet #${branchId || "1"}`}
+                    {branches.find((b) => String(b.id) === String(branchId))?.name || (branchId ? `Branch Outlet #${branchId}` : "No Branch Configured")}
                   </p>
                 </div>
               </div>

@@ -142,8 +142,10 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
   }, [isEditing, canCreate, canUpdate, navigate]);
   
   // Use currently active branch from Header/Context
-  const activeBranchId = resolveSelectedBranchId(apiState?.branches || [], apiState?.selectedBranchId);
-  const selectedBranch = (apiState?.branches || []).find((b) => String(b.id) === String(activeBranchId));
+  const branches = apiState?.branches || [];
+  const hasBranches = branches.length > 0;
+  const activeBranchId = hasBranches ? resolveSelectedBranchId(branches, apiState?.selectedBranchId) : "";
+  const selectedBranch = hasBranches ? branches.find((b) => String(b.id) === String(activeBranchId)) : null;
 
   const existingDishImage = editDish?.image || editDish?.rawMenu?.image || "";
 
@@ -591,6 +593,13 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
       return;
     }
 
+    if (!hasBranches || !activeBranchId) {
+      setMessageType("error");
+      setMessage("Please add at least one kitchen branch first before creating or updating menu items.");
+      onToast?.({ message: "Please add at least one kitchen branch first before creating or updating menu items.", type: "warning" });
+      return;
+    }
+
     if (!validate()) {
       setMessageType("error");
       setMessage("Please fix the highlighted errors before saving.");
@@ -714,7 +723,13 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
       <PageHeader
         onBack={() => navigate("/kitchen/menu")}
         badge={isEditing ? "Menu Recipe Editor" : "Menu Recipe Creator"}
-        activeBadge={selectedBranch?.name ? `${selectedBranch.name} • ${isEditing ? `ID #${editDish.id}` : "New Item"}` : `Branch #${activeBranchId || "1"}`}
+        activeBadge={
+          !hasBranches
+            ? "No Branches Configured"
+            : selectedBranch?.name
+            ? `${selectedBranch.name} • ${isEditing ? `ID #${editDish.id}` : "New Item"}`
+            : `Branch #${activeBranchId}`
+        }
         title={isEditing ? `Edit Menu Item: ${editDish.name}` : "Add New Menu Item"}
         subtitle={
           isEditing
@@ -734,24 +749,48 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
       />
 
       {/* Target Branch Header Indicator */}
-      <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-2xs">
-        <div className="flex items-center gap-3 min-w-0 flex-1">
-          <div className="grid size-9 sm:size-10 place-items-center rounded-xl bg-rose-50 text-[#8D0606] border border-rose-100 shadow-2xs shrink-0">
-            <Building2 size={18} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-bold text-slate-800 whitespace-nowrap">Target Kitchen Branch:</span>
-              <span className="rounded-md bg-rose-50 px-2 py-0.5 text-xs font-bold text-[#8D0606] border border-rose-100 whitespace-nowrap">
-                {selectedBranch?.name || `Branch #${activeBranchId || "1"}`}
-              </span>
+      {!hasBranches ? (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 rounded-2xl border border-amber-200 bg-amber-50/70 p-4 shadow-2xs text-amber-900">
+          <div className="flex items-start sm:items-center gap-3 min-w-0">
+            <div className="grid size-9 sm:size-10 place-items-center rounded-xl bg-amber-100 text-amber-700 border border-amber-200 shrink-0">
+              <AlertTriangle size={18} />
             </div>
-            <p className="text-[11px] font-medium text-slate-400 truncate mt-0.5">
-              Menu item and linked stock will be created under this active branch (selected in header).
-            </p>
+            <div className="min-w-0">
+              <h4 className="text-xs font-bold text-amber-900">No Kitchen Branch Configured</h4>
+              <p className="text-[11px] font-medium text-amber-700 mt-0.5">
+                You must add at least one kitchen branch before creating or managing menu items and recipes.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate("/kitchen/branches")}
+            className="flex items-center gap-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-1.5 text-xs font-bold shadow-xs transition shrink-0"
+          >
+            <Plus size={14} />
+            <span>Add Branch First</span>
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-2xs">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="grid size-9 sm:size-10 place-items-center rounded-xl bg-rose-50 text-[#8D0606] border border-rose-100 shadow-2xs shrink-0">
+              <Building2 size={18} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold text-slate-800 whitespace-nowrap">Target Kitchen Branch:</span>
+                <span className="rounded-md bg-rose-50 px-2 py-0.5 text-xs font-bold text-[#8D0606] border border-rose-100 whitespace-nowrap">
+                  {selectedBranch?.name || `Branch #${activeBranchId}`}
+                </span>
+              </div>
+              <p className="text-[11px] font-medium text-slate-400 truncate mt-0.5">
+                Menu item and linked stock will be created under this active branch (selected in header).
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Section 1: Basic Menu Info & Pricing */}
       <FormPanel title="Dish Details & Pricing" icon={UtensilsCrossed}>
@@ -1100,14 +1139,18 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-xs">
               <div className="flex items-center gap-2.5 text-amber-800 font-medium">
                 <AlertCircle size={16} className="shrink-0 text-amber-600" />
-                <span>No ingredients found in this branch inventory ({selectedBranch?.name || `Branch #${activeBranchId}`}). Please attach ingredients from Ingredients & Stock first.</span>
+                <span>
+                  {!hasBranches
+                    ? "No kitchen branches available. Please add a branch first before configuring recipe ingredients."
+                    : `No ingredients found in this branch inventory (${selectedBranch?.name || `Branch #${activeBranchId}`}). Please attach ingredients from Ingredients & Stock first.`}
+                </span>
               </div>
               <button
                 type="button"
-                onClick={() => navigate("/ingredients")}
+                onClick={() => navigate(!hasBranches ? "/kitchen/branches" : "/ingredients")}
                 className="shrink-0 rounded-xl bg-amber-600 px-3.5 py-1.5 font-bold text-white shadow-2xs hover:bg-amber-700 transition"
               >
-                Manage Ingredients →
+                {!hasBranches ? "Add Branch →" : "Manage Ingredients →"}
               </button>
             </div>
           )}
@@ -1412,9 +1455,10 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
           </button>
           <button
             className="flex-[2] sm:flex-initial flex h-10 sm:h-11 items-center justify-center gap-2 rounded-xl bg-[#8D0606] px-3.5 sm:px-6 text-xs font-bold text-white shadow-md shadow-rose-950/20 transition hover:bg-[#780404] active:scale-98 disabled:opacity-60"
-            disabled={saving}
+            disabled={saving || !hasBranches}
             onClick={saveMenu}
             type="button"
+            title={!hasBranches ? "Please add a kitchen branch first" : undefined}
           >
             {saving ? (
               <Loader variant="button" text={isEditing ? "Updating..." : "Saving..."} />

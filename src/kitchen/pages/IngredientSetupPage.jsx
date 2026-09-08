@@ -29,6 +29,17 @@ import {
   Layers,
   ArrowRight,
   Upload,
+  History,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Clock,
+  TrendingDown,
+  TrendingUp,
+  Receipt,
+  FileText,
+  Eye,
+  Filter,
+  ExternalLink,
 } from "lucide-react";
 import { Loader } from "../../components/ui/Loader";
 import { Pagination } from "../../components/ui/Pagination";
@@ -179,6 +190,7 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
 
   // Stock update modal state
   const [stockModalOpen, setStockModalOpen] = useState(false);
+  const [activeStockModalTab, setActiveStockModalTab] = useState("form"); // "form" | "logs"
   const [stockItem, setStockItem] = useState(null);
   const [stockMode, setStockMode] = useState("update"); // "update" | "create"
   const [currentStockId, setCurrentStockId] = useState(null);
@@ -188,6 +200,13 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
   const [expireDate, setExpireDate] = useState("");
   const [stockSaving, setStockSaving] = useState(false);
   const [stockError, setStockError] = useState("");
+
+  // Stock Logs Modal state
+  const [stockLogsModalOpen, setStockLogsModalOpen] = useState(false);
+  const [selectedLogItem, setSelectedLogItem] = useState(null); // specific inventory item or null for all
+  const [isAllLogsView, setIsAllLogsView] = useState(false);
+  const [logSearch, setLogSearch] = useState("");
+  const [logTypeFilter, setLogTypeFilter] = useState("ALL"); // "ALL" | "INWARD" | "CONSUMED" | "WASTE" | "ADJUSTMENT"
 
   const searchContainerRef = useRef(null);
   const nameRef = useRef(null);
@@ -660,6 +679,7 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
     );
     setExpireDate(initialExpireDate);
     setStockError("");
+    setActiveStockModalTab("form");
     setStockModalOpen(true);
   };
 
@@ -674,6 +694,182 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
     setAlertQuantity("");
     setExpireDate("");
     setStockError("");
+    setActiveStockModalTab("form");
+  };
+
+  // Stock Logs Modal handlers & helpers
+  const openStockLogsModal = (item = null) => {
+    setSelectedLogItem(item);
+    setIsAllLogsView(!item);
+    setLogSearch("");
+    setLogTypeFilter("ALL");
+    setStockLogsModalOpen(true);
+  };
+
+  const closeStockLogsModal = () => {
+    setStockLogsModalOpen(false);
+    setSelectedLogItem(null);
+    setIsAllLogsView(false);
+    setLogSearch("");
+    setLogTypeFilter("ALL");
+  };
+
+  // Helpers for log categorization and batch extraction
+  const getLogCategory = (type) => {
+    const t = String(type || "").toUpperCase();
+    if (t.includes("INWARD") || t.includes("ADD") || t.includes("RESTOCK") || t.includes("PURCHASE")) return "INWARD";
+    if (t.includes("CONSUMED") || t.includes("OUTWARD") || t.includes("ORDER") || t.includes("RECIPE") || t.includes("USAGE")) return "CONSUMED";
+    if (t.includes("WASTE") || t.includes("DAMAGE") || t.includes("EXPIRE") || t.includes("SPOIL")) return "WASTE";
+    if (t.includes("ADJUST")) return "ADJUSTMENT";
+    return "OTHER";
+  };
+
+  const extractLogBatch = (log) => {
+    if (!log) return null;
+    if (log.batchNumber) return log.batchNumber;
+    if (log.stock?.batchNumber) return log.stock.batchNumber;
+    if (typeof log.notes === "string") {
+      const match = log.notes.match(/batch\s*[:#-]?\s*([a-zA-Z0-9_-]+)/i);
+      if (match && match[1]) return match[1];
+    }
+    return null;
+  };
+
+  // Aggregated all logs across loaded branch inventory
+  const allBranchStockLogs = useMemo(() => {
+    const list = [];
+    (inventoryList || []).forEach((inv) => {
+      const logs = Array.isArray(inv.stockLogs) ? inv.stockLogs : [];
+      logs.forEach((log) => {
+        list.push({
+          ...log,
+          ingredientId: inv.ingredientId || inv.ingredient?.id || inv.id,
+          ingredientName: inv.ingredient?.name || inv.name || `Ingredient #${inv.ingredientId || inv.id}`,
+          ingredientImage: inv.ingredient?.image || inv.image || "",
+          ingredientCategory: inv.ingredient?.category || inv.category || "General",
+          ingredientUnit: inv.unit || "UNIT",
+          currentStock: log.currentStock !== undefined && log.currentStock !== null ? log.currentStock : inv.currentStock,
+          inventoryItem: inv,
+        });
+      });
+    });
+    list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    return list;
+  }, [inventoryList]);
+
+  const totalStockLogsCount = allBranchStockLogs.length;
+
+  // Active logs for the modal (single item or all branch ingredients)
+  const activeModalLogs = useMemo(() => {
+    if (isAllLogsView || !selectedLogItem) {
+      return allBranchStockLogs;
+    }
+    const rawLogs = Array.isArray(selectedLogItem.stockLogs) ? selectedLogItem.stockLogs : [];
+    return rawLogs
+      .map((log) => ({
+        ...log,
+        ingredientId: selectedLogItem.ingredientId || selectedLogItem.ingredient?.id || selectedLogItem.id,
+        ingredientName: selectedLogItem.ingredient?.name || selectedLogItem.name || `Ingredient #${selectedLogItem.ingredientId || selectedLogItem.id}`,
+        ingredientImage: selectedLogItem.ingredient?.image || selectedLogItem.image || "",
+        ingredientCategory: selectedLogItem.ingredient?.category || selectedLogItem.category || "General",
+        ingredientUnit: selectedLogItem.unit || "UNIT",
+        currentStock: log.currentStock !== undefined && log.currentStock !== null ? log.currentStock : selectedLogItem.currentStock,
+        inventoryItem: selectedLogItem,
+      }))
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  }, [isAllLogsView, selectedLogItem, allBranchStockLogs]);
+
+  // Filtered modal logs based on search & movement type
+  const filteredModalLogs = useMemo(() => {
+    return activeModalLogs.filter((log) => {
+      if (logTypeFilter !== "ALL") {
+        const cat = getLogCategory(log.type);
+        if (logTypeFilter !== cat) return false;
+      }
+
+      if (logSearch.trim()) {
+        const q = logSearch.toLowerCase().trim();
+        const notesStr = String(log.notes || "").toLowerCase();
+        const batchStr = String(extractLogBatch(log) || log.batchNumber || "").toLowerCase();
+        const orderStr = String(log.orderId || log.order?.id || log.order?.orderNumber || "").toLowerCase();
+        const wasteStr = String(log.wasteLogId || log.wasteLog?.id || "").toLowerCase();
+        const ingStr = String(log.ingredientName || "").toLowerCase();
+        const typeStr = String(log.type || "").toLowerCase();
+        const userStr = String(log.createdBy || "").toLowerCase();
+
+        return (
+          notesStr.includes(q) ||
+          batchStr.includes(q) ||
+          orderStr.includes(q) ||
+          wasteStr.includes(q) ||
+          ingStr.includes(q) ||
+          typeStr.includes(q) ||
+          userStr.includes(q)
+        );
+      }
+
+      return true;
+    });
+  }, [activeModalLogs, logTypeFilter, logSearch]);
+
+  // Summary counts and totals for activeModalLogs
+  const modalSummary = useMemo(() => {
+    let inwardTotal = 0;
+    let consumedTotal = 0;
+    let wasteTotal = 0;
+    let inwardCount = 0;
+    let consumedCount = 0;
+    let wasteCount = 0;
+    let adjCount = 0;
+
+    activeModalLogs.forEach((l) => {
+      const cat = getLogCategory(l.type);
+      const qty = Math.abs(Number(l.quantity) || 0);
+      if (cat === "INWARD") {
+        inwardTotal += qty;
+        inwardCount++;
+      } else if (cat === "CONSUMED") {
+        consumedTotal += qty;
+        consumedCount++;
+      } else if (cat === "WASTE") {
+        wasteTotal += qty;
+        wasteCount++;
+      } else if (cat === "ADJUSTMENT") {
+        adjCount++;
+      }
+    });
+
+    return {
+      inwardTotal,
+      consumedTotal,
+      wasteTotal,
+      inwardCount,
+      consumedCount,
+      wasteCount,
+      adjCount,
+      totalCount: activeModalLogs.length,
+    };
+  }, [activeModalLogs]);
+
+  const formatLogTimestamp = (dateString) => {
+    if (!dateString) return "—";
+    try {
+      const d = new Date(dateString);
+      if (isNaN(d.getTime())) return String(dateString);
+      const datePart = d.toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+      const timePart = d.toLocaleTimeString("en-IN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      });
+      return `${datePart}, ${timePart}`;
+    } catch (_) {
+      return String(dateString);
+    }
   };
 
   const handleStockSubmit = async (e) => {
@@ -935,7 +1131,7 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                   Target Kitchen Branch
                 </span>
                 <p className="text-xs font-bold text-slate-900 truncate mt-0.5">
-                  {branches.find((b) => String(b.id) === String(activeBranchId))?.name || `Branch Outlet #${activeBranchId || "1"}`}
+                    {branches.find((b) => String(b.id) === String(activeBranchId))?.name || (activeBranchId ? `Branch Outlet #${activeBranchId}` : "No Branch Configured")}
                 </p>
               </div>
             </div>
@@ -1474,6 +1670,22 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                   ))}
                 </div>
 
+                {/* Stock Movement Logs Button */}
+                <button
+                  type="button"
+                  onClick={() => openStockLogsModal(null)}
+                  className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/80 hover:bg-blue-100 px-3 py-1.5 text-xs font-bold text-blue-900 shadow-2xs transition active:scale-95 shrink-0"
+                  title="View All Branch Stock Movement Logs"
+                >
+                  <History size={13.5} className="text-blue-700" />
+                  <span className="hidden md:inline">Stock Logs</span>
+                  {totalStockLogsCount > 0 && (
+                    <span className="rounded-md bg-blue-600 px-1.5 py-0.2 text-[10px] font-extrabold text-white">
+                      {totalStockLogsCount}
+                    </span>
+                  )}
+                </button>
+
                 {/* View Switcher */}
                 <div className="flex items-center rounded-xl border border-slate-200 bg-slate-100 p-0.5 shadow-2xs">
                   <button
@@ -1587,16 +1799,24 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                           </span>
                         </td>
                         <td className="px-4 py-3.5">
-                          <div
-                            className={`inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-bold border shadow-2xs ${isLowStock
-                              ? "bg-rose-50 text-rose-700 border-rose-200"
-                              : "bg-slate-50 text-slate-800 border-slate-200"
+                          <button
+                            type="button"
+                            onClick={() => openStockLogsModal(item)}
+                            className={`group inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-bold border shadow-2xs transition hover:scale-102 hover:shadow-xs text-left cursor-pointer ${isLowStock
+                              ? "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
+                              : "bg-slate-50 text-slate-800 border-slate-200 hover:bg-slate-100"
                               }`}
+                            title="Click to view stock logs & usage history"
                           >
                             <Boxes size={13} className={isLowStock ? "text-rose-600 shrink-0" : "text-amber-600 shrink-0"} />
                             <span>{currentStockVal !== undefined && currentStockVal !== null && currentStockVal !== "" ? String(currentStockVal) : "0"}</span>
                             <span className="text-[10px] font-bold text-slate-400 uppercase">{item.unit || "KG"}</span>
-                          </div>
+                            {(item.stockLogs?.length || 0) > 0 && (
+                              <span className="ml-0.5 rounded-md bg-blue-100 px-1 text-[9px] font-bold text-blue-700 group-hover:bg-blue-200">
+                                {item.stockLogs.length} logs
+                              </span>
+                            )}
+                          </button>
                         </td>
                         <td className="px-4 py-3.5">
                           {currentAlertVal !== "" && currentAlertVal !== undefined && currentAlertVal !== null ? (
@@ -1630,6 +1850,22 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                         </td>
                         <td className="pl-3 pr-5 py-3.5 text-right">
                           <div className="flex justify-end items-center gap-2">
+                            {/* Stock Movement Logs Button */}
+                            <button
+                              className="relative grid size-8 place-items-center rounded-xl bg-blue-50 text-blue-800 border border-blue-200/90 hover:bg-blue-100 hover:border-blue-300 transition shadow-2xs active:scale-98 disabled:opacity-50"
+                              disabled={saving || stockSaving}
+                              onClick={() => openStockLogsModal(item)}
+                              type="button"
+                              title="View Stock Movement & Usage Logs"
+                            >
+                              <History size={14} className="text-blue-700" />
+                              {(item.stockLogs?.length || 0) > 0 && (
+                                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[9px] font-extrabold text-white shadow-xs">
+                                  {item.stockLogs.length}
+                                </span>
+                              )}
+                            </button>
+
                             {/* Update Stock Icon Button */}
                             {canUpdate("ingredient") && (
                               <button
@@ -1755,34 +1991,45 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                       </div>
 
                       {/* Card Footer Actions */}
-                      {(canUpdate("ingredient") || (isCustom && canUpdate("ingredient"))) && (
-                        <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                          {canUpdate("ingredient") && (
-                            <button
-                              type="button"
-                              disabled={saving || stockSaving}
-                              onClick={() => openStockModal(item)}
-                              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-amber-50 text-amber-900 border border-amber-200/90 py-1.5 text-xs font-bold hover:bg-amber-100 transition shadow-2xs active:scale-98"
-                            >
-                              <Boxes size={12.5} className="text-amber-700" />
-                              <span>Update Stock</span>
-                            </button>
+                      <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openStockLogsModal(item)}
+                          className="flex-1 inline-flex items-center justify-center gap-1 rounded-xl bg-blue-50 text-blue-900 border border-blue-200/90 py-1.5 text-xs font-bold hover:bg-blue-100 transition shadow-2xs active:scale-98"
+                          title="View Stock Movement Logs"
+                        >
+                          <History size={12.5} className="text-blue-700" />
+                          <span>Logs</span>
+                          {(item.stockLogs?.length || 0) > 0 && (
+                            <span className="ml-1 rounded-md bg-blue-600 px-1.5 py-0.2 text-[9.5px] font-extrabold text-white">
+                              {item.stockLogs.length}
+                            </span>
                           )}
+                        </button>
 
-                          <div className="flex items-center gap-1">
-                            {isCustom && canUpdate("ingredient") && (
-                              <button
-                                type="button"
-                                onClick={() => startEditInventory(item)}
-                                className="grid size-8 place-items-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 transition shadow-2xs"
-                                title="Edit"
-                              >
-                                <Pencil size={12} />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      )}
+                        {canUpdate("ingredient") && (
+                          <button
+                            type="button"
+                            disabled={saving || stockSaving}
+                            onClick={() => openStockModal(item)}
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-amber-50 text-amber-900 border border-amber-200/90 py-1.5 text-xs font-bold hover:bg-amber-100 transition shadow-2xs active:scale-98"
+                          >
+                            <Boxes size={12.5} className="text-amber-700" />
+                            <span>Update</span>
+                          </button>
+                        )}
+
+                        {isCustom && canUpdate("ingredient") && (
+                          <button
+                            type="button"
+                            onClick={() => startEditInventory(item)}
+                            className="grid size-8 place-items-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 transition shadow-2xs shrink-0"
+                            title="Edit"
+                          >
+                            <Pencil size={12} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -1889,193 +2136,702 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                 </div>
               </div>
 
-              {/* Stock Batch Mode Selector (Update vs New Batch) */}
-              <div className="mb-4 rounded-2xl bg-slate-50 p-2.5 border border-slate-200/80">
-                <div className="flex items-center gap-2">
-                  {currentStockId ? (
+              {/* Modal Mode Switcher Tabs */}
+              <div className="mb-4 flex items-center rounded-2xl bg-slate-100 p-1 border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setActiveStockModalTab("form")}
+                  className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 px-2.5 text-xs font-bold transition ${activeStockModalTab === "form"
+                    ? "bg-white text-slate-900 shadow-2xs"
+                    : "text-slate-500 hover:text-slate-800"
+                    }`}
+                >
+                  <Boxes size={14} className="text-amber-600" />
+                  <span>Update Stock</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveStockModalTab("logs")}
+                  className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 px-2.5 text-xs font-bold transition ${activeStockModalTab === "logs"
+                    ? "bg-white text-blue-700 shadow-2xs"
+                    : "text-slate-500 hover:text-slate-800"
+                    }`}
+                >
+                  <History size={14} className="text-blue-600" />
+                  <span>Movement Logs ({(stockItem.stockLogs || []).length})</span>
+                </button>
+              </div>
+
+              {activeStockModalTab === "logs" ? (
+                /* Modal Tab 2: Movement Logs inside Update Modal */
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between pb-1">
+                    <span className="text-xs font-bold text-slate-700">
+                      {(stockItem.stockLogs || []).length} Recorded Movement{((stockItem.stockLogs || []).length === 1) ? "" : "s"}
+                    </span>
                     <button
                       type="button"
-                      onClick={() => setStockMode("update")}
-                      className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 px-2.5 text-xs font-bold transition ${stockMode === "update"
-                        ? "bg-[#8D0606] text-white shadow-2xs"
-                        : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
-                        }`}
+                      onClick={() => {
+                        const itemToView = stockItem;
+                        closeStockModal();
+                        openStockLogsModal(itemToView);
+                      }}
+                      className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1"
                     >
-                      <Layers size={13} />
-                      <span>Update Batch #{currentStockId}</span>
+                      <span>Expanded View</span>
+                      <ExternalLink size={12} />
                     </button>
-                  ) : null}
+                  </div>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStockMode("create");
-                      setStockValue("");
-                      setExpireDate("");
-                    }}
-                    className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 px-2.5 text-xs font-bold transition ${stockMode === "create" || !currentStockId
-                      ? "bg-[#8D0606] text-white shadow-2xs"
-                      : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
-                      }`}
-                  >
-                    <Plus size={14} />
-                    <span>+ New Stock Batch</span>
-                  </button>
-                </div>
+                  {(!stockItem.stockLogs || stockItem.stockLogs.length === 0) ? (
+                    <div className="py-10 text-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/50">
+                      <History size={24} className="text-slate-300 mx-auto mb-2" />
+                      <p className="text-xs font-bold text-slate-700">No stock logs recorded yet</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5 max-w-xs mx-auto">
+                        Stock movements, recipe usage, and waste entries for this ingredient will appear here.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="max-h-[320px] overflow-y-auto space-y-2 pr-1">
+                      {stockItem.stockLogs.map((log) => {
+                        const typeStr = String(log.type || "").toUpperCase();
+                        const cat = getLogCategory(log.type);
+                        const isInward = cat === "INWARD";
+                        const isConsumed = cat === "CONSUMED";
+                        const isWaste = cat === "WASTE";
+                        const unit = stockItem.unit || "KG";
+                        const qtyNum = Math.abs(Number(log.quantity) || 0);
+                        const displayBatch = extractLogBatch(log);
 
-                <div className="mt-1.5 flex items-center justify-between px-1 text-[10.5px] font-semibold text-slate-500">
-                  <span>
-                    Mode:{" "}
-                    <strong className={stockMode === "update" && currentStockId ? "text-[#8D0606]" : "text-emerald-700"}>
-                      {stockMode === "update" && currentStockId
-                        ? `Update Existing (stockId: ${currentStockId})`
-                        : "Create New Batch (no stockId)"}
-                    </strong>
-                  </span>
-                  {availableStockBatches.length > 0 && (
-                    <span className="text-slate-400">
-                      {availableStockBatches.length} batch{availableStockBatches.length > 1 ? "es" : ""} on record
-                    </span>
+                        return (
+                          <div key={log.id || `${log.createdAt}-${Math.random()}`} className="p-3 rounded-xl border border-slate-100 bg-slate-50/80 hover:bg-slate-100/70 transition text-xs space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold border ${isInward ? "bg-emerald-50 text-emerald-800 border-emerald-200" :
+                                  isConsumed ? "bg-blue-50 text-blue-800 border-blue-200" :
+                                    isWaste ? "bg-rose-50 text-rose-800 border-rose-200" :
+                                      "bg-purple-50 text-purple-800 border-purple-200"
+                                }`}>
+                                {isInward ? <ArrowDownLeft size={10} className="text-emerald-600" /> : isConsumed ? <ArrowUpRight size={10} className="text-blue-600" /> : isWaste ? <Trash2 size={10} className="text-rose-600" /> : <RefreshCw size={10} className="text-purple-600" />}
+                                <span>{typeStr}</span>
+                              </span>
+                              <span className={`font-black text-xs ${isInward ? "text-emerald-700" :
+                                  isConsumed ? "text-blue-700" :
+                                    isWaste ? "text-rose-700" : "text-slate-800"
+                                }`}>
+                                {isInward ? "+" : "-"}{qtyNum} {unit}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between text-[11px] text-slate-500">
+                              <span>{formatLogTimestamp(log.createdAt)}</span>
+                              <div className="inline-flex items-center gap-1 font-bold text-slate-700">
+                                <span>{log.previousStock ?? 0}</span>
+                                <span>➔</span>
+                                <span>{log.currentStock ?? 0} {unit}</span>
+                              </div>
+                            </div>
+
+                            {(log.orderId || log.notes || displayBatch) && (
+                              <div className="pt-1 border-t border-slate-200/60 text-[11px] text-slate-600">
+                                {log.orderId ? <strong className="text-blue-700 mr-1.5">Order #{log.orderId}</strong> : null}
+                                {displayBatch ? <span className="rounded bg-white px-1 border border-slate-200 text-[10px] font-bold mr-1.5">Batch #{displayBatch}</span> : null}
+                                <span>{log.notes}</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
+
+                  <div className="pt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveStockModalTab("form")}
+                      className="h-10 flex-1 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50"
+                    >
+                      Back to Form
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeStockModal}
+                      className="h-10 flex-1 rounded-xl border border-slate-200 bg-slate-100 text-xs font-bold text-slate-700 hover:bg-slate-200"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Modal Tab 1: Stock Form */
+                <>
+                    {/* Stock Batch Mode Selector (Update vs New Batch) */}
+                    <div className="mb-4 rounded-2xl bg-slate-50 p-2.5 border border-slate-200/80">
+                      <div className="flex items-center gap-2">
+                        {currentStockId ? (
+                          <button
+                            type="button"
+                            onClick={() => setStockMode("update")}
+                            className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 px-2.5 text-xs font-bold transition ${stockMode === "update"
+                              ? "bg-[#8D0606] text-white shadow-2xs"
+                              : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
+                              }`}
+                          >
+                            <Layers size={13} />
+                            <span>Update Batch #{currentStockId}</span>
+                          </button>
+                        ) : null}
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setStockMode("create");
+                            setStockValue("");
+                            setExpireDate("");
+                          }}
+                          className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 px-2.5 text-xs font-bold transition ${stockMode === "create" || !currentStockId
+                            ? "bg-[#8D0606] text-white shadow-2xs"
+                            : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
+                            }`}
+                        >
+                          <Plus size={14} />
+                          <span>+ New Stock Batch</span>
+                        </button>
+                      </div>
+
+                      <div className="mt-1.5 flex items-center justify-between px-1 text-[10.5px] font-semibold text-slate-500">
+                        <span>
+                          Mode:{" "}
+                          <strong className={stockMode === "update" && currentStockId ? "text-[#8D0606]" : "text-emerald-700"}>
+                            {stockMode === "update" && currentStockId
+                              ? `Update Existing (stockId: ${currentStockId})`
+                              : "Create New Batch (no stockId)"}
+                          </strong>
+                        </span>
+                        {availableStockBatches.length > 0 && (
+                          <span className="text-slate-400">
+                            {availableStockBatches.length} batch{availableStockBatches.length > 1 ? "es" : ""} on record
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Stock Form */}
+                    <form onSubmit={handleStockSubmit} className="space-y-4" noValidate>
+                      {/* Stock Quantity Input with Quick Presets */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">
+                            Stock Quantity <span className="text-rose-600">*</span>
+                          </label>
+                          <div className="flex items-center gap-1">
+                            {[10, 50, 100].map((inc) => (
+                              <button
+                                key={inc}
+                                type="button"
+                                onClick={() => {
+                                  const cur = Number(stockValue) || 0;
+                                  setStockValue(String(cur + inc));
+                                  setStockError("");
+                                }}
+                                className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600 hover:bg-slate-200 transition"
+                              >
+                                +{inc}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="relative flex items-center">
+                          <Boxes className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
+                          <input
+                            type="number"
+                            step="any"
+                            min="0"
+                            required
+                            placeholder="Enter stock quantity (e.g. 80)"
+                            value={stockValue}
+                            onChange={(e) => {
+                              setStockValue(e.target.value);
+                              setStockError("");
+                            }}
+                            className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-16 text-sm font-bold text-slate-800 outline-none transition focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500 uppercase">
+                            {stockItem.unit || "UNIT"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Alert Quantity (Low Stock Alert) Input */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">
+                            Alert Quantity <span className="text-rose-600">*</span>
+                          </label>
+                        </div>
+                        <div className="relative flex items-center">
+                          <AlertCircle className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
+                          <input
+                            type="number"
+                            step="any"
+                            min="0"
+                            required
+                            placeholder="Enter threshold quantity for low stock alerts (e.g. 10)"
+                            value={alertQuantity}
+                            onChange={(e) => {
+                              setAlertQuantity(e.target.value);
+                              setStockError("");
+                            }}
+                            className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-16 text-sm font-bold text-slate-800 outline-none transition focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500 uppercase">
+                            {stockItem.unit || "UNIT"}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-[11px] text-slate-500">
+                          Threshold to trigger low stock warnings and dashboard alerts.
+                        </p>
+                      </div>
+
+                      {/* Expiry Date Input */}
+                      <div>
+                        <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-600">
+                          Expiry Date <span className="text-rose-600">*</span>
+                        </label>
+                        <div className="relative flex items-center">
+                          <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
+                          <input
+                            type="date"
+                            required
+                            min={new Date().toISOString().split("T")[0]}
+                            value={expireDate}
+                            onChange={(e) => {
+                              setExpireDate(e.target.value);
+                              setStockError("");
+                            }}
+                            className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 text-xs font-medium text-slate-800 outline-none transition focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Error Alert */}
+                      {stockError ? (
+                        <p className="flex items-center gap-1.5 text-xs font-medium text-rose-600 animate-in fade-in">
+                          <AlertCircle size={14} className="shrink-0" />
+                          <span>{stockError}</span>
+                        </p>
+                      ) : null}
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-3 pt-2">
+                        <button
+                          type="button"
+                          disabled={stockSaving}
+                          onClick={closeStockModal}
+                          className="h-11 flex-1 rounded-xl border border-slate-200 bg-slate-100 text-xs font-bold text-slate-700 transition hover:bg-slate-200"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={stockSaving}
+                          className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#8D0606] to-[#b80808] text-xs font-bold text-white shadow-xs transition hover:from-[#7a0505] hover:to-[#a10707] active:scale-98 disabled:opacity-60"
+                        >
+                          {stockSaving ? (
+                            <Loader variant="button" text="Processing..." />
+                          ) : (
+                            <>
+                              <Save size={15} />
+                              <span>
+                                {stockMode === "update" && currentStockId
+                                  ? `Update Batch #${currentStockId}`
+                                  : "Create Stock Batch"}
+                              </span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                </>
+              )}
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: COMPREHENSIVE STOCK MOVEMENT & USAGE LOGS MODAL                     */}
+      {/* ========================================================================= */}
+      {stockLogsModalOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/60 p-3 sm:p-5 backdrop-blur-xs animate-in fade-in overflow-y-auto">
+            <div className="w-full max-w-4xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl animate-in zoom-in-95 flex flex-col max-h-[92vh]">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-slate-100 px-5 sm:px-6 py-4 bg-slate-50/80">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="grid size-10 place-items-center rounded-xl bg-blue-50 text-blue-700 border border-blue-200/80 shadow-2xs shrink-0">
+                    <History size={20} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-base font-bold text-slate-800">
+                        {selectedLogItem
+                          ? `Stock Logs: ${selectedLogItem.ingredient?.name || selectedLogItem.name || "Ingredient"}`
+                          : "Branch Stock Movement & Usage History"}
+                      </h3>
+                      {selectedLogItem ? (
+                        <span className="rounded-md bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-[#8D0606] border border-rose-100">
+                          #{selectedLogItem.ingredientId || selectedLogItem.ingredient?.id || selectedLogItem.id}
+                        </span>
+                      ) : (
+                        <span className="rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 border border-blue-100">
+                          All Branch Items
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs font-medium text-slate-500 truncate mt-0.5">
+                      {selectedBranch?.name ? `${selectedBranch.name} • ` : ""}
+                      Detailed log of stock additions, recipe usage, order consumptions, and waste records.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={closeStockLogsModal}
+                  type="button"
+                  className="grid size-8 place-items-center rounded-xl border border-slate-200 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition shrink-0"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Selected Ingredient Quick Profile (if single item) */}
+              {selectedLogItem && (
+                <div className="px-5 sm:px-6 pt-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-3 sm:p-3.5">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {selectedLogItem.ingredient?.image || selectedLogItem.image ? (
+                        <img
+                          src={selectedLogItem.ingredient?.image || selectedLogItem.image}
+                          alt={selectedLogItem.ingredient?.name || selectedLogItem.name}
+                          className="size-11 rounded-xl object-cover border border-slate-200 shadow-2xs shrink-0"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
+                        />
+                      ) : (
+                        <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-rose-50 text-[#8D0606] font-bold text-sm border border-rose-100 shadow-2xs">
+                          {(selectedLogItem.ingredient?.name || selectedLogItem.name || "A").charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-sm text-slate-800 truncate">
+                            {selectedLogItem.ingredient?.name || selectedLogItem.name}
+                          </h4>
+                          <span className="rounded-md bg-white px-1.5 py-0.5 text-[10px] font-bold text-slate-500 border border-slate-200">
+                            {selectedLogItem.ingredient?.category || selectedLogItem.category || "General"}
+                          </span>
+                        </div>
+                        <p className="text-[11px] font-medium text-slate-500 mt-0.5">
+                          Standard Unit: <strong className="text-slate-700">{selectedLogItem.unit || "KG"}</strong> • Alert Threshold:{" "}
+                          <strong className="text-amber-700">≤ {selectedLogItem.alertQuantity ?? 0} {selectedLogItem.unit || "KG"}</strong>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <div className="rounded-xl bg-white border border-slate-200 px-3 py-1.5 text-right shadow-2xs">
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Current Stock</span>
+                        <span className="text-sm font-black text-slate-900">
+                          {selectedLogItem.currentStock ?? 0} {selectedLogItem.unit || "KG"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* KPI Summary Cards */}
+              <div className="px-5 sm:px-6 pt-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-3">
+                    <div className="flex items-center justify-between text-slate-400 text-xs font-bold uppercase tracking-wider">
+                      <span>Total Movements</span>
+                      <History size={13} />
+                    </div>
+                    <p className="text-base sm:text-lg font-black text-slate-800 mt-1">
+                      {modalSummary.totalCount}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/40 p-3">
+                    <div className="flex items-center justify-between text-emerald-700 text-xs font-bold uppercase tracking-wider">
+                      <span>Total Inward</span>
+                      <ArrowDownLeft size={14} className="text-emerald-600" />
+                    </div>
+                    <p className="text-base sm:text-lg font-black text-emerald-800 mt-1">
+                      +{modalSummary.inwardTotal} <span className="text-xs font-semibold">{selectedLogItem?.unit || ""}</span>
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-blue-200/80 bg-blue-50/40 p-3">
+                    <div className="flex items-center justify-between text-blue-700 text-xs font-bold uppercase tracking-wider">
+                      <span>Consumed / Orders</span>
+                      <ArrowUpRight size={14} className="text-blue-600" />
+                    </div>
+                    <p className="text-base sm:text-lg font-black text-blue-800 mt-1">
+                      -{modalSummary.consumedTotal} <span className="text-xs font-semibold">{selectedLogItem?.unit || ""}</span>
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-rose-200/80 bg-rose-50/40 p-3">
+                    <div className="flex items-center justify-between text-rose-700 text-xs font-bold uppercase tracking-wider">
+                      <span>Recorded Waste</span>
+                      <Trash2 size={13} className="text-rose-600" />
+                    </div>
+                    <p className="text-base sm:text-lg font-black text-rose-800 mt-1">
+                      -{modalSummary.wasteTotal} <span className="text-xs font-semibold">{selectedLogItem?.unit || ""}</span>
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              {/* Stock Form */}
-              <form onSubmit={handleStockSubmit} className="space-y-4" noValidate>
-                {/* Stock Quantity Input with Quick Presets */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">
-                      Stock Quantity <span className="text-rose-600">*</span>
-                    </label>
-                    <div className="flex items-center gap-1">
-                      {[10, 50, 100].map((inc) => (
-                        <button
-                          key={inc}
-                          type="button"
-                          onClick={() => {
-                            const cur = Number(stockValue) || 0;
-                            setStockValue(String(cur + inc));
-                            setStockError("");
-                          }}
-                          className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600 hover:bg-slate-200 transition"
-                        >
-                          +{inc}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="relative flex items-center">
-                    <Boxes className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
+              {/* Filters & Search Toolbar */}
+              <div className="px-5 sm:px-6 pt-4 pb-2 border-b border-slate-100">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  {/* Search */}
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3.5 top-2.5 text-slate-400" size={14} />
                     <input
-                      type="number"
-                      step="any"
-                      min="0"
-                      required
-                      placeholder="Enter stock quantity (e.g. 80)"
-                      value={stockValue}
-                      onChange={(e) => {
-                        setStockValue(e.target.value);
-                        setStockError("");
-                      }}
-                      className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-16 text-sm font-bold text-slate-800 outline-none transition focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
+                      type="text"
+                      placeholder="Search by notes, batch #, order ID, or reason..."
+                      value={logSearch}
+                      onChange={(e) => setLogSearch(e.target.value)}
+                      className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-8 text-xs font-medium text-slate-800 outline-none transition focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500 uppercase">
-                      {stockItem.unit || "UNIT"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Alert Quantity (Low Stock Alert) Input */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">
-                      Alert Quantity <span className="text-rose-600">*</span>
-                    </label>
-                  </div>
-                  <div className="relative flex items-center">
-                    <AlertCircle className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
-                    <input
-                      type="number"
-                      step="any"
-                      min="0"
-                      required
-                      placeholder="Enter threshold quantity for low stock alerts (e.g. 10)"
-                      value={alertQuantity}
-                      onChange={(e) => {
-                        setAlertQuantity(e.target.value);
-                        setStockError("");
-                      }}
-                      className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-16 text-sm font-bold text-slate-800 outline-none transition focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500 uppercase">
-                      {stockItem.unit || "UNIT"}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[11px] text-slate-500">
-                    Threshold to trigger low stock warnings and dashboard alerts.
-                  </p>
-                </div>
-
-                {/* Expiry Date Input */}
-                <div>
-                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-600">
-                    Expiry Date <span className="text-rose-600">*</span>
-                  </label>
-                  <div className="relative flex items-center">
-                    <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
-                    <input
-                      type="date"
-                      required
-                      min={new Date().toISOString().split("T")[0]}
-                      value={expireDate}
-                      onChange={(e) => {
-                        setExpireDate(e.target.value);
-                        setStockError("");
-                      }}
-                      className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 text-xs font-medium text-slate-800 outline-none transition focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
-                    />
-                  </div>
-                </div>
-
-                {/* Error Alert */}
-                {stockError ? (
-                  <p className="flex items-center gap-1.5 text-xs font-medium text-rose-600 animate-in fade-in">
-                    <AlertCircle size={14} className="shrink-0" />
-                    <span>{stockError}</span>
-                  </p>
-                ) : null}
-
-                {/* Actions */}
-                <div className="flex items-center gap-3 pt-2">
-                  <button
-                    type="button"
-                    disabled={stockSaving}
-                    onClick={closeStockModal}
-                    className="h-11 flex-1 rounded-xl border border-slate-200 bg-slate-100 text-xs font-bold text-slate-700 transition hover:bg-slate-200"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={stockSaving}
-                    className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#8D0606] to-[#b80808] text-xs font-bold text-white shadow-xs transition hover:from-[#7a0505] hover:to-[#a10707] active:scale-98 disabled:opacity-60"
-                  >
-                    {stockSaving ? (
-                      <Loader variant="button" text="Processing..." />
-                    ) : (
-                      <>
-                        <Save size={15} />
-                        <span>
-                          {stockMode === "update" && currentStockId
-                            ? `Update Batch #${currentStockId}`
-                            : "Create Stock Batch"}
-                        </span>
-                      </>
+                    {logSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setLogSearch("")}
+                        className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600"
+                      >
+                        <X size={13} />
+                      </button>
                     )}
-                  </button>
+                  </div>
+
+                  {/* Filter Pills */}
+                  <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+                    {[
+                      { id: "ALL", label: `All (${modalSummary.totalCount})` },
+                      { id: "INWARD", label: `Inward (${modalSummary.inwardCount})` },
+                      { id: "CONSUMED", label: `Consumed (${modalSummary.consumedCount})` },
+                      { id: "WASTE", label: `Waste (${modalSummary.wasteCount})` },
+                    ].map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => setLogTypeFilter(f.id)}
+                        className={`px-2.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition ${logTypeFilter === f.id
+                          ? "bg-slate-900 text-white shadow-xs"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </form>
+              </div>
+
+              {/* Logs Content Table (Scrollable) */}
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+                {filteredModalLogs.length === 0 ? (
+                  <div className="py-14 text-center">
+                    <div className="mx-auto mb-3 grid size-12 place-items-center rounded-2xl bg-blue-50 text-blue-600 border border-blue-100 shadow-2xs">
+                      <History size={22} />
+                    </div>
+                    <h4 className="text-sm font-bold text-slate-800">No Stock Movement Logs Found</h4>
+                    <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
+                      {logSearch || logTypeFilter !== "ALL"
+                        ? "No stock logs match your current search or filter. Try clearing filters."
+                        : "When stock is added, consumed during kitchen preparation, or recorded as waste, detailed logs will be recorded here automatically."}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200/90 shadow-2xs bg-white">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-100 bg-slate-50/80 text-[10.5px] font-extrabold uppercase tracking-wider text-slate-400">
+                          <th className="py-3 px-4">Date & Time</th>
+                          {isAllLogsView && <th className="py-3 px-4">Ingredient</th>}
+                          <th className="py-3 px-4">Type</th>
+                          <th className="py-3 px-4">Quantity</th>
+                          <th className="py-3 px-4">Stock Impact</th>
+                          <th className="py-3 px-4">Batch #</th>
+                          <th className="py-3 px-4">Purpose / Usage Details</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filteredModalLogs.map((log) => {
+                          const typeStr = String(log.type || "").toUpperCase();
+                          const cat = getLogCategory(log.type);
+                          const isInward = cat === "INWARD";
+                          const isConsumed = cat === "CONSUMED";
+                          const isWaste = cat === "WASTE";
+                          const unit = log.ingredientUnit || selectedLogItem?.unit || "KG";
+                          const qtyNum = Math.abs(Number(log.quantity) || 0);
+                          const displayBatch = extractLogBatch(log);
+
+                          return (
+                            <tr key={log.id || `${log.createdAt}-${Math.random()}`} className="hover:bg-slate-50/70 transition">
+                              {/* Date & Time */}
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <div className="flex items-center gap-1.5 font-bold text-slate-700">
+                                  <Clock size={12} className="text-slate-400 shrink-0" />
+                                  <span>{formatLogTimestamp(log.createdAt)}</span>
+                                </div>
+                              </td>
+
+                              {/* Ingredient (if all items view) */}
+                              {isAllLogsView && (
+                                <td className="py-3.5 px-4 whitespace-nowrap">
+                                  <div className="flex items-center gap-2">
+                                    {log.ingredientImage ? (
+                                      <img
+                                        src={log.ingredientImage}
+                                        alt={log.ingredientName}
+                                        className="size-7 rounded-lg object-cover border border-slate-200 shadow-2xs shrink-0"
+                                      />
+                                    ) : (
+                                      <div className="grid size-7 place-items-center rounded-lg bg-rose-50 text-[#8D0606] font-bold text-[10px] border border-rose-100 shadow-2xs shrink-0">
+                                        {(log.ingredientName || "A").charAt(0).toUpperCase()}
+                                      </div>
+                                    )}
+                                    <div>
+                                      <span className="font-bold text-slate-800 text-xs block">{log.ingredientName}</span>
+                                      <span className="text-[10px] text-slate-400">{log.ingredientCategory}</span>
+                                    </div>
+                                  </div>
+                                </td>
+                              )}
+
+                              {/* Movement Type */}
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <span
+                                  className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10.5px] font-bold border ${isInward
+                                    ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                    : isConsumed
+                                      ? "bg-blue-50 text-blue-800 border-blue-200"
+                                      : isWaste
+                                        ? "bg-rose-50 text-rose-800 border-rose-200"
+                                        : "bg-purple-50 text-purple-800 border-purple-200"
+                                    }`}
+                                >
+                                  {isInward ? (
+                                    <ArrowDownLeft size={11} className="text-emerald-600" />
+                                  ) : isConsumed ? (
+                                    <ArrowUpRight size={11} className="text-blue-600" />
+                                  ) : isWaste ? (
+                                    <Trash2 size={11} className="text-rose-600" />
+                                  ) : (
+                                    <RefreshCw size={11} className="text-purple-600" />
+                                  )}
+                                  <span>{typeStr}</span>
+                                </span>
+                              </td>
+
+                              {/* Quantity */}
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <span
+                                  className={`text-xs font-black ${isInward
+                                    ? "text-emerald-700"
+                                    : isConsumed
+                                      ? "text-blue-700"
+                                      : isWaste
+                                        ? "text-rose-700"
+                                        : "text-slate-800"
+                                    }`}
+                                >
+                                  {isInward ? "+" : "-"}{qtyNum} {unit}
+                                </span>
+                              </td>
+
+                              {/* Stock Impact (Previous -> Current) */}
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <div className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 border border-slate-200/80 px-2 py-1 text-[11px] font-bold text-slate-700">
+                                  <span className="text-slate-400 font-medium">{log.previousStock ?? 0}</span>
+                                  <ArrowRight size={10} className="text-slate-400" />
+                                  <span className="text-slate-900">{log.currentStock ?? 0}</span>
+                                  <span className="text-[9.5px] text-slate-400 uppercase">{unit}</span>
+                                </div>
+                              </td>
+
+                              {/* Batch # */}
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                {displayBatch ? (
+                                  <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10.5px] font-bold text-slate-700 border border-slate-200/80">
+                                    Batch #{displayBatch}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-300 font-bold">—</span>
+                                )}
+                              </td>
+
+                              {/* Usage / Purpose / Order / Waste Details */}
+                              <td className="py-3.5 px-4">
+                                <div className="space-y-1 max-w-xs sm:max-w-md">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    {log.orderId || log.order ? (
+                                      <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 text-blue-800 border border-blue-200 px-1.5 py-0.5 text-[10.5px] font-bold">
+                                        <Receipt size={11} className="text-blue-600" />
+                                        <span>Order #{log.orderId || log.order?.id}</span>
+                                      </span>
+                                    ) : null}
+
+                                    {log.wasteLogId || log.wasteLog ? (
+                                      <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 text-rose-800 border border-rose-200 px-1.5 py-0.5 text-[10.5px] font-bold">
+                                        <Trash2 size={11} className="text-rose-600" />
+                                        <span>Waste #{log.wasteLogId || log.wasteLog?.id}</span>
+                                      </span>
+                                    ) : null}
+
+                                    {log.createdBy && (
+                                      <span className="text-[10px] font-medium text-slate-400">
+                                        By: {log.createdBy}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {log.notes ? (
+                                    <p className="text-xs text-slate-600 font-medium break-words leading-relaxed">
+                                      {log.notes}
+                                    </p>
+                                  ) : !log.orderId && !log.wasteLogId ? (
+                                    <span className="text-[11px] text-slate-400 italic">
+                                      {isInward ? "Standard stock inward addition" : "Stock transaction recorded"}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-between border-t border-slate-100 px-5 sm:px-6 py-3.5 bg-slate-50/80">
+                <span className="text-xs font-semibold text-slate-500">
+                  Showing <strong>{filteredModalLogs.length}</strong> of <strong>{modalSummary.totalCount}</strong> logs
+                </span>
+                <button
+                  type="button"
+                  onClick={closeStockLogsModal}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 transition shadow-2xs"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>,
           document.body
