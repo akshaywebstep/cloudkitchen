@@ -17,7 +17,9 @@ import {
   AlertTriangle,
   CheckCircle2,
   Sparkles,
-  Layers
+  Layers,
+  Loader2,
+  Info
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
@@ -28,10 +30,12 @@ import {
   getBranchesApi,
   getMenuCategoriesApi,
   getIngredientsApi,
-  createMenuItemApi
+  createMenuItemApi,
+  getAiRecipeApi
 } from '../../services/api';
 import { extractFieldErrors, getErrorMessage } from '../../utils/errorHelper';
 import {
+  normalizeUnit,
   getConversionHint,
   getSanityWarning,
   formatRecipeQty,
@@ -70,6 +74,11 @@ export const AddMenuModal = () => {
   const [tempUnit, setTempUnit] = useState('GM');
 
   const [errors, setErrors] = useState({});
+
+  // AI Recipe Auto-Fill States
+  const [isAiGenerating, setIsAiGenerating] = useState(false);
+  const [unmatchedAiItems, setUnmatchedAiItems] = useState([]);
+  const [aiChefTip, setAiChefTip] = useState('');
 
   useEffect(() => {
     if (isAddMenuOpen) {
@@ -153,6 +162,187 @@ export const AddMenuModal = () => {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         el.focus();
       }
+    }
+  };
+
+  const convertAiQuantityAndUnit = (aiItem, catalogIng) => {
+    const catUnit = normalizeUnit(catalogIng?.unit || aiItem.unit || 'GM');
+    const weightInGm = typeof aiItem.weightInGm === 'number' && aiItem.weightInGm > 0 ? aiItem.weightInGm : null;
+    const rawQty = parseFloat(aiItem.quantity) || 1;
+
+    if (catUnit === 'KG') {
+      const qtyInKg = weightInGm ? weightInGm / 1000 : (normalizeUnit(aiItem.unit) === 'GM' ? rawQty / 1000 : rawQty);
+      return {
+        quantity: parseFloat(qtyInKg.toFixed(4)),
+        unit: 'KG',
+      };
+    }
+
+    if (catUnit === 'LITER') {
+      const qtyInLtr = weightInGm ? weightInGm / 1000 : (normalizeUnit(aiItem.unit) === 'ML' ? rawQty / 1000 : rawQty);
+      return {
+        quantity: parseFloat(qtyInLtr.toFixed(4)),
+        unit: 'LITER',
+      };
+    }
+
+    if (catUnit === 'GM') {
+      const qtyInGm = weightInGm || (normalizeUnit(aiItem.unit) === 'KG' ? rawQty * 1000 : rawQty);
+      return {
+        quantity: parseFloat(qtyInGm.toFixed(2)),
+        unit: 'GM',
+      };
+    }
+
+    if (catUnit === 'ML') {
+      const qtyInMl = weightInGm || (normalizeUnit(aiItem.unit) === 'LITER' ? rawQty * 1000 : rawQty);
+      return {
+        quantity: parseFloat(qtyInMl.toFixed(2)),
+        unit: 'ML',
+      };
+    }
+
+    return {
+      quantity: rawQty,
+      unit: catUnit || 'PIECE',
+    };
+  };
+
+  const handleAutoSuggestRecipe = async () => {
+    const dishName = formData.name?.trim();
+    if (!dishName) {
+      toast.error('Please enter a Dish Name first to auto-fill recipe!');
+      document.getElementById('add-dish-name')?.focus();
+      return;
+    }
+
+    setIsAiGenerating(true);
+    setUnmatchedAiItems([]);
+    setAiChefTip('');
+
+    try {
+      const res = await getAiRecipeApi(dishName, {
+        kitchenId: formData.kitchenId,
+        branchId: formData.branchId,
+        servingSize: 1,
+      });
+
+      if (!res || res.status === false) {
+        toast.error(res?.message || 'Failed to auto-suggest recipe for this dish.');
+        setIsAiGenerating(false);
+        return;
+      }
+
+      // Auto-populate description if currently empty
+      if (!formData.description?.trim() && res.description) {
+        setFormData((prev) => ({ ...prev, description: res.description }));
+      }
+
+      if (res.chefTip) {
+        setAiChefTip(res.chefTip);
+      }
+
+      const aiIngredients = Array.isArray(res.data) ? res.data : [];
+      if (aiIngredients.length === 0) {
+        toast.info(`AI generated details, but no ingredients found for "${dishName}".`);
+        setIsAiGenerating(false);
+        return;
+      }
+
+      const matchedList = [];
+      const unmatchedList = [];
+
+      aiIngredients.forEach((item) => {
+        let catalogIng = null;
+
+        // 1. Match by returned ingredientId
+        if (item.ingredientId) {
+          catalogIng = ingredientsList.find((i) => Number(i.id) === Number(item.ingredientId));
+        }
+
+        // 2. Match by matchedName
+        if (!catalogIng && item.matchedName) {
+          const matchNorm = item.matchedName.toLowerCase().trim();
+          catalogIng = ingredientsList.find((i) => i.name?.toLowerCase().trim() === matchNorm);
+        }
+
+        // 3. Match by exact name
+        if (!catalogIng && item.name) {
+          const itemNorm = item.name.toLowerCase().trim();
+          catalogIng = ingredientsList.find((i) => i.name?.toLowerCase().trim() === itemNorm);
+        }
+
+        // 4. Fuzzy fallback match
+        if (!catalogIng && item.name) {
+          const cleanItemName = item.name.toLowerCase().replace(/[,()]/g, ' ').replace(/\s+/g, ' ').trim();
+          const firstWord = cleanItemName.split(' ')[0];
+          catalogIng = ingredientsList.find((i) => {
+            const iName = (i.name || '').toLowerCase().trim();
+            if (iName === cleanItemName) return true;
+            if (iName.includes(cleanItemName) || cleanItemName.includes(iName)) return true;
+            if (firstWord && firstWord.length >= 4 && iName.includes(firstWord)) return true;
+            return false;
+          });
+        }
+
+        if (catalogIng) {
+          const { quantity, unit } = convertAiQuantityAndUnit(item, catalogIng);
+          matchedList.push({
+            id: catalogIng.id,
+            name: catalogIng.name,
+            unit,
+            quantity,
+            hint: item.hint || (item.weightInGm ? `~${item.weightInGm}g` : ''),
+          });
+        } else {
+          unmatchedList.push({
+            name: item.name,
+            hint: item.hint || (item.weightInGm ? `~${item.weightInGm}g` : ''),
+            weightInGm: item.weightInGm,
+            quantity: item.quantity,
+            unit: item.unit,
+          });
+        }
+      });
+
+      if (matchedList.length > 0) {
+        // Deduplicate matched ingredients (aggregate quantities only if units are identical)
+        const uniqueMatched = [];
+        const mapById = new Map();
+
+        for (const m of matchedList) {
+          if (mapById.has(m.id)) {
+            const existing = mapById.get(m.id);
+            if (existing.unit === m.unit) {
+              existing.quantity = parseFloat((existing.quantity + m.quantity).toFixed(4));
+            }
+            if (m.hint && !existing.hint.includes(m.hint)) {
+              existing.hint = `${existing.hint}, ${m.hint}`;
+            }
+          } else {
+            const copy = { ...m };
+            mapById.set(m.id, copy);
+            uniqueMatched.push(copy);
+          }
+        }
+
+        setSelectedIngredients(uniqueMatched);
+        setUnmatchedAiItems(unmatchedList);
+
+        toast.success(
+          `✨ Recipe auto-filled with ${uniqueMatched.length} ingredients for "${dishName}"!`
+        );
+      } else {
+        setUnmatchedAiItems(unmatchedList);
+        toast.info(
+          `AI suggested ${unmatchedList.length} ingredients, but none matched your current inventory catalog. Please add them in Inventory.`
+        );
+      }
+    } catch (err) {
+      console.error('Error generating AI recipe:', err);
+      toast.error('An unexpected error occurred while generating AI recipe.');
+    } finally {
+      setIsAiGenerating(false);
     }
   };
 
@@ -246,6 +436,9 @@ export const AddMenuModal = () => {
     setTempQuantity('');
     setTempUnit('gm');
     setErrors({});
+    setIsAiGenerating(false);
+    setUnmatchedAiItems([]);
+    setAiChefTip('');
   };
 
   const handleSubmit = async (e) => {
@@ -546,24 +739,56 @@ export const AddMenuModal = () => {
           {/* Dish Name & Price */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="sm:col-span-2">
-              <label className="block text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5 font-extrabold">
-                Dish Name *
-              </label>
-              <input
-                id="add-dish-name"
-                type="text"
-                placeholder="Enter dish name (e.g. Butter Chicken)..."
-                value={formData.name}
-                onChange={(e) => {
-                  setFormData({ ...formData, name: e.target.value });
-                  if (errors.name) setErrors((prev) => ({ ...prev, name: null }));
-                }}
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium transition-all focus:outline-none ${
-                  errors.name
-                    ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/40 text-rose-900 dark:bg-rose-950/20 dark:text-rose-200'
-                    : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:border-[#8C0D0D]'
-                }`}
-              />
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-slate-700 dark:text-slate-300 uppercase tracking-wider font-extrabold">
+                  Dish Name *
+                </label>
+                <span className="text-[10px] text-slate-400 font-semibold hidden sm:inline-block">
+                  Press <kbd className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-[10px] font-mono">Enter ↵</kbd> to AI Auto-Fill
+                </span>
+              </div>
+              <div className="relative">
+                <input
+                  id="add-dish-name"
+                  type="text"
+                  placeholder="Enter dish name (e.g. Butter Chicken)..."
+                  value={formData.name}
+                  onChange={(e) => {
+                    setFormData({ ...formData, name: e.target.value });
+                    if (errors.name) setErrors((prev) => ({ ...prev, name: null }));
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAutoSuggestRecipe();
+                    }
+                  }}
+                  className={`w-full pl-4 pr-28 py-2.5 rounded-xl border text-sm font-medium transition-all focus:outline-none ${
+                    errors.name
+                      ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/40 text-rose-900 dark:bg-rose-950/20 dark:text-rose-200'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:border-[#8C0D0D]'
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={handleAutoSuggestRecipe}
+                  disabled={isAiGenerating || !formData.name?.trim()}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1.5 rounded-lg bg-[#8C0D0D] hover:bg-[#700a0a] text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:scale-95"
+                  title="Auto-fill recipe ingredients from AI"
+                >
+                  {isAiGenerating ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-200" />
+                      <span className="text-[11px]">Filling...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                      <span className="text-[11px]">AI Fill</span>
+                    </>
+                  )}
+                </button>
+              </div>
               {errors.name && (
                 <p className="text-xs font-bold text-rose-600 dark:text-rose-400 mt-1.5 flex items-center gap-1">
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />
@@ -750,10 +975,28 @@ export const AddMenuModal = () => {
 
           {/* Ingredients Recipe Section */}
           <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3">
-            <label className="block text-slate-700 dark:text-slate-300 uppercase tracking-wider font-extrabold flex items-center gap-1.5">
-              <Scale className="w-4 h-4 text-brand-800 dark:text-rose-400" />
-              Dish Ingredients & Recipe Quantities
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="block text-slate-700 dark:text-slate-300 uppercase tracking-wider font-extrabold flex items-center gap-1.5">
+                <Scale className="w-4 h-4 text-brand-800 dark:text-rose-400" />
+                Dish Ingredients & Recipe Quantities
+              </label>
+              {formData.name?.trim() && (
+                <button
+                  type="button"
+                  onClick={handleAutoSuggestRecipe}
+                  disabled={isAiGenerating}
+                  className="text-[11px] font-extrabold text-[#8C0D0D] dark:text-rose-400 hover:underline flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  title="Auto-suggest single-serving recipe ingredients using AI"
+                >
+                  {isAiGenerating ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  )}
+                  <span>{isAiGenerating ? 'Generating Recipe...' : '✨ AI Auto-Fill Recipe'}</span>
+                </button>
+              )}
+            </div>
 
             <div className="flex flex-col sm:flex-row items-center gap-2">
               <div className="flex-1 w-full min-w-0">
@@ -865,6 +1108,14 @@ export const AddMenuModal = () => {
                           <span className="font-extrabold text-slate-800 dark:text-slate-200 text-xs truncate">
                             {item.name}
                           </span>
+                          {item.hint && (
+                            <span
+                              className="text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 rounded-md border border-purple-200 dark:border-purple-800/50 hidden sm:inline-block shrink-0"
+                              title="Culinary measurement / recipe hint"
+                            >
+                              {item.hint}
+                            </span>
+                          )}
                           {rowHint?.badge && (
                             <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-100 dark:border-emerald-900/50 hidden sm:inline-block">
                               {rowHint.badge}
@@ -938,6 +1189,54 @@ export const AddMenuModal = () => {
               <p className="text-[11px] text-slate-400 font-medium italic">
                 No ingredients added to this dish recipe yet. Select an ingredient above to assign quantity.
               </p>
+            )}
+
+            {/* AI Chef Tip Notification */}
+            {aiChefTip && (
+              <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60 text-purple-800 dark:text-purple-200 text-xs flex items-start gap-2.5">
+                <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <span className="font-extrabold text-purple-950 dark:text-purple-100 block">
+                    👨‍🍳 Chef's Culinary Tip:
+                  </span>
+                  <p className="text-[11px] leading-relaxed text-purple-800 dark:text-purple-300 font-medium">
+                    {aiChefTip}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Unmatched Ingredients Notification */}
+            {unmatchedAiItems.length > 0 && (
+              <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-200 space-y-2">
+                <div className="flex items-center gap-2 font-extrabold text-xs text-amber-900 dark:text-amber-100">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>
+                    {unmatchedAiItems.length} recipe ingredients not found in your inventory catalog
+                  </span>
+                </div>
+                <p className="text-[11px] text-amber-800 dark:text-amber-300 font-medium">
+                  AI suggested these ingredients for <strong>"{formData.name}"</strong>, but they are not yet in your Inventory catalog:
+                </p>
+                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                  {unmatchedAiItems.map((item, idx) => (
+                    <span
+                      key={idx}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800 text-[11px] font-bold text-amber-950 dark:text-amber-200 shadow-2xs"
+                    >
+                      <span>{item.name}</span>
+                      {item.hint && (
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                          ({item.hint})
+                        </span>
+                      )}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-[10px] text-amber-700 dark:text-amber-400 font-semibold">
+                  💡 Tip: You can add these items in <strong>Inventory &gt; Ingredients</strong> anytime so they can be automatically tracked in future recipes.
+                </p>
+              </div>
             )}
 
             {/* Solution 3: Stock Yield & Capacity Breakdown */}

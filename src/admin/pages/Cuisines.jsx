@@ -15,7 +15,9 @@ import {
   Eye,
   Calendar,
   Layers,
-  AlertTriangle
+  AlertTriangle,
+  List,
+  LayoutGrid
 } from 'lucide-react';
 import { EmptyState } from '../components/common/EmptyState';
 import { Pagination } from '../components/common/Pagination';
@@ -38,6 +40,7 @@ export const Cuisines = () => {
   const [cuisines, setCuisines] = useState([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [viewMode, setViewMode] = useState('table'); // 'table' | 'grid'
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -353,123 +356,272 @@ export const Cuisines = () => {
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
         </div>
 
-        <div className="inline-flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1.5 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-inner overflow-x-auto no-scrollbar">
-          {['All', 'ACTIVE', 'PENDING', 'INACTIVE'].map((st) => (
-            <button
-              key={st}
-              onClick={() => setStatusFilter(st)}
-              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all duration-200 whitespace-nowrap cursor-pointer ${
-                statusFilter === st
-                  ? 'bg-brand-800 text-white shadow-md shadow-brand-900/20 scale-[1.02]'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-700/50'
-              }`}
-            >
-              {st} Status
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Cuisines Grid Cards OR Empty State */}
-      {filteredCuisines.length > 0 ? (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-5 gap-6">
-            {paginatedCuisines.map((c, idx) => (
-              <div
-                key={c.id}
-                className="bg-white dark:bg-slate-900 rounded-3xl overflow-hidden shadow-card border border-slate-100 dark:border-slate-800 hover:shadow-card-hover transition-all duration-300 transform hover:-translate-y-1 flex flex-col justify-between"
+        <div className="flex items-center gap-3 flex-wrap md:flex-nowrap justify-between md:justify-end w-full md:w-auto">
+          {/* Status Filter */}
+          <div className="inline-flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1.5 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-inner overflow-x-auto no-scrollbar">
+            {['All', 'ACTIVE', 'PENDING', 'INACTIVE'].map((st) => (
+              <button
+                key={st}
+                onClick={() => setStatusFilter(st)}
+                className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all duration-200 whitespace-nowrap cursor-pointer ${
+                  statusFilter === st
+                    ? 'bg-brand-800 text-white shadow-md shadow-brand-900/20 scale-[1.02]'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-700/50'
+                }`}
               >
-                <div>
-                  <div className="relative h-44 overflow-hidden group bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-                    {c.image ? (
-                      <img
-                        src={c.image}
-                        alt={c.name}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                      />
-                    ) : (
-                      <Utensils className="w-12 h-12 text-slate-300 dark:text-slate-600" />
-                    )}
-
-                    <span
-                      className={`absolute top-3 right-3 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider backdrop-blur-md border ${
-                        c.status === 'ACTIVE'
-                          ? 'bg-emerald-500/90 text-white border-emerald-400'
-                          : c.status === 'PENDING'
-                          ? 'bg-amber-500/90 text-white border-amber-400'
-                          : 'bg-slate-900/80 text-slate-300 border-slate-700'
-                      }`}
-                    >
-                      {c.status}
-                    </span>
-
-                    <span className="absolute bottom-3 left-3 px-2.5 py-1 rounded-xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md text-brand-800 dark:text-rose-400 text-xs font-black shadow">
-                      #{(currentPage - 1) * itemsPerPage + idx + 1}
-                    </span>
-                  </div>
-
-                  <div className="p-5 space-y-2">
-                    <h3 className="font-extrabold text-slate-900 dark:text-white text-base leading-tight">{c.name}</h3>
-                    {Array.isArray(c.subCategories) && c.subCategories.length > 0 && (
-                      <div className="space-y-1">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                          Sub-categories ({c.subCategories.length})
-                        </span>
-                        <div className="flex flex-wrap gap-1">
-                          {c.subCategories.map((sub) => (
-                            <span
-                              key={sub.id}
-                              className="px-2 py-0.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 text-[11px] font-semibold border border-rose-100 dark:border-rose-900/40"
-                            >
-                              {sub.name}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {c.createdAt && (
-                      <p className="text-[10px] font-semibold text-slate-400 flex items-center gap-1 pt-1">
-                        <Calendar className="w-3 h-3 shrink-0" />
-                        Created: {new Date(c.createdAt).toLocaleDateString()}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="p-4 pt-3 flex items-center justify-between border-t border-slate-100 dark:border-slate-800 mt-2">
-                  <button
-                    onClick={() => toggleStatus(c)}
-                    className={`p-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      c.status === 'ACTIVE'
-                        ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
-                    }`}
-                    title="Toggle Status (ACTIVE / INACTIVE)"
-                  >
-                    {c.status === 'ACTIVE' ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
-                  </button>
-
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => openViewCuisine(c.id)}
-                      className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-indigo-600 hover:text-white transition-colors border border-slate-200/60 dark:border-slate-700 cursor-pointer"
-                      title="View Cuisine Details"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => openEdit(c)}
-                      className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 hover:bg-amber-600 hover:text-white transition-colors border border-amber-200 dark:border-amber-800 cursor-pointer active:scale-95 shadow-sm"
-                      title="Edit Cuisine"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    </div>
-                </div>
-              </div>
+                {st} Status
+              </button>
             ))}
           </div>
 
+          {/* View Mode Switcher */}
+          <div className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 shrink-0">
+            <button
+              onClick={() => setViewMode('table')}
+              title="Table View"
+              className={`p-2 rounded-xl transition-all cursor-pointer ${
+                viewMode === 'table'
+                  ? 'bg-white dark:bg-slate-700 text-brand-800 dark:text-rose-400 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+              }`}
+            >
+              <List className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('grid')}
+              title="Grid Cards View"
+              className={`p-2 rounded-xl transition-all cursor-pointer ${
+                viewMode === 'grid'
+                  ? 'bg-white dark:bg-slate-700 text-brand-800 dark:text-rose-400 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+              }`}
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ═══════════ MAIN CONTENT (TABLE OR GRID) ═══════════ */}
+      {filteredCuisines.length > 0 ? (
+        <div className="space-y-6">
+          {viewMode === 'table' ? (
+            /* ═══════════ TABLE VIEW ═══════════ */
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-card border border-slate-100 dark:border-slate-800 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-100 dark:border-slate-800 text-[11px] font-black uppercase tracking-wider text-slate-400 bg-slate-50/50 dark:bg-slate-800/30 whitespace-nowrap">
+                      <th className="py-4 px-5">#</th>
+                      <th className="py-4 px-5">Cuisine Name</th>
+                      <th className="py-4 px-5">Status</th>
+                      <th className="py-4 px-5">Created Date</th>
+                      <th className="py-4 px-5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs font-semibold">
+                    {paginatedCuisines.map((c, idx) => {
+                      const itemIndex = (currentPage - 1) * itemsPerPage + idx + 1;
+
+                      return (
+                        <tr
+                          key={c.id}
+                          className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors group"
+                        >
+                          {/* Index */}
+                          <td className="py-4 px-5 whitespace-nowrap">
+                            <span className="inline-flex items-center justify-center w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-extrabold text-xs">
+                              {itemIndex}
+                            </span>
+                          </td>
+
+                          {/* Cuisine Name & Photo */}
+                          <td className="py-4 px-5 whitespace-nowrap">
+                            <div className="flex items-center gap-3">
+                              <div className="w-11 h-11 rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 shrink-0 flex items-center justify-center shadow-xs">
+                                {c.image ? (
+                                  <img
+                                    src={c.image}
+                                    alt={c.name}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      e.currentTarget.src =
+                                        'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&auto=format&fit=crop&q=80';
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center bg-rose-50 dark:bg-rose-950/40 text-[#8C0D0D] dark:text-rose-400">
+                                    <Utensils className="w-5 h-5" />
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <span className="font-extrabold text-slate-900 dark:text-white text-sm block">
+                                  {c.name}
+                                </span>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                  ID: #{c.id}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Status Badge */}
+                          <td className="py-4 px-5 whitespace-nowrap">
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10.5px] font-extrabold uppercase tracking-wider border ${
+                                c.status === 'ACTIVE'
+                                  ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                                  : c.status === 'PENDING'
+                                  ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                              }`}
+                            >
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  c.status === 'ACTIVE'
+                                    ? 'bg-emerald-500'
+                                    : c.status === 'PENDING'
+                                    ? 'bg-amber-500'
+                                    : 'bg-slate-400'
+                                }`}
+                              />
+                              {c.status}
+                            </span>
+                          </td>
+
+                          {/* Created Date */}
+                          <td className="py-4 px-5 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 text-xs">
+                              <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                              <span>{c.createdAt ? new Date(c.createdAt).toLocaleDateString() : '—'}</span>
+                            </div>
+                          </td>
+
+                          {/* Actions */}
+                          <td className="py-4 px-5 text-right whitespace-nowrap">
+                            <div className="inline-flex items-center gap-1.5">
+                              {/* Toggle Status Button */}
+                              <button
+                                onClick={() => toggleStatus(c)}
+                                className={`p-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                  c.status === 'ACTIVE'
+                                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-slate-200'
+                                }`}
+                                title="Toggle Status (ACTIVE / INACTIVE)"
+                              >
+                                {c.status === 'ACTIVE' ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
+                              </button>
+
+                              {/* View Details Button */}
+                              <button
+                                onClick={() => openViewCuisine(c.id)}
+                                className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-[#8C0D0D] hover:text-white transition-colors border border-slate-200/60 dark:border-slate-700 cursor-pointer"
+                                title="View Cuisine Details"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+
+                              {/* Edit Button */}
+                              <button
+                                onClick={() => openEdit(c)}
+                                className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 hover:bg-amber-600 hover:text-white transition-colors border border-amber-200 dark:border-amber-800 cursor-pointer active:scale-95 shadow-sm"
+                                title="Edit Cuisine"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            /* ═══════════ GRID CARDS VIEW ═══════════ */
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-5 gap-6">
+              {paginatedCuisines.map((c, idx) => (
+                <div
+                  key={c.id}
+                  className="bg-white dark:bg-slate-900 rounded-3xl overflow-hidden shadow-card border border-slate-100 dark:border-slate-800 hover:shadow-card-hover transition-all duration-300 transform hover:-translate-y-1 flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="relative h-44 overflow-hidden group bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                      {c.image ? (
+                        <img
+                          src={c.image}
+                          alt={c.name}
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        />
+                      ) : (
+                        <Utensils className="w-12 h-12 text-slate-300 dark:text-slate-600" />
+                      )}
+
+                      <span
+                        className={`absolute top-3 right-3 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider backdrop-blur-md border ${
+                          c.status === 'ACTIVE'
+                            ? 'bg-emerald-500/90 text-white border-emerald-400'
+                            : c.status === 'PENDING'
+                            ? 'bg-amber-500/90 text-white border-amber-400'
+                            : 'bg-slate-900/80 text-slate-300 border-slate-700'
+                        }`}
+                      >
+                        {c.status}
+                      </span>
+
+                      <span className="absolute bottom-3 left-3 px-2.5 py-1 rounded-xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md text-brand-800 dark:text-rose-400 text-xs font-black shadow">
+                        #{(currentPage - 1) * itemsPerPage + idx + 1}
+                      </span>
+                    </div>
+
+                    <div className="p-5 space-y-2">
+                      <h3 className="font-extrabold text-slate-900 dark:text-white text-base leading-tight">{c.name}</h3>
+                      {c.createdAt && (
+                        <p className="text-[10px] font-semibold text-slate-400 flex items-center gap-1 pt-1">
+                          <Calendar className="w-3 h-3 shrink-0" />
+                          Created: {new Date(c.createdAt).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="p-4 pt-3 flex items-center justify-between border-t border-slate-100 dark:border-slate-800 mt-2">
+                    <button
+                      onClick={() => toggleStatus(c)}
+                      className={`p-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        c.status === 'ACTIVE'
+                          ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                      }`}
+                      title="Toggle Status (ACTIVE / INACTIVE)"
+                    >
+                      {c.status === 'ACTIVE' ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
+                    </button>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => openViewCuisine(c.id)}
+                        className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-indigo-600 hover:text-white transition-colors border border-slate-200/60 dark:border-slate-700 cursor-pointer"
+                        title="View Cuisine Details"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => openEdit(c)}
+                        className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 hover:bg-amber-600 hover:text-white transition-colors border border-amber-200 dark:border-amber-800 cursor-pointer active:scale-95 shadow-sm"
+                        title="Edit Cuisine"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}
@@ -537,25 +689,27 @@ export const Cuisines = () => {
                   </div>
                 </div>
 
-                {/* Sub-categories */}
-                <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
-                    Sub-Categories ({viewingCuisine.subCategories?.length || 0})
-                  </h4>
-                  {Array.isArray(viewingCuisine.subCategories) && viewingCuisine.subCategories.length > 0 ? (
-                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                      {viewingCuisine.subCategories.map((sub) => (
-                        <div
-                          key={sub.id}
-                          className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700/80 flex items-center justify-between"
-                        >
-                          <span className="font-bold text-slate-800 dark:text-slate-100 text-xs">{sub.name}</span>
-                          <span className="text-[10px] font-semibold text-slate-400">Sub-category</span>
-                        </div>
-                      ))}
+                {/* Cuisine Info Details */}
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-400">Cuisine ID:</span>
+                    <span className="font-extrabold text-slate-800 dark:text-slate-100">#{viewingCuisine.id}</span>
+                  </div>
+                  {viewingCuisine.createdAt && (
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-400">Created Date:</span>
+                      <span className="text-slate-600 dark:text-slate-300 font-semibold">
+                        {new Date(viewingCuisine.createdAt).toLocaleDateString()}
+                      </span>
                     </div>
-                  ) : (
-                    <p className="text-xs text-slate-400 italic">No sub-categories added yet.</p>
+                  )}
+                  {viewingCuisine.updatedAt && (
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-400">Last Updated:</span>
+                      <span className="text-slate-600 dark:text-slate-300 font-semibold">
+                        {new Date(viewingCuisine.updatedAt).toLocaleDateString()}
+                      </span>
+                    </div>
                   )}
                 </div>
 
