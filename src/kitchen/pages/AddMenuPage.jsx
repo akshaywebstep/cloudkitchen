@@ -23,6 +23,7 @@ import {
   Upload,
   Link2,
   Sparkles,
+  Loader2,
   Check,
   AlertTriangle,
   ChefHat,
@@ -302,9 +303,165 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
   const [saving, setSaving] = useState(false);
   const [loadingIngredients, setLoadingIngredients] = useState(false);
 
+  // AI Recipe Auto-Fill States
+  const [isAiGenerating, setIsAiGenerating] = useState(false);
+  const [unmatchedAiItems, setUnmatchedAiItems] = useState([]);
+  const [aiChefTip, setAiChefTip] = useState("");
+
   // Field refs for auto-scroll on validation error
   const nameRef = useRef(null);
   const priceRef = useRef(null);
+
+  const handleAutoSuggestRecipe = async () => {
+    const dishName = form.name?.trim();
+    if (!dishName) {
+      onToast?.({ message: "Please enter a Dish / Menu Name first to auto-fill recipe!", type: "warning" });
+      nameRef.current?.focus();
+      return;
+    }
+
+    setIsAiGenerating(true);
+    setUnmatchedAiItems([]);
+    setAiChefTip("");
+
+    try {
+      const res = await api.aiRecipe(
+        {
+          dishName,
+          servingSize: 1,
+          kitchenId: apiState?.kitchen?.id || selectedBranch?.kitchenId || undefined,
+          branchId: activeBranchId || undefined,
+        },
+        activeBranchId
+      );
+
+      if (!res || res.status === false) {
+        onToast?.({ message: res?.message || "Failed to auto-suggest recipe for this dish.", type: "error" });
+        setIsAiGenerating(false);
+        return;
+      }
+
+      // Auto-populate description if currently empty
+      if (!form.description?.trim() && res.description) {
+        setForm((prev) => ({ ...prev, description: res.description }));
+      }
+
+      if (res.chefTip) {
+        setAiChefTip(res.chefTip);
+      }
+
+      const aiIngredients = Array.isArray(res.data) ? res.data : [];
+      if (aiIngredients.length === 0) {
+        onToast?.({ message: `AI generated details, but no ingredients found for "${dishName}".`, type: "info" });
+        setIsAiGenerating(false);
+        return;
+      }
+
+      const matchedList = [];
+      const unmatchedList = [];
+
+      aiIngredients.forEach((item) => {
+        let branchItem = null;
+
+        // 1. Match by inventoryItemId
+        if (item.inventoryItemId) {
+          branchItem = branchIngredients.find((b) => Number(b.id) === Number(item.inventoryItemId));
+        }
+
+        // 2. Match by ingredientId
+        if (!branchItem && item.ingredientId) {
+          branchItem = branchIngredients.find(
+            (b) => Number(b.ingredientId || b.ingredient?.id) === Number(item.ingredientId)
+          );
+        }
+
+        // 3. Match by matchedName
+        if (!branchItem && item.matchedName) {
+          const matchNorm = item.matchedName.toLowerCase().trim();
+          branchItem = branchIngredients.find(
+            (b) => (b.ingredient?.name || b.name || "").toLowerCase().trim() === matchNorm
+          );
+        }
+
+        // 4. Fuzzy fallback match
+        if (!branchItem && item.name) {
+          const cleanItemName = item.name.toLowerCase().replace(/[,()]/g, " ").replace(/\s+/g, " ").trim();
+          const firstWord = cleanItemName.split(" ")[0];
+          branchItem = branchIngredients.find((b) => {
+            const bName = (b.ingredient?.name || b.name || "").toLowerCase().replace(/[,()]/g, " ").replace(/\s+/g, " ").trim();
+            if (bName === cleanItemName) return true;
+            if (bName.includes(cleanItemName) || cleanItemName.includes(bName)) return true;
+            if (firstWord && firstWord.length >= 4 && bName.includes(firstWord)) return true;
+            return false;
+          });
+        }
+
+        if (branchItem) {
+          const ingId = String(branchItem.ingredientId || branchItem.ingredient?.id || branchItem.id);
+          matchedList.push({
+            ingredientId: ingId,
+            name: branchItem.ingredient?.name || branchItem.name,
+            quantity: String(item.quantity || "1"),
+            unit: item.unit || branchItem.unit || "KG",
+            hint: item.hint || (item.weightInGm ? `~${item.weightInGm}g` : ""),
+          });
+        } else {
+          unmatchedList.push({
+            name: item.name,
+            hint: item.hint || (item.weightInGm ? `~${item.weightInGm}g` : ""),
+            weightInGm: item.weightInGm,
+            quantity: item.quantity,
+            unit: item.unit,
+          });
+        }
+      });
+
+      if (matchedList.length > 0) {
+        // Deduplicate matched ingredients
+        const uniqueMatched = [];
+        const seen = new Set();
+
+        for (const m of matchedList) {
+          if (seen.has(m.ingredientId)) {
+            const existing = uniqueMatched.find((u) => u.ingredientId === m.ingredientId);
+            if (existing && existing.unit === m.unit) {
+              existing.quantity = String(parseFloat((parseFloat(existing.quantity) + parseFloat(m.quantity)).toFixed(4)));
+            }
+            if (existing && m.hint && !existing.hint?.includes(m.hint)) {
+              existing.hint = `${existing.hint}, ${m.hint}`;
+            }
+          } else {
+            seen.add(m.ingredientId);
+            uniqueMatched.push({
+              ingredientId: m.ingredientId,
+              quantity: m.quantity,
+              unit: m.unit,
+              hint: m.hint,
+            });
+          }
+        }
+
+        setRecipeIngredients(uniqueMatched);
+        setUnmatchedAiItems(unmatchedList);
+
+        onToast?.({
+          message: `✨ Recipe auto-filled with ${uniqueMatched.length} ingredients for "${dishName}"!`,
+          type: "success",
+        });
+      } else {
+        setUnmatchedAiItems(unmatchedList);
+        onToast?.({
+          message: `AI suggested ${unmatchedList.length} ingredients, but none matched your branch inventory.`,
+          type: "info",
+        });
+      }
+    } catch (err) {
+      console.error("Error generating AI recipe:", err);
+      onToast?.({ message: getApiErrorMessage(err, "Failed to auto-suggest recipe."), type: "error" });
+    } finally {
+      setIsAiGenerating(false);
+    }
+  };
 
   const updateForm = (key) => (event) => {
     const value = event.target.value;
@@ -796,16 +953,78 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
       <FormPanel title="Dish Details & Pricing" icon={UtensilsCrossed}>
         <div className="grid gap-5 md:grid-cols-2">
           {/* Menu Name */}
-          <TextField
-            ref={nameRef}
-            icon={UtensilsCrossed}
-            label="Dish / Menu Name"
-            required
-            placeholder="Enter dish / menu name (e.g. Paneer Butter Masala)"
-            value={form.name}
-            onChange={updateForm("name")}
-            error={errors.name}
-          />
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#475569]">
+                Dish / Menu Name <span className="text-rose-600">*</span>
+              </label>
+              <button
+                type="button"
+                onClick={handleAutoSuggestRecipe}
+                disabled={isAiGenerating || !form.name?.trim()}
+                className="text-[11px] font-bold text-[#8D0606] hover:text-[#720505] flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                title="Auto-fill recipe ingredients from AI"
+              >
+                {isAiGenerating ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-[#8D0606]" />
+                    <span>Auto-filling...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Auto-fill with AI</span>
+                  </>
+                )}
+              </button>
+            </div>
+            <div className="relative">
+              <UtensilsCrossed className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94a3b8]" size={17} />
+              <input
+                ref={nameRef}
+                type="text"
+                placeholder="Enter dish / menu name (e.g. Paneer Butter Masala)"
+                value={form.name}
+                onChange={updateForm("name")}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAutoSuggestRecipe();
+                  }
+                }}
+                className={`w-full rounded-xl border bg-white h-11 pl-10 pr-24 text-xs font-medium text-[#0f172a] outline-none transition duration-200 placeholder:text-[#94a3b8] ${
+                  errors.name
+                    ? "border-rose-500 bg-rose-50/20 text-rose-900 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20"
+                    : "border-[#e2e8f0] focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
+                }`}
+              />
+              <button
+                type="button"
+                onClick={handleAutoSuggestRecipe}
+                disabled={isAiGenerating || !form.name?.trim()}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1.5 rounded-lg bg-[#8D0606] hover:bg-[#720505] text-white text-[11px] font-bold flex items-center gap-1 shadow-xs transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:scale-95"
+                title="Auto-fill recipe ingredients from AI"
+              >
+                {isAiGenerating ? (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin text-rose-200" />
+                    <span>Filling...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3 h-3 text-amber-300" />
+                    <span>AI Fill</span>
+                  </>
+                )}
+              </button>
+            </div>
+            {errors.name ? (
+              <p className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-rose-600 animate-in fade-in">
+                <AlertCircle size={13} className="shrink-0" />
+                <span>{errors.name}</span>
+              </p>
+            ) : null}
+          </div>
 
           {/* Price */}
           <TextField
@@ -1125,14 +1344,35 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
             <p className="text-xs text-slate-500 font-medium">
               Specify the stock quantity of each ingredient required per serving to enable automated stock deduction.
             </p>
-            <button
-              type="button"
-              onClick={addIngredientRow}
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-rose-50 px-3.5 py-2 text-xs font-bold text-[#8D0606] border border-rose-100 hover:bg-rose-100 transition shadow-2xs active:scale-98 shrink-0 whitespace-nowrap self-start sm:self-auto"
-            >
-              <Plus size={14} />
-              <span>Add Ingredient</span>
-            </button>
+            <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={handleAutoSuggestRecipe}
+                disabled={isAiGenerating || !form.name?.trim()}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-amber-50 px-3.5 py-2 text-xs font-bold text-amber-800 border border-amber-200/80 hover:bg-amber-100 transition shadow-2xs active:scale-98 shrink-0 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                title="Auto-suggest single-serving recipe ingredients using AI"
+              >
+                {isAiGenerating ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin text-amber-700" />
+                    <span>Generating Recipe...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={14} className="text-amber-600" />
+                    <span>Auto-fill Recipe with AI</span>
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={addIngredientRow}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-rose-50 px-3.5 py-2 text-xs font-bold text-[#8D0606] border border-rose-100 hover:bg-rose-100 transition shadow-2xs active:scale-98 shrink-0 whitespace-nowrap"
+              >
+                <Plus size={14} />
+                <span>Add Ingredient</span>
+              </button>
+            </div>
           </div>
 
           {branchIngredients.length === 0 && !loadingIngredients && (
@@ -1177,14 +1417,26 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
               <p className="text-[11px] text-slate-400 mt-0.5 max-w-sm">
                 Ingredients are optional. You can add ingredients anytime to track stock deductions per order.
               </p>
-              <button
-                type="button"
-                onClick={addIngredientRow}
-                className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-white border border-slate-200 px-3.5 py-1.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 transition"
-              >
-                <Plus size={14} />
-                <span>Add Ingredient</span>
-              </button>
+              <div className="flex items-center gap-2 mt-3">
+                <button
+                  type="button"
+                  onClick={handleAutoSuggestRecipe}
+                  disabled={isAiGenerating || !form.name?.trim()}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-amber-50 border border-amber-200 px-3.5 py-1.5 text-xs font-bold text-amber-800 shadow-2xs hover:bg-amber-100 transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  title="Auto-fill recipe ingredients from AI"
+                >
+                  <Sparkles size={14} className="text-amber-600" />
+                  <span>Auto-fill with AI</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={addIngredientRow}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-white border border-slate-200 px-3.5 py-1.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 transition"
+                >
+                  <Plus size={14} />
+                  <span>Add Ingredient</span>
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-3">
@@ -1225,6 +1477,11 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
                           menuPortalTarget={document.body}
                           isLoading={loadingIngredients}
                         />
+                        {row.hint && (
+                          <span className="mt-1 inline-block text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
+                            {row.hint}
+                          </span>
+                        )}
                         {errors[`ingredient_${index}`] && (
                           <p className="mt-1 text-[11px] font-semibold text-rose-600">
                             {errors[`ingredient_${index}`]}
@@ -1344,6 +1601,54 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
             <Plus size={14} />
             <span>Add Another Ingredient to Recipe</span>
           </button>
+
+          {/* AI Chef Tip Notification */}
+          {aiChefTip && (
+            <div className="p-3.5 rounded-2xl bg-purple-50 border border-purple-200 text-purple-900 text-xs flex items-start gap-2.5 animate-in fade-in shadow-2xs">
+              <Sparkles className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <span className="font-extrabold text-purple-950 block">
+                  👨‍🍳 Chef's Culinary Tip:
+                </span>
+                <p className="text-[11.5px] leading-relaxed text-purple-800 font-medium">
+                  {aiChefTip}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Unmatched Ingredients Notification */}
+          {unmatchedAiItems.length > 0 && (
+            <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 space-y-2 animate-in fade-in shadow-2xs">
+              <div className="flex items-center gap-2 font-extrabold text-xs text-amber-950">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>
+                  {unmatchedAiItems.length} recipe ingredient{unmatchedAiItems.length > 1 ? "s" : ""} suggested by AI not found in this branch inventory
+                </span>
+              </div>
+              <p className="text-[11px] text-amber-800 font-medium">
+                AI suggested these ingredients for <strong>&ldquo;{form.name}&rdquo;</strong>, but they are not yet in your branch inventory catalog:
+              </p>
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                {unmatchedAiItems.map((item, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-amber-200 text-[11px] font-bold text-amber-950 shadow-2xs"
+                  >
+                    <span>{item.name}</span>
+                    {item.hint && (
+                      <span className="text-[10px] text-slate-500 font-medium">
+                        ({item.hint})
+                      </span>
+                    )}
+                  </span>
+                ))}
+              </div>
+              <p className="text-[10.5px] text-amber-700 font-semibold">
+                💡 Tip: You can attach these items under <strong>Ingredients & Stock</strong> anytime so they can be automatically deducted in future orders.
+              </p>
+            </div>
+          )}
 
           {/* Solution 3: Stock Yield Calculator (Kitchen Managers' Favorite) */}
           {stockYield && stockYield.items.length > 0 && (

@@ -1306,27 +1306,10 @@ export const getAiRecipeApi = async (dishName, options = {}) => {
       ...(options.branchId ? { branchId: options.branchId } : {}),
     };
 
-    try {
-      const response = await apiClient.post('/shared/ai-recipe', payload, { headers });
-      if (response.data && response.data.status !== false) {
-        return response.data;
-      }
-      return response.data;
-    } catch (apiErr) {
-      // If endpoint not found on remote server (e.g. 404), fallback to local dev server (port 3000)
-      if (apiErr.response?.status === 404 || apiErr.code === 'ERR_NETWORK') {
-        const localResponse = await axios.post(
-          'http://localhost:3000/api/v1/shared/ai-recipe',
-          payload,
-          {
-            headers: { 'Content-Type': 'application/json' },
-            timeout: 30000,
-          }
-        );
-        return localResponse.data;
-      }
-      throw apiErr;
-    }
+    const response = await apiClient.post("/shared/ai-recipe", payload, {
+      headers,
+    });
+    return response.data;
   } catch (error) {
     if (error.response && error.response.data) return error.response.data;
     return { status: false, message: error.message || 'Failed to generate recipe with AI.' };

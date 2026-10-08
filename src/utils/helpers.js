@@ -81,11 +81,36 @@ export function getKitchenSubscriptionRecords(kitchen) {
 export function isActiveSubscriptionRecord(subscription) {
   if (!subscription) return false;
   const status = String(subscription.status || subscription.subscriptionStatus || subscription.state || "").toUpperCase();
-  return status === "ACTIVE" || truthyFlag(subscription.isActive ?? subscription.active ?? subscription.isCurrent ?? subscription.current);
+  if (["EXPIRED", "CANCELLED", "PAST_DUE", "INACTIVE"].includes(status)) return false;
+  if (subscription.validUntil) {
+    const expiry = new Date(subscription.validUntil).getTime();
+    if (!isNaN(expiry) && expiry < Date.now()) return false;
+  }
+  return status === "ACTIVE" || status === "TRIALING" || truthyFlag(subscription.isActive ?? subscription.active ?? subscription.isCurrent ?? subscription.current);
 }
 
 export function hasActiveKitchenSubscription(kitchen) {
-  return getKitchenSubscriptionRecords(kitchen).some(isActiveSubscriptionRecord);
+  if (!kitchen) return false;
+  if (kitchen.isSubscriptionActive === false) return false;
+  const records = getKitchenSubscriptionRecords(kitchen);
+  if (records.length > 0) {
+    return records.some(isActiveSubscriptionRecord);
+  }
+  return kitchen.isSubscriptionActive === true;
+}
+
+export function isKitchenSubscriptionActive(kitchen, selectedPlan = null) {
+  if (!kitchen) return false;
+  if (kitchen.isSubscriptionActive === false) return false;
+  const records = getKitchenSubscriptionRecords(kitchen);
+  if (records.length > 0) {
+    return records.some(isActiveSubscriptionRecord);
+  }
+  const sub = kitchen.subscription || kitchen.activeSubscription || selectedPlan;
+  if (sub) {
+    return isActiveSubscriptionRecord(sub);
+  }
+  return kitchen.isSubscriptionActive === true;
 }
 
 export function hasSelectedSubscription(apiState) {

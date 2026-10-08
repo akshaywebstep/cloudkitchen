@@ -90,9 +90,20 @@ export const api = {
   },
   health: () => request("/system/health", { token: "" }),
   info: () => request("/system/info", { token: "" }),
-  login: (body) => request("/kitchen/auth/login", { method: "POST", body, token: "" }),
-  forgotPassword: (username) => request("/kitchen/auth/forgot-password", { method: "POST", body: { username }, token: "" }),
-  resetPassword: (body) => request("/kitchen/auth/reset-password", { method: "POST", body, token: "" }),
+  login: (body) =>
+    request("/kitchen/auth/login", { method: "POST", body, token: "" }),
+  forgotPassword: (username) =>
+    request("/kitchen/auth/forgot-password", {
+      method: "POST",
+      body: { username },
+      token: "",
+    }),
+  resetPassword: (body) =>
+    request("/kitchen/auth/reset-password", {
+      method: "POST",
+      body,
+      token: "",
+    }),
   verify: (token) => request("/kitchen/auth/verify", { token }),
   registerWithPlan: (formDataOrObj) => {
     let form;
@@ -124,9 +135,14 @@ export const api = {
     Object.entries(body).forEach(([key, value]) => {
       if (value !== undefined && value !== null) form.append(key, value);
     });
-    return request("/kitchen/auth/register", { method: "POST", body: form, token: "" });
+    return request("/kitchen/auth/register", {
+      method: "POST",
+      body: form,
+      token: "",
+    });
   },
-  finishOnboarding: (body = { status: true }) => request("/kitchen/auth/finish-onboarding", { method: "POST", body }),
+  finishOnboarding: (body = { status: true }) =>
+    request("/kitchen/auth/finish-onboarding", { method: "POST", body }),
   onboarding: (body) => {
     const form = new FormData();
     Object.entries(body).forEach(([key, value]) => {
@@ -137,18 +153,22 @@ export const api = {
   plans: async () => {
     try {
       // Public GET without token as requested
-      const res = await request("/kitchen/subscription/plans", { method: "GET", token: "" });
+      const res = await request("/kitchen/subscription/plans", {
+        method: "GET",
+        token: "",
+      });
       if (Array.isArray(res?.data) && res.data.length > 0) {
         const normalizedPlans = res.data.map((p) => ({
           ...p,
           id: p.id,
           name: p.name,
           title: p.title || p.name,
-          description: p.title || "Cloud kitchen operations & inventory management.",
+          description:
+            p.title || "Cloud kitchen operations & inventory management.",
           monthlyPrice: Number(p.price || 0),
-          yearlyPrice: Number(p.annualPrice || (Number(p.price || 0) * 10)),
+          yearlyPrice: Number(p.annualPrice || Number(p.price || 0) * 10),
           price: Number(p.price || 0),
-          annualPrice: Number(p.annualPrice || (Number(p.price || 0) * 10)),
+          annualPrice: Number(p.annualPrice || Number(p.price || 0) * 10),
           currency: "INR",
           currencySymbol: "₹",
           trialDays: p.freeTrialDays || 7,
@@ -156,7 +176,12 @@ export const api = {
           maxUsers: p.maxUsers || 5,
           stripePriceIdMonthly: `price_${(p.name || "plan").toLowerCase().replace(/\s+/g, "_")}_monthly`,
           stripePriceIdYearly: `price_${(p.name || "plan").toLowerCase().replace(/\s+/g, "_")}_yearly`,
-          badge: p.name === "Growth Pro" ? "Most Popular" : p.name === "Starter" ? "Single Outlet" : "Franchise Scale",
+          badge:
+            p.name === "Growth Pro"
+              ? "Most Popular"
+              : p.name === "Starter"
+                ? "Single Outlet"
+                : "Franchise Scale",
           isPopular: p.name === "Growth Pro",
           features: Array.isArray(p.features) ? p.features : [],
         }));
@@ -167,14 +192,29 @@ export const api = {
     }
     return { status: true, data: STANDARD_PLANS };
   },
-  selectPlan: (body) => request("/kitchen/subscription/select", { method: "POST", body }),
-  upgradePlan: (body) => request("/kitchen/subscription/upgrade", { method: "POST", body }),
-  downgradePlan: (body) => request("/kitchen/subscription/downgrade", { method: "POST", body }),
-  subscriptionPreview: (params = {}) => request(`/kitchen/subscription/preview?${new URLSearchParams(params)}`),
-  createStripeCheckoutSession: async ({ plan, billingCycle = "MONTHLY", kitchen, owner }) => {
+  selectPlan: (body) =>
+    request("/kitchen/subscription/select", { method: "POST", body }),
+  upgradePlan: (body) =>
+    request("/kitchen/subscription/upgrade", { method: "POST", body }),
+  downgradePlan: (body) =>
+    request("/kitchen/subscription/downgrade", { method: "POST", body }),
+  subscriptionPreview: (params = {}) =>
+    request(`/kitchen/subscription/preview?${new URLSearchParams(params)}`),
+  createStripeCheckoutSession: async ({
+    plan,
+    billingCycle = "MONTHLY",
+    kitchen,
+    owner,
+  }) => {
     // Generate secure mock or live checkout session
-    const stripePriceId = plan?.stripePriceIdMonthly || plan?.stripePriceIdYearly || `price_${plan?.slug || "starter"}_${billingCycle.toLowerCase()}`;
-    const amount = billingCycle === "YEARLY" ? (plan?.yearlyPrice || '') : (plan?.monthlyPrice || '');
+    const stripePriceId =
+      plan?.stripePriceIdMonthly ||
+      plan?.stripePriceIdYearly ||
+      `price_${plan?.slug || "starter"}_${billingCycle.toLowerCase()}`;
+    const amount =
+      billingCycle === "YEARLY"
+        ? plan?.yearlyPrice || ""
+        : plan?.monthlyPrice || "";
     const session = {
       sessionId: `cs_test_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
       stripeCustomerId: `cus_${Math.random().toString(36).substring(2, 10)}`,
@@ -190,18 +230,25 @@ export const api = {
     };
     return { status: true, data: session };
   },
-  simulateStripeWebhook: async ({ eventType = "checkout.session.completed", session, plan, kitchen }) => {
+  simulateStripeWebhook: async ({
+    eventType = "checkout.session.completed",
+    session,
+    plan,
+    kitchen,
+  }) => {
     // Simulate real webhook event processing and status change
     const trialEndsAt = new Date();
     trialEndsAt.setDate(trialEndsAt.getDate() + Number(plan?.trialDays || 14));
-    
+
     const webhookResponse = {
       eventId: `evt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       type: eventType,
       processedAt: new Date().toISOString(),
       subscription: {
         id: `sub_${Math.random().toString(36).substring(2, 10)}`,
-        stripeCustomerId: session?.stripeCustomerId || `cus_${Math.random().toString(36).substring(2, 10)}`,
+        stripeCustomerId:
+          session?.stripeCustomerId ||
+          `cus_${Math.random().toString(36).substring(2, 10)}`,
         stripePriceId: session?.stripePriceId || plan?.stripePriceIdMonthly,
         planId: plan?.id || "plan_starter",
         planName: plan?.name || "Starter",
@@ -212,7 +259,11 @@ export const api = {
         isActive: true,
       },
     };
-    return { status: true, message: "Webhook processed successfully", data: webhookResponse };
+    return {
+      status: true,
+      message: "Webhook processed successfully",
+      data: webhookResponse,
+    };
   },
   countries: (params = {}) => {
     const defaultParams = { page: "1", limit: "50", ...params };
@@ -227,45 +278,98 @@ export const api = {
     return request(`/master/city?${new URLSearchParams(defaultParams)}`);
   },
   cuisines: (params = {}) => {
-    const defaultParams = { page: "1", limit: "50", name: "", category: "", status: "ACTIVE", ...params };
+    const defaultParams = {
+      page: "1",
+      limit: "50",
+      name: "",
+      category: "",
+      status: "ACTIVE",
+      ...params,
+    };
     return request(`/master/cuisine?${new URLSearchParams(defaultParams)}`);
   },
   ingredients: (params = {}, token) => {
-    const search = Object.keys(params).length ? `?${new URLSearchParams(params)}` : "";
-    return request(`/master/ingredient${search}`, token !== undefined ? { token } : {});
+    const search = Object.keys(params).length
+      ? `?${new URLSearchParams(params)}`
+      : "";
+    return request(
+      `/master/ingredient${search}`,
+      token !== undefined ? { token } : {},
+    );
   },
-  branches: (params = {}) => request(`/kitchen/branch?${new URLSearchParams(params)}`),
+  branches: (params = {}) =>
+    request(`/kitchen/branch?${new URLSearchParams(params)}`),
   branch: (branchId) => request(`/kitchen/branch/${branchId}`),
   createBranch: (body) => request("/kitchen/branch", { method: "POST", body }),
-  updateBranch: (branchId, body) => request(`/kitchen/branch/${branchId}`, { method: "PUT", body }),
-  deleteBranch: (branchId) => request(`/kitchen/branch/${branchId}`, { method: "DELETE" }),
-  createBranchIngredients: (branchId, body) => request(`/kitchen/branch/${branchId}/ingredient`, { method: "POST", body }),
-  updateBranchIngredient: (branchId, inventoryId, body) => request(`/kitchen/branch/${branchId}/ingredient/${inventoryId}`, { method: "PUT", body }),
-  deleteBranchIngredient: (branchId, inventoryId) => request(`/kitchen/branch/${branchId}/ingredient/${inventoryId}`, { method: "DELETE" }),
+  updateBranch: (branchId, body) =>
+    request(`/kitchen/branch/${branchId}`, { method: "PUT", body }),
+  deleteBranch: (branchId) =>
+    request(`/kitchen/branch/${branchId}`, { method: "DELETE" }),
+  createBranchIngredients: (branchId, body) =>
+    request(`/kitchen/branch/${branchId}/ingredient`, { method: "POST", body }),
+  updateBranchIngredient: (branchId, inventoryId, body) =>
+    request(`/kitchen/branch/${branchId}/ingredient/${inventoryId}`, {
+      method: "PUT",
+      body,
+    }),
+  deleteBranchIngredient: (branchId, inventoryId) =>
+    request(`/kitchen/branch/${branchId}/ingredient/${inventoryId}`, {
+      method: "DELETE",
+    }),
   branchIngredients: (branchId, params = {}) => {
     const defaultParams = { page: "1", limit: "50", ...params };
-    return request(`/kitchen/branch/${branchId}/ingredient?${new URLSearchParams(defaultParams)}`);
+    return request(
+      `/kitchen/branch/${branchId}/ingredient?${new URLSearchParams(defaultParams)}`,
+    );
   },
-  createStock: (branchId, body) => request(`/kitchen/branch/${branchId}/ingredient/stock`, { method: "POST", body }),
+  createStock: (branchId, body) =>
+    request(`/kitchen/branch/${branchId}/ingredient/stock`, {
+      method: "POST",
+      body,
+    }),
   stocks: (branchId) => request(`/kitchen/branch/${branchId}/ingredient/stock`),
   menus: (branchId, params = {}) => {
     const defaultParams = { page: "1", limit: "50", ...params };
-    return request(`/kitchen/branch/${branchId}/menu?${new URLSearchParams(defaultParams)}`);
+    return request(
+      `/kitchen/branch/${branchId}/menu?${new URLSearchParams(defaultParams)}`,
+    );
   },
-  createMenu: (branchId, body) => request(`/kitchen/branch/${branchId}/menu`, { method: "POST", body }),
-  updateMenu: (branchId, menuId, body) => request(`/kitchen/branch/${branchId}/menu/${menuId}`, { method: "PUT", body }),
-  deleteMenu: (branchId, menuId) => request(`/kitchen/branch/${branchId}/menu/${menuId}`, { method: "DELETE" }),
+  createMenu: (branchId, body) =>
+    request(`/kitchen/branch/${branchId}/menu`, { method: "POST", body }),
+  updateMenu: (branchId, menuId, body) =>
+    request(`/kitchen/branch/${branchId}/menu/${menuId}`, {
+      method: "PUT",
+      body,
+    }),
+  deleteMenu: (branchId, menuId) =>
+    request(`/kitchen/branch/${branchId}/menu/${menuId}`, { method: "DELETE" }),
+  aiRecipe: (body, branchId) => {
+    const path = branchId
+      ? `/kitchen/branch/${branchId}/menu/ai-recipe`
+      : `/kitchen/menu/ai-recipe`;
+    return request(path, { method: "POST", body });
+  },
   menuCategories: (params = {}) => {
-    const search = Object.keys(params).length ? `?${new URLSearchParams(params)}` : "";
+    const search = Object.keys(params).length
+      ? `?${new URLSearchParams(params)}`
+      : "";
     return request(`/kitchen/menu/categories${search}`);
   },
   orders: (branchId, params = {}) => {
     const defaultParams = { page: "1", limit: "50", ...params };
-    return request(`/kitchen/order/branch/${branchId}?${new URLSearchParams(defaultParams)}`);
+    return request(
+      `/kitchen/order/branch/${branchId}?${new URLSearchParams(defaultParams)}`,
+    );
   },
-  orderDetail: (branchId, orderId) => request(`/kitchen/order/branch/${branchId}/${orderId}`),
-  updateOrderStatus: (branchId, body) => request(`/kitchen/order/branch/${branchId}/bulk-status`, { method: "PATCH", body }),
-  createOrder: (branchId, body) => request(`/kitchen/order/branch/${branchId}`, { method: "POST", body }),
+  orderDetail: (branchId, orderId) =>
+    request(`/kitchen/order/branch/${branchId}/${orderId}`),
+  updateOrderStatus: (branchId, body) =>
+    request(`/kitchen/order/branch/${branchId}/bulk-status`, {
+      method: "PATCH",
+      body,
+    }),
+  createOrder: (branchId, body) =>
+    request(`/kitchen/order/branch/${branchId}`, { method: "POST", body }),
   customers: (params = {}) => {
     const query = new URLSearchParams(params).toString();
     return request(`/kitchen/customer${query ? `?${query}` : ""}`);
@@ -278,10 +382,17 @@ export const api = {
     const query = new URLSearchParams(params).toString();
     return request(`/kitchen/staff-role${query ? `?${query}` : ""}`);
   },
-  createStaffRole: (body) => request("/kitchen//role", { method: "POST", body }),
-  updateStaffRole: (roleId, body) => request(`/kitchen/staff-role/role/${roleId}`, { method: "PUT", body }),
-  updateRolePermissions: (roleId, body) => request(`/kitchen/staff-role/role/${roleId}/permissions`, { method: "PUT", body }),
-  deleteStaffRole: (roleId) => request(`/kitchen/staff-role/${roleId}`, { method: "DELETE" }),
+  createStaffRole: (body) =>
+    request("/kitchen//role", { method: "POST", body }),
+  updateStaffRole: (roleId, body) =>
+    request(`/kitchen/staff-role/role/${roleId}`, { method: "PUT", body }),
+  updateRolePermissions: (roleId, body) =>
+    request(`/kitchen/staff-role/role/${roleId}/permissions`, {
+      method: "PUT",
+      body,
+    }),
+  deleteStaffRole: (roleId) =>
+    request(`/kitchen/staff-role/${roleId}`, { method: "DELETE" }),
   staffFormOptions: (params = {}) => {
     const query = new URLSearchParams(params).toString();
     return request(`/kitchen/staff/form-options${query ? `?${query}` : ""}`);
@@ -318,7 +429,8 @@ export const api = {
     });
     return request(`/kitchen/staff/${staffId}`, { method: "PUT", body: form });
   },
-  deleteStaff: (staffId) => request(`/kitchen/staff/${staffId}`, { method: "DELETE" }),
+  deleteStaff: (staffId) =>
+    request(`/kitchen/staff/${staffId}`, { method: "DELETE" }),
   dashboardStats: (params = {}) => {
     const query = new URLSearchParams(params).toString();
     return request(`/kitchen/dashboard/stats${query ? `?${query}` : ""}`);
@@ -338,9 +450,14 @@ export const api = {
   },
   wasteLogs: (branchId, params = {}) => {
     const query = new URLSearchParams(params).toString();
-    return request(`/kitchen/branch/${branchId}/waste${query ? `?${query}` : ""}`);
+    return request(
+      `/kitchen/branch/${branchId}/waste${query ? `?${query}` : ""}`,
+    );
   },
-  createWasteLog: (branchId, body) => request(`/kitchen/branch/${branchId}/waste`, { method: "POST", body }),
-  updateWasteLog: (branchId, id, body) => request(`/kitchen/branch/${branchId}/waste/${id}`, { method: "PUT", body }),
-  deleteWasteLog: (branchId, id) => request(`/kitchen/branch/${branchId}/waste/${id}`, { method: "DELETE" }),
+  createWasteLog: (branchId, body) =>
+    request(`/kitchen/branch/${branchId}/waste`, { method: "POST", body }),
+  updateWasteLog: (branchId, id, body) =>
+    request(`/kitchen/branch/${branchId}/waste/${id}`, { method: "PUT", body }),
+  deleteWasteLog: (branchId, id) =>
+    request(`/kitchen/branch/${branchId}/waste/${id}`, { method: "DELETE" }),
 };

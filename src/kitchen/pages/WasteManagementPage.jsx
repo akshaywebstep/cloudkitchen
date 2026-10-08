@@ -22,6 +22,7 @@ import {
   Filter,
   Flame,
   AlertOctagon,
+  AlertCircle,
   Sparkles,
   Layers,
 } from "lucide-react";
@@ -42,6 +43,64 @@ const REASON_OPTIONS = [
   { value: "SPILLAGE", label: "Spillage / Accident" },
   { value: "OTHER", label: "Other" },
 ];
+
+/**
+ * Robustly resolve waste item name, category, image, unit, and batch
+ * Supporting deep backend relations, flat fallbacks, and branch inventory cache
+ */
+export function resolveWasteItem(log, ingredientsMap = {}) {
+  const ing = log?.inventoryItem?.ingredient || log?.ingredient || {};
+  const inv = log?.inventoryItem || {};
+  const stock = log?.stock || {};
+  const cached =
+    ingredientsMap[String(log?.inventoryItemId)] ||
+    ingredientsMap[String(log?.inventoryItem?.id)] ||
+    ingredientsMap[`ing_${log?.ingredientId || inv.ingredientId || ing.id}`] ||
+    {};
+
+  const name =
+    log?.itemName ||
+    ing.name ||
+    inv.name ||
+    inv.ingredientName ||
+    cached.name || "";
+
+  const category =
+    ing.category ||
+    inv.category ||
+    inv.ingredientCategory ||
+    cached.category ||
+    log?.category ||
+    "";
+
+  const image =
+    ing.image ||
+    inv.image ||
+    cached.image ||
+    log?.image ||
+    "";
+
+  const unit =
+    inv.unit ||
+    ing.unit ||
+    cached.unit ||
+    log?.unit ||
+    "units";
+
+  const batchDisplay =
+    stock.batchNumber ||
+    stock.batchNo ||
+    log?.batchNumber ||
+    (log?.stockId ? `Stock #${log.stockId}` : "—");
+
+  return {
+    name,
+    category,
+    image,
+    unit,
+    batchDisplay,
+  };
+}
 
 export function WasteManagementPage({ apiState, onToast }) {
   const { canCreate, canUpdate, canDelete } = usePermissions(apiState);
@@ -132,13 +191,75 @@ export function WasteManagementPage({ apiState, onToast }) {
     fetchWasteLogs();
   }, [apiState?.token, activeBranchId]);
 
+  // Preload branch ingredients map as robust fallback
+  const [branchIngredientsMap, setBranchIngredientsMap] = useState({});
+
+  useEffect(() => {
+    if (!activeBranchId) {
+      setBranchIngredientsMap({});
+      return;
+    }
+    let isMounted = true;
+    const token = apiState?.token || getStoredToken();
+    const myHeaders = new Headers();
+    if (token) myHeaders.append("Authorization", `Bearer ${token}`);
+
+    fetch(`${getApiBaseUrl()}/kitchen/branch/${activeBranchId}/ingredient`, {
+      method: "GET",
+      headers: myHeaders,
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((parsed) => {
+        if (!isMounted) return;
+        const rawList = Array.isArray(parsed?.data)
+          ? parsed.data
+          : Array.isArray(parsed)
+            ? parsed
+            : Array.isArray(parsed?.ingredients)
+              ? parsed.ingredients
+              : [];
+        const map = {};
+        rawList.forEach((item) => {
+          const name =
+            item.ingredient?.name ||
+            item.name ||
+            item.ingredientName ||
+            item.title;
+          const category =
+            item.ingredient?.category ||
+            item.category ||
+            item.ingredientCategory ||
+            "";
+          const image = item.ingredient?.image || item.image || "";
+          const unit = item.unit || item.ingredient?.unit || "";
+          if (item.id) {
+            map[String(item.id)] = { name, category, image, unit };
+          }
+          if (item.ingredientId || item.ingredient?.id) {
+            const ingId = String(item.ingredientId || item.ingredient?.id);
+            map[`ing_${ingId}`] = { name, category, image, unit };
+          }
+        });
+        setBranchIngredientsMap(map);
+      })
+      .catch((err) => console.warn("Failed to preload ingredients map:", err));
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeBranchId, apiState?.token]);
+
   // Filtered Logs
   const filteredLogs = useMemo(() => {
     return wasteLogs.filter((log) => {
+      const item = resolveWasteItem(log, branchIngredientsMap);
+
       // Search
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
-        const itemStr = (log.itemName || log.inventoryItem?.name || log.ingredient?.name || "").toLowerCase();
+        const itemStr = (item.name || "").toLowerCase();
+        const catStr = (item.category || "").toLowerCase();
+        const batchStr = (item.batchDisplay || "").toLowerCase();
         const reasonStr = (log.reason || "").toLowerCase();
         const notesStr = (log.notes || "").toLowerCase();
         const idStr = String(log.id || "");
@@ -146,6 +267,8 @@ export function WasteManagementPage({ apiState, onToast }) {
         const stockIdStr = String(log.stockId || "");
         if (
           !itemStr.includes(q) &&
+          !catStr.includes(q) &&
+          !batchStr.includes(q) &&
           !reasonStr.includes(q) &&
           !notesStr.includes(q) &&
           !idStr.includes(q) &&
@@ -163,7 +286,7 @@ export function WasteManagementPage({ apiState, onToast }) {
 
       return true;
     });
-  }, [wasteLogs, searchQuery, reasonFilter]);
+  }, [wasteLogs, searchQuery, reasonFilter, branchIngredientsMap]);
 
   // Paginated records
   const paginatedLogs = useMemo(() => {
@@ -297,7 +420,7 @@ export function WasteManagementPage({ apiState, onToast }) {
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
             <input
               type="text"
-              placeholder="Search waste records by item name, reason, or batch ID..."
+              placeholder="Search waste records by item name, reason..."
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
@@ -345,7 +468,7 @@ export function WasteManagementPage({ apiState, onToast }) {
               <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-extrabold uppercase tracking-wider text-slate-500 whitespace-nowrap">
                 <th className="pl-6 pr-3 py-3.5">#</th>
                 <th className="px-4 py-3.5">Inventory Item</th>
-                <th className="px-4 py-3.5">Stock Batch</th>
+                {/* <th className="px-4 py-3.5">Stock Batch</th> */}
                 <th className="px-4 py-3.5">Quantity Wasted</th>
                 <th className="px-4 py-3.5">Unit Cost (₹)</th>
                 <th className="px-4 py-3.5">Total Loss (₹)</th>
@@ -379,11 +502,7 @@ export function WasteManagementPage({ apiState, onToast }) {
                 paginatedLogs.map((log, index) => {
                   const itemIndex = (currentPage - 1) * pageSize + index + 1;
                   const reasonBadge = getReasonBadge(log.reason);
-                  const itemName =
-                    log.itemName ||
-                    log.inventoryItem?.name ||
-                    log.ingredient?.name ||
-                    `Item #${log.inventoryItemId || log.id}`;
+                  const item = resolveWasteItem(log, branchIngredientsMap);
                   const qty = Number(log.quantityWasted || log.quantity || 0);
                   const unitPrice = Number(log.unitCost || log.cost || 0);
                   const totalLoss = qty * unitPrice > 0 ? qty * unitPrice : unitPrice;
@@ -398,31 +517,52 @@ export function WasteManagementPage({ apiState, onToast }) {
                       {/* Inventory Item */}
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
-                          <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-purple-50 text-purple-700 border border-purple-100 font-bold text-xs shadow-2xs">
-                            <Boxes size={16} />
+                          <div className="size-10 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0 shadow-2xs">
+                            {item.image ? (
+                              <img
+                                src={item.image}
+                                alt={item.name}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = "none";
+                                  if (e.currentTarget.parentElement) {
+                                    e.currentTarget.parentElement.innerHTML =
+                                      '<div class="grid size-full place-items-center bg-rose-50 text-[#8D0606]"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/></svg></div>';
+                                  }
+                                }}
+                              />
+                            ) : (
+                              <div className="grid size-full place-items-center bg-rose-50 text-[#8D0606]">
+                                <Boxes size={18} />
+                              </div>
+                            )}
                           </div>
                           <div>
-                            <p className="font-bold text-slate-900 text-sm truncate max-w-[200px]">
-                              {itemName}
+                            <p className="font-extrabold text-slate-900 text-sm truncate max-w-[220px]" title={item.name}>
+                              {item.name}
                             </p>
-                            <span className="text-[10.5px] font-mono text-slate-400 font-semibold block">
-                              Item ID: #{log.inventoryItemId || log.id}
-                            </span>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              {item.category && (
+                                <span className="inline-block rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
+                                  {item.category}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </td>
 
                       {/* Stock Batch */}
-                      <td className="px-4 py-4 whitespace-nowrap">
+                      {/* <td className="px-4 py-4 whitespace-nowrap">
                         <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-mono font-bold text-slate-700 whitespace-nowrap">
                           <Layers size={13} className="text-slate-400 shrink-0" />
-                          <span>Stock #{log.stockId || "—"}</span>
+                          <span>{item.batchDisplay}</span>
                         </span>
-                      </td>
+                      </td> */}
 
                       {/* Quantity Wasted */}
                       <td className="px-4 py-4 font-bold text-slate-900 text-sm whitespace-nowrap">
-                        {qty} <span className="text-[11px] text-slate-400 font-semibold uppercase">{log.unit || "units"}</span>
+                        {qty} <span className="text-[11px] text-slate-400 font-semibold uppercase">{item.unit}</span>
                       </td>
 
                       {/* Unit Cost */}
@@ -452,7 +592,7 @@ export function WasteManagementPage({ apiState, onToast }) {
 
                       {/* Date */}
                       <td className="px-6 py-4 text-right text-[11px] text-slate-500 whitespace-nowrap">
-                        {log.createdAt ? new Date(log.createdAt).toLocaleDateString() : "—"}
+                        {log.wastedAt || log.createdAt ? new Date(log.wastedAt || log.createdAt).toLocaleDateString() : "—"}
                       </td>
                     </tr>
                   );
@@ -535,13 +675,13 @@ function WasteCreateModal({ branchId, apiState, onClose, onSuccess, onToast }) {
       };
 
       try {
-        // Fetch expired ingredients
+        // Fetch branch ingredients (all available ingredients with batch status)
         const res = await fetch(
-          `${getApiBaseUrl()}/kitchen/branch/${branchId}/ingredient?isExpired=true`,
+          `${getApiBaseUrl()}/kitchen/branch/${branchId}/ingredient`,
           requestOptions
         );
         const text = await res.text();
-        console.log("Branch ingredients (isExpired=true) response:", text);
+        console.log("Branch ingredients response:", text);
 
         let parsed = null;
         try {
