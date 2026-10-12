@@ -54,6 +54,21 @@ const DISH_PRESETS = [
   { name: "Beverage / Juice", url: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=700&q=80" },
 ];
 
+export const INGREDIENT_PRESET_IMAGES = [
+  { label: "Spices & Masala", url: "https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=400&q=80" },
+  { label: "Vegetables", url: "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=400&q=80" },
+  { label: "Paneer & Dairy", url: "https://images.unsplash.com/photo-1628088062854-d1870b4553da?auto=format&fit=crop&w=400&q=80" },
+  { label: "Rice & Grains", url: "https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=400&q=80" },
+  { label: "Oils & Ghee", url: "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=400&q=80" },
+  { label: "Meat & Chicken", url: "https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?auto=format&fit=crop&w=400&q=80" },
+  { label: "Bakery & Flour", url: "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=400&q=80" },
+  { label: "Sauces & Condiments", url: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=400&q=80" },
+  { label: "Herbs & Greens", url: "https://images.unsplash.com/photo-1515543237350-b3eea1ec8082?auto=format&fit=crop&w=400&q=80" },
+  { label: "Onion & Garlic", url: "https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?auto=format&fit=crop&w=400&q=80" },
+  { label: "Tomato & Puree", url: "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=400&q=80" },
+  { label: "General Grocery", url: "https://images.unsplash.com/photo-1506368249639-73a05d6f6488?auto=format&fit=crop&w=400&q=80" },
+];
+
 // ---------------------------------------------------------------------------
 // Shared styling for react-select dropdowns matching form design system
 // ---------------------------------------------------------------------------
@@ -398,6 +413,8 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
   const [showStockModal, setShowStockModal] = useState(false);
   const [provisionItems, setProvisionItems] = useState([]);
   const [isProvisioning, setIsProvisioning] = useState(false);
+  const [activeImageModalIdx, setActiveImageModalIdx] = useState(null);
+  const [tempImageUrl, setTempImageUrl] = useState("");
 
   // Dynamic category options loaded STRICTLY from Categories API (GET /kitchen/menu/categories)
   const dynamicCategoryOptions = useMemo(() => {
@@ -544,6 +561,7 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
           const autoStockUnit = normalizeInventoryStockUnit(item.unit, item.weightInGm);
           unmatchedList.push({
             name: item.name,
+            image: item.image || "",
             hint: item.hint || (item.weightInGm ? `~${item.weightInGm}g` : ""),
             weightInGm: item.weightInGm,
             quantity: String(item.quantity || "1"),
@@ -629,6 +647,7 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
     setProvisionItems(
       selected.map((item) => ({
         name: item.name,
+        image: item.image || "",
         category: item.category || form.category?.trim() || apiCategories?.[0]?.name || "General",
         recipeQty: item.recipeQty || item.quantity || "1",
         recipeUnit: item.recipeUnit || item.unit || "GM",
@@ -651,6 +670,7 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
         items: provisionItems.map((item) => ({
           name: item.name,
           category: item.category || "General",
+          image: item.image?.trim() || undefined,
           unit: item.stockUnit || item.recipeUnit || "GM",
           initialStock: parseFloat(item.initialStock) || 0,
           alertQuantity: 5,
@@ -2142,7 +2162,7 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
 
               <div className="overflow-x-auto">
                 <div className="min-w-[620px] space-y-2.5">
-                  <div className="grid grid-cols-[1.1fr_1.2fr_140px_140px] gap-2.5 px-2 text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
+                  <div className="grid grid-cols-[1.2fr_1.1fr_140px_140px] gap-2.5 px-2 text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
                     <span>Ingredient</span>
                     <span>Category</span>
                     <span>Recipe Qty & Unit</span>
@@ -2152,11 +2172,63 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
                   {provisionItems.map((item, idx) => (
                     <div
                       key={idx}
-                      className="grid grid-cols-[1.1fr_1.2fr_140px_140px] gap-2.5 items-center p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 text-xs"
+                      className="grid grid-cols-[1.2fr_1.1fr_140px_140px] gap-2.5 items-center p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 text-xs"
                     >
-                      <div className="min-w-0">
-                        <strong className="text-slate-800 block text-xs font-bold truncate">{item.name}</strong>
-                        {item.hint && <span className="text-[10px] text-slate-400 font-medium truncate block">{item.hint}</span>}
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        {item.image ? (
+                          <div className="relative group shrink-0 size-9 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs">
+                            <img
+                              src={item.image}
+                              alt={item.name}
+                              className="size-full object-cover"
+                              onError={(e) => {
+                                e.target.src = "https://images.unsplash.com/photo-1506368249639-73a05d6f6488?auto=format&fit=crop&w=100&q=80";
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setProvisionItems((prev) =>
+                                  prev.map((p, i) => (i === idx ? { ...p, image: "" } : p))
+                                );
+                              }}
+                              className="absolute inset-0 bg-slate-950/60 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition cursor-pointer"
+                              title="Remove photo"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveImageModalIdx(idx);
+                              setTempImageUrl(item.image || "");
+                            }}
+                            className="size-9 rounded-lg border border-dashed border-slate-300 hover:border-[#8D0606] bg-white hover:bg-rose-50/50 flex flex-col items-center justify-center text-slate-400 hover:text-[#8D0606] shrink-0 transition cursor-pointer shadow-2xs"
+                            title="Add optional photo"
+                          >
+                            <ImageIcon size={13} />
+                            <span className="text-[8px] font-bold leading-none mt-0.5">+Img</span>
+                          </button>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <strong className="text-slate-800 block text-xs font-bold truncate">{item.name}</strong>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {item.hint && <span className="text-[10px] text-slate-400 font-medium truncate">{item.hint}</span>}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveImageModalIdx(idx);
+                                setTempImageUrl(item.image || "");
+                              }}
+                              className="text-[10px] font-semibold text-rose-700 hover:underline cursor-pointer"
+                            >
+                              {item.image ? "Change photo" : "+ Photo (opt)"}
+                            </button>
+                          </div>
+                        </div>
                       </div>
                       <div>
                         <CreatableSelect
@@ -2253,7 +2325,7 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
               <div className="p-3 rounded-xl bg-amber-50 border border-amber-200/80 text-[11px] text-amber-800 flex items-start gap-2">
                 <AlertCircle size={15} className="text-amber-600 shrink-0 mt-0.5" />
                 <span>
-                  <strong>Tip:</strong> Branch inventory stock is tracked in standard units like <strong>GM / KG / PIECE / LITER</strong> (not TSP or CUP). You can change recipe and inventory units anytime. Initial stock can stay <strong>0</strong> if physical raw material is not yet inwarded.
+                  <strong>Tip:</strong> Branch inventory stock is tracked in standard units like <strong>GM / KG / PIECE / LITER</strong> (not TSP or CUP). You can change recipe and inventory units anytime. Initial stock can stay <strong>0</strong> if physical raw material is not yet inwarded. Photo is <strong>optional</strong>.
                 </span>
               </div>
             </div>
@@ -2286,6 +2358,151 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Ingredient Photo Picker Modal (Optional) */}
+      {activeImageModalIdx !== null && provisionItems[activeImageModalIdx] && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden space-y-0">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50/80">
+              <div className="flex items-center gap-2">
+                <ImageIcon size={16} className="text-[#8D0606]" />
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900">
+                    Ingredient Photo (Optional)
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    {provisionItems[activeImageModalIdx]?.name}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveImageModalIdx(null)}
+                className="size-7 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 grid place-items-center cursor-pointer transition"
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+              {tempImageUrl ? (
+                <div className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50">
+                  <img
+                    src={tempImageUrl}
+                    alt="Preview"
+                    className="size-16 rounded-lg object-cover border border-slate-200 shadow-2xs"
+                    onError={(e) => {
+                      e.target.src = "https://images.unsplash.com/photo-1506368249639-73a05d6f6488?auto=format&fit=crop&w=200&q=80";
+                    }}
+                  />
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                      Active Preview
+                    </span>
+                    <p className="text-[10px] text-slate-500 truncate">{tempImageUrl}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setTempImageUrl("")}
+                    className="px-2.5 py-1 text-[11px] font-bold text-rose-600 hover:bg-rose-50 rounded-lg transition border border-rose-200 cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                </div>
+              ) : null}
+
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                  Image Web URL
+                </label>
+                <div className="relative">
+                  <Link2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="url"
+                    value={tempImageUrl}
+                    onChange={(e) => setTempImageUrl(e.target.value)}
+                    placeholder="Paste image URL (e.g. https://images.unsplash.com/...)"
+                    className="h-9 w-full rounded-xl border border-slate-200 pl-8 pr-3 text-xs font-medium text-slate-800 outline-none focus:border-[#8D0606]"
+                  />
+                </div>
+                <p className="text-[10.5px] text-slate-400">
+                  Direct link from web, Unsplash, Cloudinary, or choose from common presets below.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 block">
+                  Or 1-Click Pick from Common Presets:
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {INGREDIENT_PRESET_IMAGES.map((preset) => {
+                    const isSelected = tempImageUrl === preset.url;
+                    return (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => setTempImageUrl(preset.url)}
+                        className={`flex items-center gap-2 p-1.5 rounded-xl border text-left transition cursor-pointer ${
+                          isSelected
+                            ? "border-[#8D0606] bg-rose-50/60 ring-1 ring-[#8D0606]"
+                            : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                        }`}
+                      >
+                        <img
+                          src={preset.url}
+                          alt={preset.label}
+                          className="size-8 rounded-lg object-cover shrink-0"
+                        />
+                        <span className="text-[11px] font-bold text-slate-700 truncate">
+                          {preset.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50/80">
+              <button
+                type="button"
+                onClick={() => {
+                  setProvisionItems((prev) =>
+                    prev.map((p, i) => (i === activeImageModalIdx ? { ...p, image: "" } : p))
+                  );
+                  setActiveImageModalIdx(null);
+                }}
+                className="text-xs font-semibold text-slate-500 hover:text-slate-800 cursor-pointer"
+              >
+                Skip / Clear
+              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveImageModalIdx(null)}
+                  className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProvisionItems((prev) =>
+                      prev.map((p, i) =>
+                        i === activeImageModalIdx ? { ...p, image: tempImageUrl.trim() } : p
+                      )
+                    );
+                    setActiveImageModalIdx(null);
+                  }}
+                  className="px-4 py-1.5 text-xs font-bold text-white bg-[#8D0606] hover:bg-[#720505] rounded-xl transition shadow-xs cursor-pointer"
+                >
+                  Save Photo
+                </button>
+              </div>
             </div>
           </div>
         </div>
