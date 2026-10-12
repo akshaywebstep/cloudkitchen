@@ -521,7 +521,7 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
             quantity: String(item.quantity || "1"),
             unit: item.unit || "GM",
             category: form.category?.trim() || apiCategories?.[0]?.name || "General",
-            initialStock: item.unit === "KG" || item.unit === "LITER" ? "5" : "250",
+            initialStock: "0",
             selected: true,
           });
         }
@@ -601,7 +601,7 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
         category: item.category || form.category?.trim() || apiCategories?.[0]?.name || "General",
         recipeQty: item.quantity || "1",
         recipeUnit: item.unit || "GM",
-        initialStock: item.initialStock || (item.unit === "KG" || item.unit === "LITER" ? "5" : "250"),
+        initialStock: item.initialStock !== undefined && item.initialStock !== "" ? item.initialStock : "0",
         stockUnit: item.unit || "GM",
         hint: item.hint || "",
       }))
