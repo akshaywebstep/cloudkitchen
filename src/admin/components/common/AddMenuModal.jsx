@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import Select from 'react-select';
+import CreatableSelect from 'react-select/creatable';
 import {
   X,
   Plus,
@@ -19,7 +20,10 @@ import {
   Sparkles,
   Layers,
   Loader2,
-  Info
+  Info,
+  Check,
+  Boxes,
+  Link2
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
@@ -31,7 +35,8 @@ import {
   getMenuCategoriesApi,
   getIngredientsApi,
   createMenuItemApi,
-  getAiRecipeApi
+  getAiRecipeApi,
+  quickProvisionIngredientsApi
 } from '../../services/api';
 import { extractFieldErrors, getErrorMessage } from '../../utils/errorHelper';
 import {
@@ -42,6 +47,21 @@ import {
   calculateStockCapacity
 } from '../../utils/recipeHelper';
 import { STANDARD_MEASURE_UNITS, findUnitOption } from '../../../constants/measureUnits';
+
+export const INGREDIENT_PRESET_IMAGES = [
+  { label: "Spices & Masala", url: "https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=400&q=80" },
+  { label: "Vegetables", url: "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=400&q=80" },
+  { label: "Paneer & Dairy", url: "https://images.unsplash.com/photo-1628088062854-d1870b4553da?auto=format&fit=crop&w=400&q=80" },
+  { label: "Rice & Grains", url: "https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=400&q=80" },
+  { label: "Oils & Ghee", url: "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=400&q=80" },
+  { label: "Meat & Chicken", url: "https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?auto=format&fit=crop&w=400&q=80" },
+  { label: "Bakery & Flour", url: "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=400&q=80" },
+  { label: "Sauces & Condiments", url: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=400&q=80" },
+  { label: "Herbs & Greens", url: "https://images.unsplash.com/photo-1515543237350-b3eea1ec8082?auto=format&fit=crop&w=400&q=80" },
+  { label: "Onion & Garlic", url: "https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?auto=format&fit=crop&w=400&q=80" },
+  { label: "Tomato & Puree", url: "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=400&q=80" },
+  { label: "General Grocery", url: "https://images.unsplash.com/photo-1506368249639-73a05d6f6488?auto=format&fit=crop&w=400&q=80" },
+];
 
 export const AddMenuModal = () => {
   const { isAddMenuOpen, setIsAddMenuOpen } = useApp();
@@ -79,6 +99,56 @@ export const AddMenuModal = () => {
   const [isAiGenerating, setIsAiGenerating] = useState(false);
   const [unmatchedAiItems, setUnmatchedAiItems] = useState([]);
   const [aiChefTip, setAiChefTip] = useState('');
+
+  // Quick Provision States (AI suggestions -> Catalog + Inventory)
+  const [showStockModal, setShowStockModal] = useState(false);
+  const [provisionItems, setProvisionItems] = useState([]);
+  const [isProvisioning, setIsProvisioning] = useState(false);
+  const [activeImageModalIdx, setActiveImageModalIdx] = useState(null);
+  const [tempImageUrl, setTempImageUrl] = useState('');
+
+  // Dynamic category options combining Menu Categories + Standard Food categories
+  const dynamicCategoryOptions = useMemo(() => {
+    const list = [];
+    const seen = new Set();
+
+    (categories || []).forEach((cat) => {
+      const name = (cat.name || '').trim();
+      if (name && !seen.has(name.toLowerCase())) {
+        seen.add(name.toLowerCase());
+        list.push({ value: name, label: name });
+      }
+    });
+
+    const standardCategories = [
+      "Spices & Masala",
+      "Vegetables",
+      "Dairy",
+      "Grains & Pulses",
+      "Oils & Ghee",
+      "Meat & Seafood",
+      "Bakery & Bread",
+      "Sauces & Condiments",
+      "General",
+    ];
+
+    standardCategories.forEach((sc) => {
+      if (!seen.has(sc.toLowerCase())) {
+        seen.add(sc.toLowerCase());
+        list.push({ value: sc, label: sc });
+      }
+    });
+
+    return list;
+  }, [categories]);
+
+  const normalizeInventoryStockUnit = (unitStr) => {
+    const u = String(unitStr || "").trim().toUpperCase();
+    if (u === "TSP" || u === "TBSP" || u === "CUP" || u === "PINCH") {
+      return "GM";
+    }
+    return u || "GM";
+  };
 
   useEffect(() => {
     if (isAddMenuOpen) {
@@ -295,12 +365,23 @@ export const AddMenuModal = () => {
             hint: item.hint || (item.weightInGm ? `~${item.weightInGm}g` : ''),
           });
         } else {
+          const autoStockUnit = normalizeInventoryStockUnit(item.unit);
+          const currentCatObj = categories.find((c) => String(c.id) === String(formData.categoryId));
+          const fallbackCategory = currentCatObj?.name || 'General';
+
           unmatchedList.push({
             name: item.name,
+            image: item.image || '',
             hint: item.hint || (item.weightInGm ? `~${item.weightInGm}g` : ''),
             weightInGm: item.weightInGm,
-            quantity: item.quantity,
-            unit: item.unit,
+            quantity: item.quantity ? String(item.quantity) : '1',
+            unit: item.unit || 'GM',
+            recipeQty: item.quantity ? String(item.quantity) : '1',
+            recipeUnit: item.unit || 'GM',
+            category: fallbackCategory,
+            initialStock: '0',
+            stockUnit: autoStockUnit,
+            selected: true,
           });
         }
       });
@@ -343,6 +424,114 @@ export const AddMenuModal = () => {
       toast.error('An unexpected error occurred while generating AI recipe.');
     } finally {
       setIsAiGenerating(false);
+    }
+  };
+
+  // Quick Provision Handlers (AI Suggestions -> Catalog + Recipe)
+  const handleToggleSuggestedItem = (idxToToggle) => {
+    setUnmatchedAiItems((prev) =>
+      prev.map((item, idx) => (idx === idxToToggle ? { ...item, selected: !item.selected } : item))
+    );
+  };
+
+  const handleRemoveSuggestedItem = (idxToRemove) => {
+    setUnmatchedAiItems((prev) => prev.filter((_, idx) => idx !== idxToRemove));
+  };
+
+  const handleSelectAllSuggested = (selectVal) => {
+    setUnmatchedAiItems((prev) => prev.map((item) => ({ ...item, selected: selectVal })));
+  };
+
+  const handleOpenProvisionModal = () => {
+    const selected = unmatchedAiItems.filter((item) => item.selected !== false);
+    if (selected.length === 0) {
+      toast.error('Please select at least one ingredient to add!');
+      return;
+    }
+    const currentCatObj = categories.find((c) => String(c.id) === String(formData.categoryId));
+    const fallbackCategory = currentCatObj?.name || 'General';
+
+    setProvisionItems(
+      selected.map((item) => ({
+        name: item.name,
+        image: item.image || '',
+        category: item.category || fallbackCategory,
+        recipeQty: item.recipeQty || item.quantity || '1',
+        recipeUnit: item.recipeUnit || item.unit || 'GM',
+        initialStock: item.initialStock !== undefined && item.initialStock !== '' ? item.initialStock : '0',
+        stockUnit: item.stockUnit || normalizeInventoryStockUnit(item.unit),
+        hint: item.hint || '',
+      }))
+    );
+    setShowStockModal(true);
+  };
+
+  const handleConfirmProvision = async () => {
+    setIsProvisioning(true);
+    try {
+      const payload = {
+        kitchenId: formData.kitchenId ? Number(formData.kitchenId) : undefined,
+        branchId: formData.branchId ? Number(formData.branchId) : undefined,
+        items: provisionItems.map((item) => ({
+          name: item.name,
+          category: item.category || 'General',
+          image: item.image?.trim() || undefined,
+          unit: item.stockUnit || item.recipeUnit || 'GM',
+          initialStock: parseFloat(item.initialStock) || 0,
+          alertQuantity: 5,
+        })),
+      };
+
+      const res = await quickProvisionIngredientsApi(payload);
+      if (!res || res.status === false) {
+        throw new Error(res?.message || 'Failed to add ingredients to catalog');
+      }
+
+      // Fresh ingredients list to update local ingredientsList state
+      const createdItems = Array.isArray(res?.data) ? res.data : [];
+
+      // Update ingredientsList in modal so dish submission recognizes the new master ingredient IDs
+      setIngredientsList((prev) => {
+        const existingIds = new Set(prev.map((i) => Number(i.id)));
+        const toAdd = createdItems.filter((c) => !existingIds.has(Number(c.id || c.ingredientId)));
+        return [...prev, ...toAdd];
+      });
+
+      // Map newly provisioned items into selectedIngredients (recipe table)
+      const newRecipeRows = provisionItems.map((prov) => {
+        const matchingCreated = createdItems.find(
+          (c) => c.name?.toLowerCase().trim() === prov.name?.toLowerCase().trim()
+        );
+        const ingredientId = Number(matchingCreated?.id || matchingCreated?.ingredientId || 0);
+        return {
+          id: ingredientId,
+          name: prov.name,
+          quantity: parseFloat(prov.recipeQty) || 1,
+          unit: prov.recipeUnit || prov.stockUnit || 'GM',
+          hint: prov.hint,
+        };
+      });
+
+      // Append to selectedIngredients
+      setSelectedIngredients((prev) => {
+        const existingIds = new Set(prev.map((r) => Number(r.id)));
+        const nonDuplicate = newRecipeRows.filter((r) => !existingIds.has(Number(r.id)));
+        return [...prev, ...nonDuplicate];
+      });
+
+      // Remove added items from unmatchedAiItems
+      const addedNames = new Set(provisionItems.map((p) => p.name.toLowerCase().trim()));
+      setUnmatchedAiItems((prev) => prev.filter((item) => !addedNames.has(item.name.toLowerCase().trim())));
+
+      setShowStockModal(false);
+      toast.success(
+        `✨ ${newRecipeRows.length} ingredients added to Catalog & linked to Recipe!`
+      );
+    } catch (err) {
+      console.error('Error provisioning ingredients in admin:', err);
+      toast.error(err.message || 'Failed to provision ingredients.');
+    } finally {
+      setIsProvisioning(false);
     }
   };
 
@@ -589,6 +778,56 @@ export const AddMenuModal = () => {
     }),
   };
 
+  const compactModalSelectStyles = {
+    control: (base, state) => ({
+      ...base,
+      minHeight: 32,
+      height: 32,
+      borderRadius: 8,
+      backgroundColor: theme === 'dark' ? '#0f172a' : '#ffffff',
+      borderColor: state.isFocused ? '#8C0D0D' : theme === 'dark' ? '#334155' : '#e2e8f0',
+      boxShadow: state.isFocused ? '0 0 0 2px rgba(140, 13, 13, 0.2)' : 'none',
+      fontSize: 11,
+      fontWeight: 600,
+    }),
+    valueContainer: (base) => ({
+      ...base,
+      padding: '0 6px',
+    }),
+    input: (base) => ({
+      ...base,
+      margin: 0,
+      padding: 0,
+      color: theme === 'dark' ? '#ffffff' : '#0f172a',
+    }),
+    singleValue: (base) => ({
+      ...base,
+      color: theme === 'dark' ? '#ffffff' : '#0f172a',
+      fontSize: 11,
+      fontWeight: 600,
+    }),
+    menuPortal: (base) => ({ ...base, zIndex: 99999 }),
+    menu: (base) => ({
+      ...base,
+      zIndex: 99999,
+      backgroundColor: theme === 'dark' ? '#1e293b' : '#ffffff',
+      border: theme === 'dark' ? '1px solid #334155' : '1px solid #e2e8f0',
+    }),
+    option: (base, state) => ({
+      ...base,
+      fontSize: 11,
+      fontWeight: 600,
+      backgroundColor: state.isSelected
+        ? '#8C0D0D'
+        : state.isFocused
+        ? theme === 'dark' ? '#334155' : '#fff1f1'
+        : 'transparent',
+      color: state.isSelected
+        ? '#ffffff'
+        : theme === 'dark' ? '#f8fafc' : '#0f172a',
+    }),
+  };
+
   const kitchenOptions = kitchens.map((k) => ({ value: k.id, label: k.name || k.kitchenName || 'Kitchen' }));
 
   // Filter branches strictly belonging to the currently selected kitchen
@@ -617,7 +856,8 @@ export const AddMenuModal = () => {
   const unitOptions = STANDARD_MEASURE_UNITS;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-200">
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-200">
       <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-3xl w-full overflow-hidden animate-modal-pop max-h-[92vh] flex flex-col">
         {/* Modal Header */}
         <div className="bg-[#8C0D0D] text-white p-6 flex items-center justify-between relative overflow-hidden shrink-0">
@@ -1206,36 +1446,92 @@ export const AddMenuModal = () => {
               </div>
             )}
 
-            {/* Unmatched Ingredients Notification */}
+            {/* Unmatched Ingredients Notification with Quick-Add action */}
             {unmatchedAiItems.length > 0 && (
-              <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-200 space-y-2">
-                <div className="flex items-center gap-2 font-extrabold text-xs text-amber-900 dark:text-amber-100">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>
-                    {unmatchedAiItems.length} recipe ingredients not found in your inventory catalog
-                  </span>
-                </div>
-                <p className="text-[11px] text-amber-800 dark:text-amber-300 font-medium">
-                  AI suggested these ingredients for <strong>"{formData.name}"</strong>, but they are not yet in your Inventory catalog:
-                </p>
-                <div className="flex flex-wrap gap-1.5 pt-0.5">
-                  {unmatchedAiItems.map((item, idx) => (
-                    <span
-                      key={idx}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800 text-[11px] font-bold text-amber-950 dark:text-amber-200 shadow-2xs"
+              <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-200 space-y-3 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 font-extrabold text-xs text-amber-900 dark:text-amber-100">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>
+                      {unmatchedAiItems.length} recipe ingredient{unmatchedAiItems.length > 1 ? "s" : ""} not found in your catalog
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px] font-bold">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectAllSuggested(true)}
+                      className="text-amber-800 dark:text-amber-300 hover:underline cursor-pointer"
                     >
-                      <span>{item.name}</span>
+                      Select All
+                    </button>
+                    <span className="text-amber-300 dark:text-amber-700">|</span>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectAllSuggested(false)}
+                      className="text-amber-800 dark:text-amber-300 hover:underline cursor-pointer"
+                    >
+                      Deselect
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-amber-800 dark:text-amber-300 font-medium">
+                  AI suggested these ingredients for <strong>"{formData.name}"</strong>, but they are not yet in your Catalog. Select items to quickly set up Category, Units &amp; Stock:
+                </p>
+
+                {/* Items selection cards */}
+                <div className="flex flex-wrap gap-2 pt-0.5">
+                  {unmatchedAiItems.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className={`inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition shadow-2xs ${
+                        item.selected !== false
+                          ? "bg-white dark:bg-slate-900 border-amber-300 dark:border-amber-700 text-amber-950 dark:text-amber-100"
+                          : "bg-amber-100/60 dark:bg-amber-950/20 border-transparent text-amber-700/60 dark:text-amber-400/50 line-through"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={item.selected !== false}
+                        onChange={() => handleToggleSuggestedItem(idx)}
+                        className="rounded border-amber-400 text-[#8C0D0D] focus:ring-[#8C0D0D] cursor-pointer size-3.5"
+                      />
+                      <span className="cursor-pointer" onClick={() => handleToggleSuggestedItem(idx)}>
+                        {item.name}
+                      </span>
                       {item.hint && (
                         <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
                           ({item.hint})
                         </span>
                       )}
-                    </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSuggestedItem(idx)}
+                        className="ml-0.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 cursor-pointer"
+                        title="Remove from suggestion"
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
                   ))}
                 </div>
-                <p className="text-[10px] text-amber-700 dark:text-amber-400 font-semibold">
-                  💡 Tip: You can add these items in <strong>Inventory &gt; Ingredients</strong> anytime so they can be automatically tracked in future recipes.
-                </p>
+
+                {/* Quick Add Button */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-1 border-t border-amber-200/70 dark:border-amber-800/50">
+                  <span className="text-[10px] text-amber-800 dark:text-amber-300 font-semibold">
+                    💡 Instantly adds missing items to Master Catalog &amp; connects them directly to this dish.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleOpenProvisionModal}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[#8C0D0D] hover:bg-[#720a0a] text-white text-xs font-bold shadow-md shadow-rose-950/20 cursor-pointer transition active:scale-98 shrink-0"
+                  >
+                    <Sparkles size={14} className="text-amber-300" />
+                    <span>
+                      Setup &amp; Add ({unmatchedAiItems.filter((i) => i.selected !== false).length}) to Recipe
+                    </span>
+                  </button>
+                </div>
               </div>
             )}
 
@@ -1300,7 +1596,412 @@ export const AddMenuModal = () => {
           </div>
         </form>
       </div>
-    </div>,
-    document.body
-  );
+    </div>
+
+    {/* Quick Provision Stock Modal for Admin */}
+    {showStockModal && (
+      <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
+        <div className="w-full max-w-3xl rounded-3xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden space-y-0">
+          {/* Modal Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-850/80">
+            <div className="flex items-center gap-3">
+              <div className="size-10 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-[#8C0D0D] dark:text-rose-400 grid place-items-center shadow-2xs">
+                <Boxes size={20} />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-slate-900 dark:text-slate-100">Setup Category, Units &amp; Stock for Ingredients</h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                  Configure culinary category, cooking/inventory units, and initial stock before adding to catalog.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowStockModal(false)}
+              className="size-8 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 grid place-items-center cursor-pointer transition"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          {/* Modal Content */}
+          <div className="p-6 max-h-[62vh] overflow-y-auto space-y-3.5">
+            {/* Quick Bulk Category Apply */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700">
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-200">Quick Apply Category to All:</span>
+              <div className="w-full sm:w-64">
+                <CreatableSelect
+                  menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                  styles={compactModalSelectStyles}
+                  options={dynamicCategoryOptions}
+                  placeholder="Apply category to all items..."
+                  onChange={(opt) => {
+                    if (!opt?.value) return;
+                    setProvisionItems((prev) =>
+                      prev.map((p) => ({ ...p, category: opt.value }))
+                    );
+                  }}
+                  isClearable={false}
+                />
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <div className="min-w-[620px] space-y-2.5">
+                <div className="grid grid-cols-[1.2fr_1.1fr_140px_140px] gap-2.5 px-2 text-[10.5px] font-extrabold uppercase tracking-wider text-slate-400">
+                  <span>Ingredient</span>
+                  <span>Category</span>
+                  <span>Recipe Qty &amp; Unit</span>
+                  <span>Initial Stock &amp; Unit</span>
+                </div>
+
+                {provisionItems.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="grid grid-cols-[1.2fr_1.1fr_140px_140px] gap-2.5 items-center p-2.5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 text-xs"
+                  >
+                    {/* Ingredient Column with Photo Avatar */}
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {item.image ? (
+                        <div className="relative group shrink-0 size-9 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 shadow-2xs">
+                          <img
+                            src={item.image}
+                            alt={item.name}
+                            className="size-full object-cover"
+                            onError={(e) => {
+                              e.target.src = "https://images.unsplash.com/photo-1506368249639-73a05d6f6488?auto=format&fit=crop&w=100&q=80";
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setProvisionItems((prev) =>
+                                prev.map((p, i) => (i === idx ? { ...p, image: "" } : p))
+                              );
+                            }}
+                            className="absolute inset-0 bg-slate-950/70 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition cursor-pointer"
+                            title="Remove photo"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveImageModalIdx(idx);
+                            setTempImageUrl(item.image || "");
+                          }}
+                          className="size-9 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 hover:border-[#8C0D0D] bg-white dark:bg-slate-800 hover:bg-rose-50/50 dark:hover:bg-rose-950/30 flex flex-col items-center justify-center text-slate-400 hover:text-[#8C0D0D] dark:hover:text-rose-400 shrink-0 transition cursor-pointer shadow-2xs"
+                          title="Add optional photo"
+                        >
+                          <ImageIcon size={13} />
+                          <span className="text-[8px] font-bold leading-none mt-0.5">+Img</span>
+                        </button>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <strong className="text-slate-800 dark:text-slate-100 block text-xs font-bold truncate">{item.name}</strong>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {item.hint && <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium truncate">{item.hint}</span>}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveImageModalIdx(idx);
+                              setTempImageUrl(item.image || "");
+                            }}
+                            className="text-[10px] font-semibold text-[#8C0D0D] dark:text-rose-400 hover:underline cursor-pointer"
+                          >
+                            {item.image ? "Change photo" : "+ Photo (opt)"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Category CreatableSelect */}
+                    <div>
+                      <CreatableSelect
+                        menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                        styles={compactModalSelectStyles}
+                        options={dynamicCategoryOptions}
+                        value={item.category ? { value: item.category, label: item.category } : null}
+                        onChange={(opt) => {
+                          const val = opt?.value || opt?.label || "";
+                          setProvisionItems((prev) =>
+                            prev.map((p, i) => (i === idx ? { ...p, category: val } : p))
+                          );
+                        }}
+                        placeholder="Select category..."
+                        isClearable={false}
+                      />
+                    </div>
+
+                    {/* Recipe Qty & Cooking Unit */}
+                    <div>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          min="0.001"
+                          step="0.01"
+                          value={item.recipeQty}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setProvisionItems((prev) =>
+                              prev.map((p, i) => (i === idx ? { ...p, recipeQty: val } : p))
+                            );
+                          }}
+                          className="h-8 w-14 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:border-[#8C0D0D] text-center"
+                          title="Quantity required in recipe cooking"
+                        />
+                        <select
+                          value={item.recipeUnit}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setProvisionItems((prev) =>
+                              prev.map((p, i) => (i === idx ? { ...p, recipeUnit: val } : p))
+                            );
+                          }}
+                          className="h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-1 text-[11px] font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-[#8C0D0D] cursor-pointer"
+                          title="Recipe cooking unit"
+                        >
+                          {STANDARD_MEASURE_UNITS.map((u) => (
+                            <option key={u.value} value={u.value}>
+                              {u.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Initial Stock & Inventory Stock Unit */}
+                    <div>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          value={item.initialStock}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setProvisionItems((prev) =>
+                              prev.map((p, i) => (i === idx ? { ...p, initialStock: val } : p))
+                            );
+                          }}
+                          placeholder="0"
+                          className="h-8 w-14 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 text-xs font-bold text-slate-800 dark:text-slate-100 outline-none focus:border-[#8C0D0D] text-center"
+                          title="Initial physical stock in kitchen inventory"
+                        />
+                        <select
+                          value={item.stockUnit}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setProvisionItems((prev) =>
+                              prev.map((p, i) => (i === idx ? { ...p, stockUnit: val } : p))
+                            );
+                          }}
+                          className="h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-1 text-[11px] font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-[#8C0D0D] cursor-pointer"
+                          title="Unit used to track stock in branch inventory"
+                        >
+                          {STANDARD_MEASURE_UNITS.map((u) => (
+                            <option key={u.value} value={u.value}>
+                              {u.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Informational Hint */}
+            <div className="p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/60 text-[11px] text-amber-900 dark:text-amber-200 flex items-start gap-2.5">
+              <AlertCircle size={15} className="text-amber-600 shrink-0 mt-0.5" />
+              <span>
+                <strong>Tip:</strong> Inventory stock is tracked in standard units like <strong>GM / KG / PIECE / LITER</strong>. You can change units anytime. Initial stock can remain <strong>0</strong> if physical raw material is not yet inwarded. Photo is strictly <strong>optional</strong>.
+              </span>
+            </div>
+          </div>
+
+          {/* Modal Footer */}
+          <div className="flex items-center justify-end gap-2.5 px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-850/80">
+            <button
+              type="button"
+              onClick={() => setShowStockModal(false)}
+              disabled={isProvisioning}
+              className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmProvision}
+              disabled={isProvisioning}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#8C0D0D] hover:bg-[#700a0a] px-5 py-2 text-xs font-bold text-white shadow-xs transition cursor-pointer active:scale-98 disabled:opacity-50"
+            >
+              {isProvisioning ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Adding to Catalog &amp; Recipe...</span>
+                </>
+              ) : (
+                <>
+                  <Check size={14} />
+                  <span>Confirm &amp; Add to Recipe</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Ingredient Photo Picker Modal (Optional) */}
+    {activeImageModalIdx !== null && provisionItems[activeImageModalIdx] && (
+      <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in">
+        <div className="w-full max-w-lg rounded-3xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden space-y-0">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-850/80">
+            <div className="flex items-center gap-2.5">
+              <ImageIcon size={18} className="text-[#8C0D0D] dark:text-rose-400" />
+              <div>
+                <h4 className="text-xs font-black text-slate-900 dark:text-slate-100">
+                  Ingredient Photo (Optional)
+                </h4>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                  {provisionItems[activeImageModalIdx]?.name}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveImageModalIdx(null)}
+              className="size-7 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 grid place-items-center cursor-pointer transition"
+            >
+              <X size={15} />
+            </button>
+          </div>
+
+          <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+            {tempImageUrl ? (
+              <div className="flex items-center gap-3 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+                <img
+                  src={tempImageUrl}
+                  alt="Preview"
+                  className="size-16 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shadow-2xs"
+                  onError={(e) => {
+                    e.target.src = "https://images.unsplash.com/photo-1506368249639-73a05d6f6488?auto=format&fit=crop&w=200&q=80";
+                  }}
+                />
+                <div className="min-w-0 flex-1 space-y-1">
+                  <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800">
+                    Active Preview
+                  </span>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{tempImageUrl}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setTempImageUrl("")}
+                  className="px-2.5 py-1 text-[11px] font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-xl transition border border-rose-200 dark:border-rose-800 cursor-pointer"
+                >
+                  Clear
+                </button>
+              </div>
+            ) : null}
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                Image Web URL
+              </label>
+              <div className="relative">
+                <Link2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="url"
+                  value={tempImageUrl}
+                  onChange={(e) => setTempImageUrl(e.target.value)}
+                  placeholder="Paste image URL (e.g. https://images.unsplash.com/...)"
+                  className="h-9 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-8 pr-3 text-xs font-medium text-slate-800 dark:text-slate-100 outline-none focus:border-[#8C0D0D]"
+                />
+              </div>
+              <p className="text-[10.5px] text-slate-400">
+                Direct link from web, Unsplash, Cloudinary, or choose from common presets below.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 block">
+                Or 1-Click Pick from Common Presets:
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {INGREDIENT_PRESET_IMAGES.map((preset) => {
+                  const isSelected = tempImageUrl === preset.url;
+                  return (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => setTempImageUrl(preset.url)}
+                      className={`flex items-center gap-2 p-1.5 rounded-xl border text-left transition cursor-pointer ${
+                        isSelected
+                          ? "border-[#8C0D0D] bg-rose-50/60 dark:bg-rose-950/30 ring-1 ring-[#8C0D0D]"
+                          : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800"
+                      }`}
+                    >
+                      <img
+                        src={preset.url}
+                        alt={preset.label}
+                        className="size-8 rounded-lg object-cover shrink-0"
+                      />
+                      <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 truncate">
+                        {preset.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-850/80">
+            <button
+              type="button"
+              onClick={() => {
+                setProvisionItems((prev) =>
+                  prev.map((p, i) => (i === activeImageModalIdx ? { ...p, image: "" } : p))
+                );
+                setActiveImageModalIdx(null);
+              }}
+              className="text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer"
+            >
+              Skip / Clear
+            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveImageModalIdx(null)}
+                className="px-3.5 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setProvisionItems((prev) =>
+                    prev.map((p, i) =>
+                      i === activeImageModalIdx ? { ...p, image: tempImageUrl.trim() } : p
+                    )
+                  );
+                  setActiveImageModalIdx(null);
+                }}
+                className="px-4 py-1.5 text-xs font-bold text-white bg-[#8C0D0D] hover:bg-[#700a0a] rounded-xl transition shadow-xs cursor-pointer"
+              >
+                Save Photo
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+  </>,
+  document.body
+);
 };

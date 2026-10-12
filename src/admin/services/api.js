@@ -382,6 +382,24 @@ export const deleteIngredientApi = async (id) => {
 };
 
 /**
+ * Quick Provision Ingredients API (Bulk Create Master Ingredients & Map Inventory)
+ * @param {Object} data - { kitchenId?, branchId?, items: [...] }
+ * @returns {Promise<Object>} Response object { status, message, data }
+ */
+export const quickProvisionIngredientsApi = async (data) => {
+  try {
+    const token = localStorage.getItem('admin_token');
+    const response = await apiClient.post('/admin/ingredient/quick-provision', data, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.data;
+  } catch (error) {
+    if (error.response && error.response.data) return error.response.data;
+    return { status: false, message: error.message || 'Failed to provision ingredients.' };
+  }
+};
+
+/**
  * Fetch All Branches List API
  * @param {Object} [params] - Optional query params like { page, limit, search, userId }
  * @returns {Promise<Object>} Response object { status, message, data, meta }
