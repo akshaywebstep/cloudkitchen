@@ -54,6 +54,110 @@ const DISH_PRESETS = [
   { name: "Beverage / Juice", url: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=700&q=80" },
 ];
 
+export const STANDARD_INGREDIENT_CATEGORIES = [
+  "Spices & Masala",
+  "Vegetables",
+  "Dairy",
+  "Grains & Pulses",
+  "Oils & Ghee",
+  "Meat & Seafood",
+  "Bakery & Bread",
+  "Sauces & Condiments",
+  "General",
+];
+
+export const resolveIngredientCategory = (item, fallbackCategory = "") => {
+  const catType = String(item?.categoryType || item?.category || "").toUpperCase();
+  const name = String(item?.name || "").toLowerCase().trim();
+
+  // 1. Check AI Category Type
+  if (catType.includes("SPICE") || catType.includes("MASALA") || catType.includes("SEASONING")) {
+    return "Spices & Masala";
+  }
+  if (catType.includes("VEG") || catType.includes("HERB")) {
+    return "Vegetables";
+  }
+  if (catType.includes("DAIRY")) {
+    return "Dairy";
+  }
+  if (catType.includes("GRAIN") || catType.includes("PULSE") || catType.includes("FLOUR")) {
+    return "Grains & Pulses";
+  }
+  if (catType.includes("OIL") || catType.includes("FAT")) {
+    return "Oils & Ghee";
+  }
+  if (
+    catType.includes("MEAT") ||
+    catType.includes("SEAFOOD") ||
+    catType.includes("POULTRY") ||
+    catType.includes("CHICKEN") ||
+    catType.includes("MUTTON")
+  ) {
+    return "Meat & Seafood";
+  }
+  if (catType.includes("BAKERY") || catType.includes("BREAD")) {
+    return "Bakery & Bread";
+  }
+  if (catType.includes("SAUCE") || catType.includes("CONDIMENT")) {
+    return "Sauces & Condiments";
+  }
+
+  // 2. Keyword heuristic checks
+  // Spices & Masala
+  if (
+    /(masala|chilli|chili|mirch|haldi|turmeric|jeera|cumin|clove|laung|elaichi|cardamom|cinnamon|dalchini|pepper|salt|namak|sugar|chini|dhaniya powder|coriander powder|garam masala|kasuri methi|hing|asafoetida|bay leaf|tej patta|mustard seed|rai|fennel|saunf|star anise|nutmeg|jaiphal|mace|javitri|saffron|kesar|ajwain|chaat masala|amchur|powder|seasoning)/i.test(
+      name
+    )
+  ) {
+    return "Spices & Masala";
+  }
+
+  // Dairy
+  if (/(paneer|milk|doodh|curd|dahi|yogurt|butter|makhan|ghee|cream|malai|cheese|khoya|mawa)/i.test(name)) {
+    return "Dairy";
+  }
+
+  // Vegetables & Herbs
+  if (
+    /(onion|pyaz|tomato|tamatar|potato|aloo|garlic|lahsun|ginger|adrak|capsicum|shimla|coriander|mint|pudina|lemon|nimbu|carrot|gajar|peas|matar|cabbage|cauliflower|spinach|palak|mushroom|cucumber|kheera)/i.test(
+      name
+    )
+  ) {
+    return "Vegetables";
+  }
+
+  // Grains & Pulses
+  if (
+    /(rice|chawal|basmati|flour|atta|maida|besan|suji|sooji|rava|dal|lentil|chana|rajma|moong|urad|toor|arhar|corn flour|cornstarch|grain)/i.test(
+      name
+    )
+  ) {
+    return "Grains & Pulses";
+  }
+
+  // Oils & Ghee
+  if (/(oil|tel)/i.test(name)) {
+    return "Oils & Ghee";
+  }
+
+  // Meat & Seafood
+  if (/(chicken|murgh|mutton|gosht|lamb|fish|machli|prawn|jheenga|egg|anda|keema|meat)/i.test(name)) {
+    return "Meat & Seafood";
+  }
+
+  // Bakery & Bread
+  if (/(bread|bun|pav|yeast|baking powder|baking soda|toast)/i.test(name)) {
+    return "Bakery & Bread";
+  }
+
+  // Fallback to menu category if specified and not General
+  if (fallbackCategory && fallbackCategory.trim() && fallbackCategory.trim().toLowerCase() !== "general") {
+    return fallbackCategory.trim();
+  }
+
+  return "Spices & Masala";
+};
+
 // ---------------------------------------------------------------------------
 // Shared styling for react-select dropdowns matching form design system
 // ---------------------------------------------------------------------------
@@ -313,6 +417,35 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
   const [provisionItems, setProvisionItems] = useState([]);
   const [isProvisioning, setIsProvisioning] = useState(false);
 
+  // Hybrid approach category options for AI provision items
+  const availableCategoryOptions = useMemo(() => {
+    const list = [
+      "Spices & Masala",
+      "Vegetables",
+      "Dairy",
+      "Grains & Pulses",
+      "Oils & Ghee",
+      "Meat & Seafood",
+      "Bakery & Bread",
+      "Sauces & Condiments",
+    ];
+    // Add dynamic kitchen menu categories if present
+    (apiCategories || []).forEach((c) => {
+      const cName = typeof c === "string" ? c : c?.name;
+      if (cName && !list.includes(cName.trim())) {
+        list.push(cName.trim());
+      }
+    });
+    // Add form dish category if present
+    if (form.category?.trim() && !list.includes(form.category.trim())) {
+      list.push(form.category.trim());
+    }
+    if (!list.includes("General")) {
+      list.push("General");
+    }
+    return list;
+  }, [apiCategories, form.category]);
+
   // Field refs for auto-scroll on validation error
   const nameRef = useRef(null);
   const priceRef = useRef(null);
@@ -417,7 +550,7 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
             weightInGm: item.weightInGm,
             quantity: String(item.quantity || "1"),
             unit: item.unit || "GM",
-            category: item.categoryType === "VEGETABLE" ? "Vegetables" : item.categoryType === "DAIRY" ? "Dairy" : "General",
+            category: resolveIngredientCategory(item, form.category),
             initialStock: item.unit === "KG" || item.unit === "LITER" ? "5" : "250",
             selected: true,
           });
@@ -495,7 +628,7 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
     setProvisionItems(
       selected.map((item) => ({
         name: item.name,
-        category: item.category || "General",
+        category: item.category || resolveIngredientCategory(item, form.category),
         recipeQty: item.quantity || "1",
         recipeUnit: item.unit || "GM",
         initialStock: item.initialStock || (item.unit === "KG" || item.unit === "LITER" ? "5" : "250"),
@@ -1785,6 +1918,11 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
                         ({item.hint})
                       </span>
                     )}
+                    {item.category && (
+                      <span className="rounded-md bg-amber-100/90 px-1.5 py-0.5 text-[9.5px] font-extrabold text-amber-900 tracking-wide select-none border border-amber-200/50">
+                        {item.category}
+                      </span>
+                    )}
                     <button
                       type="button"
                       onClick={() => handleRemoveSuggestedItem(idx)}
@@ -1956,7 +2094,7 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
       {/* Quick Provision Stock Modal */}
       {showStockModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden space-y-0">
+          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden space-y-0">
             {/* Modal Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/70">
               <div className="flex items-center gap-2.5">
@@ -1964,9 +2102,9 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
                   <Boxes size={18} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">Setup Initial Stock & Add to Recipe</h3>
+                  <h3 className="text-sm font-bold text-slate-900">Setup Category, Initial Stock & Add to Recipe</h3>
                   <p className="text-[11px] text-slate-500">
-                    Add selected AI ingredients to branch inventory and link them to this recipe.
+                    Verify culinary category and optional stock before adding ingredients to branch inventory.
                   </p>
                 </div>
               </div>
@@ -1981,52 +2119,75 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
 
             {/* Modal Items List */}
             <div className="p-5 max-h-[60vh] overflow-y-auto space-y-3">
-              <div className="grid grid-cols-[1fr_95px_120px] gap-3 px-2 text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
-                <span>Ingredient</span>
-                <span>Recipe Qty</span>
-                <span>Initial Stock</span>
-              </div>
+              <div className="overflow-x-auto">
+                <div className="min-w-[500px] space-y-2.5">
+                  <div className="grid grid-cols-[1.3fr_1.3fr_95px_110px] gap-3 px-2 text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
+                    <span>Ingredient</span>
+                    <span>Category</span>
+                    <span>Recipe Qty</span>
+                    <span>Initial Stock</span>
+                  </div>
 
-              {provisionItems.map((item, idx) => (
-                <div
-                  key={idx}
-                  className="grid grid-cols-[1fr_95px_120px] gap-3 items-center p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 text-xs"
-                >
-                  <div>
-                    <strong className="text-slate-800 block text-xs font-bold">{item.name}</strong>
-                    {item.hint && <span className="text-[10px] text-slate-400 font-medium">{item.hint}</span>}
-                  </div>
-                  <div>
-                    <span className="font-extrabold text-slate-700 bg-white px-2 py-1 rounded-lg border border-slate-200 text-[11px]">
-                      {item.recipeQty} {item.recipeUnit}
-                    </span>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.1"
-                        value={item.initialStock}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setProvisionItems((prev) =>
-                            prev.map((p, i) => (i === idx ? { ...p, initialStock: val } : p))
-                          );
-                        }}
-                        placeholder="0"
-                        className="h-8 w-16 rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-800 outline-none focus:border-[#8D0606]"
-                      />
-                      <span className="text-[11px] font-bold text-slate-500">{item.stockUnit}</span>
+                  {provisionItems.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="grid grid-cols-[1.3fr_1.3fr_95px_110px] gap-3 items-center p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 text-xs"
+                    >
+                      <div className="min-w-0">
+                        <strong className="text-slate-800 block text-xs font-bold truncate">{item.name}</strong>
+                        {item.hint && <span className="text-[10px] text-slate-400 font-medium truncate block">{item.hint}</span>}
+                      </div>
+                      <div>
+                        <select
+                          value={item.category || "General"}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setProvisionItems((prev) =>
+                              prev.map((p, i) => (i === idx ? { ...p, category: val } : p))
+                            );
+                          }}
+                          className="h-8 w-full rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 outline-none focus:border-[#8D0606] cursor-pointer"
+                        >
+                          {availableCategoryOptions.map((catName) => (
+                            <option key={catName} value={catName}>
+                              {catName}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <span className="font-extrabold text-slate-700 bg-white px-2 py-1 rounded-lg border border-slate-200 text-[11px] whitespace-nowrap">
+                          {item.recipeQty} {item.recipeUnit}
+                        </span>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.1"
+                            value={item.initialStock}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setProvisionItems((prev) =>
+                                prev.map((p, i) => (i === idx ? { ...p, initialStock: val } : p))
+                              );
+                            }}
+                            placeholder="0"
+                            className="h-8 w-16 rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-800 outline-none focus:border-[#8D0606]"
+                          />
+                          <span className="text-[11px] font-bold text-slate-500">{item.stockUnit}</span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
+              </div>
 
               <div className="p-3 rounded-xl bg-amber-50 border border-amber-200/80 text-[11px] text-amber-800 flex items-start gap-2">
                 <AlertCircle size={15} className="text-amber-600 shrink-0 mt-0.5" />
                 <span>
-                  Initial stock can be <strong>0</strong> if physical raw material is not yet in kitchen. You can inward stock anytime later from Ingredients & Stock.
+                  Ingredients will be saved with the selected <strong>Category</strong> in your Master & Branch Inventory. Initial stock can be <strong>0</strong> if physical stock is not yet inwarded.
                 </span>
               </div>
             </div>
