@@ -116,6 +116,33 @@ const compactSelectStyles = {
   }),
 };
 
+export const normalizeInventoryStockUnit = (unit = "", weightInGm = null) => {
+  const u = String(unit || "").trim().toUpperCase();
+  const culinaryNonInventory = [
+    "TSP",
+    "TBSP",
+    "CUP",
+    "PINCH",
+    "SPOON",
+    "BOWL",
+    "PLATE",
+    "PORTION",
+    "SERVING",
+    "SLICE",
+  ];
+  if (culinaryNonInventory.includes(u)) {
+    if (weightInGm && Number(weightInGm) >= 1000) return "KG";
+    return "GM";
+  }
+  if (u === "KILOGRAM" || u === "KGS") return "KG";
+  if (u === "GRAM" || u === "GRAMS" || u === "G") return "GM";
+  if (u === "MILLILITER" || u === "MILLI") return "ML";
+  if (u === "LITRE" || u === "LTR" || u === "L") return "LITER";
+  if (u === "PCS" || u === "PC" || u === "PIECES") return "PIECE";
+  if (!u) return "GM";
+  return u;
+};
+
 const selectStyles = (hasError) => ({
   control: (base, state) => ({
     ...base,
@@ -514,14 +541,18 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
             hint: item.hint || (item.weightInGm ? `~${item.weightInGm}g` : ""),
           });
         } else {
+          const autoStockUnit = normalizeInventoryStockUnit(item.unit, item.weightInGm);
           unmatchedList.push({
             name: item.name,
             hint: item.hint || (item.weightInGm ? `~${item.weightInGm}g` : ""),
             weightInGm: item.weightInGm,
             quantity: String(item.quantity || "1"),
             unit: item.unit || "GM",
+            recipeQty: String(item.quantity || "1"),
+            recipeUnit: item.unit || "GM",
             category: form.category?.trim() || apiCategories?.[0]?.name || "General",
             initialStock: "0",
+            stockUnit: autoStockUnit,
             selected: true,
           });
         }
@@ -599,10 +630,10 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
       selected.map((item) => ({
         name: item.name,
         category: item.category || form.category?.trim() || apiCategories?.[0]?.name || "General",
-        recipeQty: item.quantity || "1",
-        recipeUnit: item.unit || "GM",
+        recipeQty: item.recipeQty || item.quantity || "1",
+        recipeUnit: item.recipeUnit || item.unit || "GM",
         initialStock: item.initialStock !== undefined && item.initialStock !== "" ? item.initialStock : "0",
-        stockUnit: item.unit || "GM",
+        stockUnit: item.stockUnit || normalizeInventoryStockUnit(item.unit, item.weightInGm),
         hint: item.hint || "",
       }))
     );
@@ -2064,7 +2095,7 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
       {/* Quick Provision Stock Modal */}
       {showStockModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden space-y-0">
+          <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden space-y-0">
             {/* Modal Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/70">
               <div className="flex items-center gap-2.5">
@@ -2072,9 +2103,9 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
                   <Boxes size={18} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">Setup Category, Initial Stock & Add to Recipe</h3>
+                  <h3 className="text-sm font-bold text-slate-900">Setup Category, Units & Stock for Ingredients</h3>
                   <p className="text-[11px] text-slate-500">
-                    Verify culinary category and optional stock before adding ingredients to branch inventory.
+                    Verify culinary category, recipe/inventory units, and initial stock before adding to kitchen.
                   </p>
                 </div>
               </div>
@@ -2110,18 +2141,18 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
               </div>
 
               <div className="overflow-x-auto">
-                <div className="min-w-[550px] space-y-2.5">
-                  <div className="grid grid-cols-[1.2fr_1.4fr_85px_105px] gap-3 px-2 text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
+                <div className="min-w-[620px] space-y-2.5">
+                  <div className="grid grid-cols-[1.1fr_1.2fr_140px_140px] gap-2.5 px-2 text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
                     <span>Ingredient</span>
                     <span>Category</span>
-                    <span>Recipe Qty</span>
-                    <span>Initial Stock</span>
+                    <span>Recipe Qty & Unit</span>
+                    <span>Initial Stock & Unit</span>
                   </div>
 
                   {provisionItems.map((item, idx) => (
                     <div
                       key={idx}
-                      className="grid grid-cols-[1.2fr_1.4fr_85px_105px] gap-3 items-center p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 text-xs"
+                      className="grid grid-cols-[1.1fr_1.2fr_140px_140px] gap-2.5 items-center p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 text-xs"
                     >
                       <div className="min-w-0">
                         <strong className="text-slate-800 block text-xs font-bold truncate">{item.name}</strong>
@@ -2144,12 +2175,42 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
                         />
                       </div>
                       <div>
-                        <span className="font-extrabold text-slate-700 bg-white px-2 py-1 rounded-lg border border-slate-200 text-[11px] whitespace-nowrap">
-                          {item.recipeQty} {item.recipeUnit}
-                        </span>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min="0.001"
+                            step="0.01"
+                            value={item.recipeQty}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setProvisionItems((prev) =>
+                                prev.map((p, i) => (i === idx ? { ...p, recipeQty: val } : p))
+                              );
+                            }}
+                            className="h-8 w-14 rounded-lg border border-slate-200 bg-white px-1.5 text-xs font-bold text-slate-800 outline-none focus:border-[#8D0606] text-center"
+                            title="Quantity required in recipe cooking"
+                          />
+                          <select
+                            value={item.recipeUnit}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setProvisionItems((prev) =>
+                                prev.map((p, i) => (i === idx ? { ...p, recipeUnit: val } : p))
+                              );
+                            }}
+                            className="h-8 rounded-lg border border-slate-200 bg-white px-1 text-[11px] font-bold text-slate-700 outline-none focus:border-[#8D0606] cursor-pointer"
+                            title="Recipe cooking unit"
+                          >
+                            {STANDARD_MEASURE_UNITS.map((u) => (
+                              <option key={u.value} value={u.value}>
+                                {u.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                       <div>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1">
                           <input
                             type="number"
                             min="0"
@@ -2162,9 +2223,26 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
                               );
                             }}
                             placeholder="0"
-                            className="h-8 w-16 rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-800 outline-none focus:border-[#8D0606]"
+                            className="h-8 w-14 rounded-lg border border-slate-200 bg-white px-1.5 text-xs font-bold text-slate-800 outline-none focus:border-[#8D0606] text-center"
+                            title="Initial physical stock in kitchen inventory"
                           />
-                          <span className="text-[11px] font-bold text-slate-500">{item.stockUnit}</span>
+                          <select
+                            value={item.stockUnit}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setProvisionItems((prev) =>
+                                prev.map((p, i) => (i === idx ? { ...p, stockUnit: val } : p))
+                              );
+                            }}
+                            className="h-8 rounded-lg border border-slate-200 bg-white px-1 text-[11px] font-bold text-slate-700 outline-none focus:border-[#8D0606] cursor-pointer"
+                            title="Unit used to track stock in branch inventory"
+                          >
+                            {STANDARD_MEASURE_UNITS.map((u) => (
+                              <option key={u.value} value={u.value}>
+                                {u.label}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                       </div>
                     </div>
@@ -2175,7 +2253,7 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
               <div className="p-3 rounded-xl bg-amber-50 border border-amber-200/80 text-[11px] text-amber-800 flex items-start gap-2">
                 <AlertCircle size={15} className="text-amber-600 shrink-0 mt-0.5" />
                 <span>
-                  Ingredients will be saved with the selected <strong>Category</strong> in your Master & Branch Inventory. Initial stock can be <strong>0</strong> if physical stock is not yet inwarded.
+                  <strong>Tip:</strong> Branch inventory stock is tracked in standard units like <strong>GM / KG / PIECE / LITER</strong> (not TSP or CUP). You can change recipe and inventory units anytime. Initial stock can stay <strong>0</strong> if physical raw material is not yet inwarded.
                 </span>
               </div>
             </div>
