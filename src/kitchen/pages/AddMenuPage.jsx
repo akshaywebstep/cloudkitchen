@@ -308,6 +308,11 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
   const [unmatchedAiItems, setUnmatchedAiItems] = useState([]);
   const [aiChefTip, setAiChefTip] = useState("");
 
+  // Quick Provision States (for AI suggestions -> branch inventory + stock)
+  const [showStockModal, setShowStockModal] = useState(false);
+  const [provisionItems, setProvisionItems] = useState([]);
+  const [isProvisioning, setIsProvisioning] = useState(false);
+
   // Field refs for auto-scroll on validation error
   const nameRef = useRef(null);
   const priceRef = useRef(null);
@@ -410,8 +415,11 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
             name: item.name,
             hint: item.hint || (item.weightInGm ? `~${item.weightInGm}g` : ""),
             weightInGm: item.weightInGm,
-            quantity: item.quantity,
-            unit: item.unit,
+            quantity: String(item.quantity || "1"),
+            unit: item.unit || "GM",
+            category: item.categoryType === "VEGETABLE" ? "Vegetables" : item.categoryType === "DAIRY" ? "Dairy" : "General",
+            initialStock: item.unit === "KG" || item.unit === "LITER" ? "5" : "250",
+            selected: true,
           });
         }
       });
@@ -460,6 +468,109 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
       onToast?.({ message: getApiErrorMessage(err, "Failed to auto-suggest recipe."), type: "error" });
     } finally {
       setIsAiGenerating(false);
+    }
+  };
+
+  // Quick Provision Handlers (AI Suggestions -> Branch Inventory + Recipe)
+  const handleRemoveSuggestedItem = (idxToRemove) => {
+    setUnmatchedAiItems((prev) => prev.filter((_, idx) => idx !== idxToRemove));
+  };
+
+  const handleToggleSuggestedItem = (idxToToggle) => {
+    setUnmatchedAiItems((prev) =>
+      prev.map((item, idx) => (idx === idxToToggle ? { ...item, selected: !item.selected } : item))
+    );
+  };
+
+  const handleSelectAllSuggested = (selectVal) => {
+    setUnmatchedAiItems((prev) => prev.map((item) => ({ ...item, selected: selectVal })));
+  };
+
+  const handleOpenProvisionModal = () => {
+    const selected = unmatchedAiItems.filter((item) => item.selected !== false);
+    if (selected.length === 0) {
+      onToast?.({ message: "Please select at least one ingredient to add!", type: "warning" });
+      return;
+    }
+    setProvisionItems(
+      selected.map((item) => ({
+        name: item.name,
+        category: item.category || "General",
+        recipeQty: item.quantity || "1",
+        recipeUnit: item.unit || "GM",
+        initialStock: item.initialStock || (item.unit === "KG" || item.unit === "LITER" ? "5" : "250"),
+        stockUnit: item.unit || "GM",
+        hint: item.hint || "",
+      }))
+    );
+    setShowStockModal(true);
+  };
+
+  const handleConfirmProvision = async () => {
+    if (!activeBranchId) {
+      onToast?.({ message: "Please select an active kitchen branch first!", type: "error" });
+      return;
+    }
+    setIsProvisioning(true);
+    try {
+      const payload = {
+        items: provisionItems.map((item) => ({
+          name: item.name,
+          category: item.category || "General",
+          unit: item.stockUnit || item.recipeUnit || "GM",
+          initialStock: parseFloat(item.initialStock) || 0,
+          alertQuantity: 5,
+        })),
+      };
+
+      const res = await api.quickProvisionIngredients(activeBranchId, payload);
+      if (!res || res.status === false) {
+        throw new Error(res?.message || "Failed to add ingredients to branch inventory");
+      }
+
+      // Refresh branch ingredients in local state
+      const branchRes = await api.branchIngredients(activeBranchId, { page: "1", limit: "100" });
+      const freshList = Array.isArray(branchRes?.data) ? branchRes.data : Array.isArray(branchRes) ? branchRes : [];
+      setBranchIngredients(freshList);
+
+      // Map newly provisioned items into recipeIngredients table rows
+      const createdItems = Array.isArray(res?.data) ? res.data : [];
+      const newRecipeRows = provisionItems.map((prov) => {
+        const matchingCreated = createdItems.find(
+          (c) => c.name?.toLowerCase().trim() === prov.name?.toLowerCase().trim()
+        );
+        const ingredientId = String(
+          matchingCreated?.ingredientId || matchingCreated?.id || ""
+        );
+        return {
+          ingredientId,
+          name: prov.name,
+          quantity: String(prov.recipeQty || "1"),
+          unit: prov.recipeUnit || prov.stockUnit || "GM",
+          hint: prov.hint,
+        };
+      });
+
+      // Filter out empty rows from current recipeIngredients and append new ones
+      setRecipeIngredients((prev) => {
+        const existingValid = prev.filter((r) => r.ingredientId);
+        return [...existingValid, ...newRecipeRows];
+      });
+
+      // Remove added items from unmatchedAiItems
+      const addedNames = new Set(provisionItems.map((p) => p.name.toLowerCase().trim()));
+      setUnmatchedAiItems((prev) => prev.filter((item) => !addedNames.has(item.name.toLowerCase().trim())));
+
+      setShowStockModal(false);
+      onToast?.({
+        message: `✨ ${newRecipeRows.length} ingredients added to Branch Inventory with Stock & linked to Recipe!`,
+        type: "success",
+      });
+    } catch (err) {
+      console.error("Error provisioning ingredients:", err);
+      onToast?.({ message: getApiErrorMessage(err, "Failed to provision ingredients"), type: "error" });
+    } finally {
+      setIsProvisioning(false);
     }
   };
 
@@ -1617,36 +1728,91 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
             </div>
           )}
 
-          {/* Unmatched Ingredients Notification */}
+          {/* Unmatched Ingredients Notification with Multi-Add and Remove */}
           {unmatchedAiItems.length > 0 && (
-            <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 space-y-2 animate-in fade-in shadow-2xs">
-              <div className="flex items-center gap-2 font-extrabold text-xs text-amber-950">
-                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                <span>
-                  {unmatchedAiItems.length} recipe ingredient{unmatchedAiItems.length > 1 ? "s" : ""} suggested by AI not found in this branch inventory
-                </span>
-              </div>
-              <p className="text-[11px] text-amber-800 font-medium">
-                AI suggested these ingredients for <strong>&ldquo;{form.name}&rdquo;</strong>, but they are not yet in your branch inventory catalog:
-              </p>
-              <div className="flex flex-wrap gap-1.5 pt-0.5">
-                {unmatchedAiItems.map((item, idx) => (
-                  <span
-                    key={idx}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-amber-200 text-[11px] font-bold text-amber-950 shadow-2xs"
+            <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-200 text-amber-900 space-y-3 animate-in fade-in shadow-2xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200/70 pb-2.5">
+                <div className="flex items-center gap-2 font-extrabold text-xs text-amber-950">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>
+                    {unmatchedAiItems.length} recipe ingredient{unmatchedAiItems.length > 1 ? "s" : ""} suggested by AI not found in this branch inventory
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSelectAllSuggested(true)}
+                    className="text-[11px] font-bold text-amber-800 hover:text-amber-950 underline cursor-pointer"
                   >
-                    <span>{item.name}</span>
+                    Select All
+                  </button>
+                  <span className="text-amber-300">|</span>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectAllSuggested(false)}
+                    className="text-[11px] font-bold text-amber-800 hover:text-amber-950 underline cursor-pointer"
+                  >
+                    Deselect All
+                  </button>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-amber-800 font-medium">
+                AI suggested these ingredients for <strong>&ldquo;{form.name}&rdquo;</strong>. Select the ones you want to add or remove unwanted ones:
+              </p>
+
+              <div className="flex flex-wrap gap-2 pt-0.5">
+                {unmatchedAiItems.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className={`inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-[11px] font-bold transition shadow-2xs ${
+                      item.selected !== false
+                        ? "bg-white border-amber-300 text-amber-950"
+                        : "bg-amber-100/60 border-amber-200/60 text-slate-400 opacity-60"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={item.selected !== false}
+                      onChange={() => handleToggleSuggestedItem(idx)}
+                      className="size-3.5 rounded border-amber-300 text-[#8D0606] focus:ring-[#8D0606] cursor-pointer"
+                    />
+                    <span className="cursor-pointer select-none" onClick={() => handleToggleSuggestedItem(idx)}>
+                      {item.name}
+                    </span>
                     {item.hint && (
-                      <span className="text-[10px] text-slate-500 font-medium">
+                      <span className="text-[10px] text-slate-500 font-medium select-none">
                         ({item.hint})
                       </span>
                     )}
-                  </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveSuggestedItem(idx)}
+                      className="ml-1 size-4 grid place-items-center rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                      title="Remove from suggested list"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
                 ))}
               </div>
-              <p className="text-[10.5px] text-amber-700 font-semibold">
-                💡 Tip: You can attach these items under <strong>Ingredients & Stock</strong> anytime so they can be automatically deducted in future orders.
-              </p>
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                <p className="text-[10.5px] text-amber-700 font-medium">
+                  💡 Tip: You can set initial stock quantities while adding so they track deductions in future orders.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleOpenProvisionModal}
+                  disabled={unmatchedAiItems.filter((i) => i.selected !== false).length === 0}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#8D0606] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#720505] active:scale-98 transition shrink-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Plus size={14} />
+                  <span>
+                    Add Selected to Recipe ({unmatchedAiItems.filter((i) => i.selected !== false).length})
+                  </span>
+                </button>
+              </div>
             </div>
           )}
 
@@ -1786,6 +1952,117 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
           </p>
         ) : null}
       </div>
+
+      {/* Quick Provision Stock Modal */}
+      {showStockModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden space-y-0">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/70">
+              <div className="flex items-center gap-2.5">
+                <div className="size-9 rounded-xl bg-rose-50 text-[#8D0606] grid place-items-center shadow-2xs">
+                  <Boxes size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Setup Initial Stock & Add to Recipe</h3>
+                  <p className="text-[11px] text-slate-500">
+                    Add selected AI ingredients to branch inventory and link them to this recipe.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowStockModal(false)}
+                className="size-7 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 grid place-items-center cursor-pointer transition"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Items List */}
+            <div className="p-5 max-h-[60vh] overflow-y-auto space-y-3">
+              <div className="grid grid-cols-[1fr_95px_120px] gap-3 px-2 text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
+                <span>Ingredient</span>
+                <span>Recipe Qty</span>
+                <span>Initial Stock</span>
+              </div>
+
+              {provisionItems.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="grid grid-cols-[1fr_95px_120px] gap-3 items-center p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 text-xs"
+                >
+                  <div>
+                    <strong className="text-slate-800 block text-xs font-bold">{item.name}</strong>
+                    {item.hint && <span className="text-[10px] text-slate-400 font-medium">{item.hint}</span>}
+                  </div>
+                  <div>
+                    <span className="font-extrabold text-slate-700 bg-white px-2 py-1 rounded-lg border border-slate-200 text-[11px]">
+                      {item.recipeQty} {item.recipeUnit}
+                    </span>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        value={item.initialStock}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setProvisionItems((prev) =>
+                            prev.map((p, i) => (i === idx ? { ...p, initialStock: val } : p))
+                          );
+                        }}
+                        placeholder="0"
+                        className="h-8 w-16 rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-800 outline-none focus:border-[#8D0606]"
+                      />
+                      <span className="text-[11px] font-bold text-slate-500">{item.stockUnit}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200/80 text-[11px] text-amber-800 flex items-start gap-2">
+                <AlertCircle size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                <span>
+                  Initial stock can be <strong>0</strong> if physical raw material is not yet in kitchen. You can inward stock anytime later from Ingredients & Stock.
+                </span>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-2 px-5 py-3.5 border-t border-slate-100 bg-slate-50/70">
+              <button
+                type="button"
+                onClick={() => setShowStockModal(false)}
+                disabled={isProvisioning}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmProvision}
+                disabled={isProvisioning}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[#8D0606] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#720505] active:scale-98 transition cursor-pointer disabled:opacity-50"
+              >
+                {isProvisioning ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Adding to Inventory & Recipe...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check size={14} />
+                    <span>Confirm & Add to Recipe</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

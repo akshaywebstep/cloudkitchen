@@ -307,6 +307,8 @@ export const api = {
     request(`/kitchen/branch/${branchId}`, { method: "DELETE" }),
   createBranchIngredients: (branchId, body) =>
     request(`/kitchen/branch/${branchId}/ingredient`, { method: "POST", body }),
+  quickProvisionIngredients: (branchId, body) =>
+    request(`/kitchen/branch/${branchId}/ingredient/quick-provision`, { method: "POST", body }),
   updateBranchIngredient: (branchId, inventoryId, body) =>
     request(`/kitchen/branch/${branchId}/ingredient/${inventoryId}`, {
       method: "PUT",
