@@ -1306,25 +1306,25 @@ function PlanUpgradeModal({ currentSubscription, apiState, kitchenForm, onClose,
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/60 p-4 backdrop-blur-xs">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/60 p-2.5 sm:p-4 backdrop-blur-xs">
       <div
-        className="relative w-full max-w-4xl max-h-[92vh] flex flex-col rounded-3xl bg-white shadow-2xl overflow-hidden border border-slate-100 animate-in fade-in zoom-in-95 duration-200"
+        className="relative w-full max-w-4xl max-h-[92vh] flex flex-col rounded-3xl bg-white shadow-2xl overflow-hidden border border-slate-100 animate-in fade-in zoom-in-95 duration-200 my-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-rose-50/70 via-white to-white px-6 py-5">
-          <div className="flex items-center gap-3.5">
-            <div className="grid size-11 place-items-center rounded-2xl bg-rose-50 border border-rose-200 text-[#8D0606] shadow-2xs">
+        <div className="shrink-0 flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-rose-50/70 via-white to-white px-4 sm:px-6 py-3.5 sm:py-5">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="grid size-11 place-items-center rounded-2xl bg-rose-50 border border-rose-200 text-[#8D0606] shadow-2xs shrink-0">
               <Zap size={20} className="text-[#8D0606]" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg font-bold text-slate-900">Manage Subscription Plan</h3>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 truncate">Manage Subscription Plan</h3>
                 <span className="rounded-full bg-rose-100/70 px-2 py-0.5 text-[10px] font-bold text-[#8D0606]">
                   Live Prorated Billing
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-slate-500 mt-0.5 truncate">
                 Current active: <span className="font-semibold text-slate-800">{currentSubscription?.planName || currentSubscription?.name || "Starter Plan"}</span> ({currentSubscription?.billingCycle || "Monthly"})
               </p>
             </div>
@@ -1333,14 +1333,14 @@ function PlanUpgradeModal({ currentSubscription, apiState, kitchenForm, onClose,
           <button
             type="button"
             onClick={onClose}
-            className="grid size-9 place-items-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            className="grid size-9 place-items-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 shrink-0 ml-2"
           >
             <X size={18} />
           </button>
         </div>
 
         {/* Scrollable Modal Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
           {/* Billing Cycle Switcher */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5">
             <div>
@@ -1387,7 +1387,7 @@ function PlanUpgradeModal({ currentSubscription, apiState, kitchenForm, onClose,
                 <span className="text-xs font-medium">Fetching subscription plans...</span>
               </div>
             ) : (
-              <div className="grid gap-3.5 sm:grid-cols-3">
+              <div className="grid gap-3.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 {plans.map((plan) => {
                   const isSelected = selectedPlan?.id === plan.id;
                   const isThisTierCurrent = isSamePlanTier(plan, currentSubscription);

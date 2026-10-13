@@ -857,12 +857,12 @@ export const Ingredients = () => {
 
   // ─────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-7 pb-12 animate-fade-in mx-auto">
+    <div className="space-y-6 sm:space-y-7 pb-12 animate-fade-in mx-auto min-w-0 w-full">
       {/* ─── HERO BANNER ─── */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 shadow-card border border-slate-200/80 dark:border-slate-800 relative overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-7 shadow-card border border-slate-200/80 dark:border-slate-800 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-rose-500/10 via-amber-500/5 to-transparent rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5 sm:gap-6">
           <div className="space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="px-3 py-1 rounded-full bg-rose-50 dark:bg-rose-950/60 text-[#8C0D0D] dark:text-rose-400 font-extrabold text-[11px] border border-rose-100 dark:border-rose-900/50 flex items-center gap-1.5">
@@ -874,7 +874,7 @@ export const Ingredients = () => {
                 {ingredients.length} Ingredients Active
               </span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white">
+            <h1 className="text-xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white">
               Ingredients & Inventory Addition
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium max-w-xl">
@@ -882,11 +882,11 @@ export const Ingredients = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5 flex-wrap self-start lg:self-center">
+          <div className="flex items-center gap-2.5 flex-wrap w-full sm:w-auto self-start lg:self-center">
             {/* Add to Inventory Button */}
             <button
               onClick={() => openInventoryModal()}
-              className="px-4 py-3 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs shadow-md flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
+              className="flex-1 sm:flex-initial justify-center px-4 py-3 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs shadow-md flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
             >
               <PackagePlus className="w-4 h-4" />
               <span>Add to Inventory</span>
@@ -900,7 +900,7 @@ export const Ingredients = () => {
                 setErrors({});
                 setIsModalOpen(true);
               }}
-              className="px-5 py-3 rounded-2xl bg-[#8C0D0D] text-white hover:bg-rose-900 font-extrabold text-xs shadow-lg flex items-center gap-2 transition-all active:scale-95 shrink-0 cursor-pointer"
+              className="flex-1 sm:flex-initial justify-center px-5 py-3 rounded-2xl bg-[#8C0D0D] text-white hover:bg-rose-900 font-extrabold text-xs shadow-lg flex items-center gap-2 transition-all active:scale-95 shrink-0 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Create Ingredient</span>
@@ -910,10 +910,10 @@ export const Ingredients = () => {
       </div>
 
       {/* ─── PRIMARY TAB SWITCHER ─── */}
-      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2 overflow-x-auto no-scrollbar">
         <button
           onClick={() => setActiveTab('catalog')}
-          className={`px-5 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+          className={`px-4 sm:px-5 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === 'catalog'
               ? 'bg-[#8C0D0D] text-white shadow-md shadow-rose-900/20'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -930,7 +930,7 @@ export const Ingredients = () => {
               handleTabKitchenChange(String(kitchens[0].id));
             }
           }}
-          className={`px-5 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+          className={`px-4 sm:px-5 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === 'branch-inventory'
               ? 'bg-[#8C0D0D] text-white shadow-md shadow-rose-900/20'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -1119,9 +1119,9 @@ export const Ingredients = () => {
                 </div>
               ) : (
                 /* TABLE VIEW */
-                <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-card border border-slate-100 dark:border-slate-800 overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-card border border-slate-100 dark:border-slate-800 overflow-hidden min-w-0">
+                  <div className="overflow-x-auto min-w-0">
+                    <table className="w-full text-left border-collapse min-w-[750px]">
                       <thead>
                         <tr className="bg-slate-50/80 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 uppercase text-[10px] font-extrabold tracking-wider border-b border-slate-100 dark:border-slate-800">
                           <th className="p-4 pl-6 w-16">#</th>
@@ -1330,7 +1330,7 @@ export const Ingredients = () => {
               </div>
             )}
 
-            <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
               <div className="text-xs font-bold text-slate-500">
                 {selectedInvKitchen && !loadingBranchInv && invBranches.length === 0 ? (
                   <span className="text-rose-600 dark:text-rose-400 font-extrabold flex items-center gap-1.5">
@@ -1345,11 +1345,11 @@ export const Ingredients = () => {
                   <span>Select a Kitchen Hub and Branch to view live inventory</span>
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto">
                 <button
                   onClick={() => fetchBranchInventory(selectedInvKitchen, selectedInvBranch)}
                   disabled={!selectedInvBranch || loadingBranchInv}
-                  className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="flex-1 sm:flex-initial justify-center px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${loadingBranchInv ? 'animate-spin' : ''}`} />
                   <span>Refresh Inventory</span>
@@ -1363,7 +1363,7 @@ export const Ingredients = () => {
                     openInventoryModal();
                   }}
                   disabled={!selectedInvBranch}
-                  className="px-4 py-2 rounded-xl bg-[#8C0D0D] text-white hover:bg-rose-900 text-xs font-extrabold shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="flex-1 sm:flex-initial justify-center px-4 py-2 rounded-xl bg-[#8C0D0D] text-white hover:bg-rose-900 text-xs font-extrabold shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <PackagePlus className="w-3.5 h-3.5" />
                   <span>+ Add Item to this Branch</span>
@@ -1374,9 +1374,9 @@ export const Ingredients = () => {
 
           {/* Branch Inventory Table */}
           {filteredBranchInv.length > 0 ? (
-            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-card border border-slate-100 dark:border-slate-800 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-card border border-slate-100 dark:border-slate-800 overflow-hidden min-w-0">
+              <div className="overflow-x-auto min-w-0">
+                <table className="w-full text-left border-collapse min-w-[850px]">
                   <thead>
                     <tr className="bg-slate-50/80 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 uppercase text-[10px] font-extrabold tracking-wider border-b border-slate-100 dark:border-slate-800">
                       <th className="p-4 pl-6 w-16">#</th>
@@ -1537,12 +1537,12 @@ export const Ingredients = () => {
       {/* ─── INVENTORY ADDITION MODAL ─── */}
       {isInventoryModalOpen &&
         createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-lg w-full overflow-hidden animate-modal-pop max-h-[90vh] flex flex-col">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-lg w-full overflow-hidden animate-modal-pop max-h-[92vh] flex flex-col my-auto">
               {/* Header */}
-              <div className="bg-[#8C0D0D] text-white p-6 flex items-center justify-between shrink-0">
+              <div className="bg-[#8C0D0D] text-white p-4 sm:p-6 flex items-center justify-between shrink-0">
                 <div>
-                  <h3 className="text-lg font-extrabold flex items-center gap-2 text-white">
+                  <h3 className="text-base sm:text-lg font-extrabold flex items-center gap-2 text-white">
                     <PackagePlus className="w-5 h-5 text-amber-300" />
                     Add Ingredient to Branch Inventory
                   </h3>
@@ -1559,7 +1559,7 @@ export const Ingredients = () => {
               </div>
 
               {/* Form */}
-              <form onSubmit={handleInventorySubmit} noValidate className="p-6 space-y-4 text-xs font-semibold overflow-y-auto">
+              <form onSubmit={handleInventorySubmit} noValidate className="p-4 sm:p-6 space-y-4 text-xs font-semibold overflow-y-auto flex-1">
                 {/* Kitchen Hub */}
                 <div>
                   <label className="block text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1 font-extrabold">
@@ -1765,18 +1765,18 @@ export const Ingredients = () => {
                 </div>
 
                 {/* Footer Buttons */}
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <div className="flex flex-wrap sm:flex-nowrap items-center justify-end gap-2.5 sm:gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
                   <button
                     type="button"
                     onClick={() => setIsInventoryModalOpen(false)}
-                    className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold cursor-pointer"
+                    className="w-full sm:w-auto px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={submittingInventory}
-                    className="px-5 py-2.5 rounded-xl bg-[#8C0D0D] hover:bg-rose-900 text-white font-extrabold shadow cursor-pointer disabled:opacity-60"
+                    className="w-full sm:w-auto justify-center px-5 py-2.5 rounded-xl bg-[#8C0D0D] hover:bg-rose-900 text-white font-extrabold shadow cursor-pointer disabled:opacity-60"
                   >
                     {submittingInventory ? 'Saving Inventory...' : 'Save to Inventory'}
                   </button>
@@ -1790,11 +1790,11 @@ export const Ingredients = () => {
       {/* ─── MASTER INGREDIENT DETAIL MODAL ─── */}
       {viewingIngredient &&
         createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-md w-full overflow-hidden animate-modal-pop">
-              <div className="bg-gradient-to-r from-[#8C0D0D] to-[#600808] text-white p-6 flex items-center justify-between">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-md w-full overflow-hidden animate-modal-pop max-h-[92vh] flex flex-col my-auto">
+              <div className="bg-gradient-to-r from-[#8C0D0D] to-[#600808] text-white p-4 sm:p-6 flex items-center justify-between shrink-0">
                 <div>
-                  <h3 className="text-lg font-black flex items-center gap-2">
+                  <h3 className="text-base sm:text-lg font-black flex items-center gap-2">
                     <Boxes className="w-5 h-5 text-amber-300" />
                     Ingredient: {viewingIngredient.name}
                   </h3>
@@ -1807,18 +1807,18 @@ export const Ingredients = () => {
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <div className="p-6 space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center shrink-0">
+              <div className="p-4 sm:p-6 space-y-4 flex-1 overflow-y-auto">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="w-14 sm:w-16 h-14 sm:h-16 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center shrink-0">
                     {viewingIngredient.image ? (
                       <img src={viewingIngredient.image} alt={viewingIngredient.name} className="w-full h-full object-cover" />
                     ) : (
-                      <Boxes className="w-8 h-8 text-slate-400" />
+                      <Boxes className="w-7 sm:w-8 h-7 sm:h-8 text-slate-400" />
                     )}
                   </div>
-                  <div>
-                    <h4 className="text-base font-black text-slate-900 dark:text-white">{viewingIngredient.name}</h4>
-                    <p className="text-xs text-slate-500 font-bold mt-0.5">Category: {viewingIngredient.category}</p>
+                  <div className="min-w-0">
+                    <h4 className="text-base font-black text-slate-900 dark:text-white truncate">{viewingIngredient.name}</h4>
+                    <p className="text-xs text-slate-500 font-bold mt-0.5 truncate">Category: {viewingIngredient.category}</p>
                     <span
                       className={`mt-1 inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
                         viewingIngredient.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
@@ -1829,14 +1829,14 @@ export const Ingredients = () => {
                   </div>
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t border-slate-100 dark:border-slate-800 flex-wrap gap-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
                     <button
                       onClick={() => {
                         const target = viewingIngredient;
                         setViewingIngredient(null);
                         openStockLogs(target, selectedInvBranch || null, selectedInvKitchen || null);
                       }}
-                      className="px-3.5 py-2 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 font-extrabold text-xs hover:bg-blue-600 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer border border-blue-200 dark:border-blue-800"
+                      className="flex-1 sm:flex-initial justify-center px-3.5 py-2 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 font-extrabold text-xs hover:bg-blue-600 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer border border-blue-200 dark:border-blue-800"
                     >
                       <History className="w-4 h-4" />
                       <span>Stock Logs</span>
@@ -1846,7 +1846,7 @@ export const Ingredients = () => {
                         setViewingIngredient(null);
                         openInventoryModal(viewingIngredient);
                       }}
-                      className="px-3.5 py-2 rounded-xl bg-rose-50 text-[#8C0D0D] font-extrabold text-xs hover:bg-[#8C0D0D] hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
+                      className="flex-1 sm:flex-initial justify-center px-3.5 py-2 rounded-xl bg-rose-50 text-[#8C0D0D] font-extrabold text-xs hover:bg-[#8C0D0D] hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
                     >
                       <PackagePlus className="w-4 h-4" />
                       <span>+ Add to Inventory</span>
@@ -1854,7 +1854,7 @@ export const Ingredients = () => {
                   </div>
                   <button
                     onClick={() => setViewingIngredient(null)}
-                    className="px-5 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-sm cursor-pointer"
+                    className="w-full sm:w-auto px-5 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-sm cursor-pointer"
                   >
                     Close
                   </button>
@@ -1868,11 +1868,11 @@ export const Ingredients = () => {
       {/* ─── CREATE / EDIT MASTER INGREDIENT MODAL ─── */}
       {isModalOpen &&
         createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-lg w-full overflow-hidden animate-modal-pop max-h-[90vh] flex flex-col">
-              <div className="bg-[#8C0D0D] text-white p-6 flex items-center justify-between shrink-0">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-lg w-full overflow-hidden animate-modal-pop max-h-[92vh] flex flex-col my-auto">
+              <div className="bg-[#8C0D0D] text-white p-4 sm:p-6 flex items-center justify-between shrink-0">
                 <div>
-                  <h3 className="text-lg font-extrabold flex items-center gap-2 text-white">
+                  <h3 className="text-base sm:text-lg font-extrabold flex items-center gap-2 text-white">
                     <Boxes className="w-5 h-5 text-amber-300" />
                     {editingIngredient ? `Edit Ingredient: ${editingIngredient.name}` : 'Create New Raw Ingredient'}
                   </h3>
@@ -1888,7 +1888,7 @@ export const Ingredients = () => {
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} noValidate className="p-6 space-y-4 text-xs font-semibold overflow-y-auto">
+              <form onSubmit={handleSubmit} noValidate className="p-4 sm:p-6 space-y-4 text-xs font-semibold overflow-y-auto flex-1">
                 {(errors.general || errors.form) && (
                   <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 flex items-start gap-2.5 text-rose-700 dark:text-rose-300">
                     <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
@@ -1925,7 +1925,7 @@ export const Ingredients = () => {
                 </div>
 
                 {/* Category + Status */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div>
                     <label className="block text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1 font-extrabold">
                       Category
@@ -2018,17 +2018,17 @@ export const Ingredients = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <div className="flex flex-wrap sm:flex-nowrap items-center justify-end gap-2.5 sm:gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold cursor-pointer"
+                    className="w-full sm:w-auto px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2.5 rounded-xl bg-[#8C0D0D] hover:bg-rose-900 text-white font-extrabold shadow cursor-pointer"
+                    className="w-full sm:w-auto justify-center px-5 py-2.5 rounded-xl bg-[#8C0D0D] hover:bg-rose-900 text-white font-extrabold shadow cursor-pointer"
                   >
                     {editingIngredient ? 'Save Changes' : 'Create Ingredient'}
                   </button>
@@ -2042,11 +2042,11 @@ export const Ingredients = () => {
       {/* ─── STOCK MOVEMENT AUDIT LOGS MODAL (ADMIN) ─── */}
       {stockLogsModalOpen && selectedLogIngredient &&
         createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-            <div className="relative flex flex-col w-full max-w-5xl max-h-[92vh] rounded-3xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-modal-pop">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
+            <div className="relative flex flex-col w-full max-w-5xl max-h-[92vh] rounded-3xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-modal-pop my-auto">
               
               {/* Modal Header */}
-              <div className="bg-gradient-to-r from-[#8C0D0D] via-[#6a0808] to-[#420404] text-white p-5 sm:p-6 flex items-center justify-between shrink-0">
+              <div className="bg-gradient-to-r from-[#8C0D0D] via-[#6a0808] to-[#420404] text-white p-4 sm:p-6 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3.5 min-w-0">
                   <div className="grid size-11 place-items-center rounded-2xl bg-white/10 text-white border border-white/20 shadow-sm shrink-0">
                     <History size={22} className="text-amber-300" />
@@ -2300,8 +2300,8 @@ export const Ingredients = () => {
                     </p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs bg-white dark:bg-slate-900">
-                    <table className="w-full text-left border-collapse text-xs">
+                  <div className="overflow-x-auto min-w-0 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs bg-white dark:bg-slate-900">
+                    <table className="w-full text-left border-collapse text-xs min-w-[700px]">
                       <thead>
                         <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/80 text-[10.5px] font-extrabold uppercase tracking-wider text-slate-400">
                           <th className="py-3 px-4">Date & Time</th>
@@ -2454,11 +2454,11 @@ export const Ingredients = () => {
               </div>
 
               {/* Modal Footer */}
-              <div className="p-4 sm:p-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 flex items-center justify-between flex-wrap gap-3 shrink-0">
+              <div className="p-3.5 sm:p-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 shrink-0">
                 <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold">
                   Live audit trail tracked across all cloud kitchen hubs & outlets.
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
                   <button
                     type="button"
                     onClick={() => {
@@ -2466,7 +2466,7 @@ export const Ingredients = () => {
                       closeStockLogsModal();
                       openInventoryModal(target);
                     }}
-                    className="px-3.5 py-2 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-[#8C0D0D] dark:text-rose-300 border border-rose-200 dark:border-rose-900/50 font-extrabold text-xs hover:bg-[#8C0D0D] hover:text-white transition cursor-pointer flex items-center gap-1.5"
+                    className="flex-1 sm:flex-initial justify-center px-3.5 py-2 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-[#8C0D0D] dark:text-rose-300 border border-rose-200 dark:border-rose-900/50 font-extrabold text-xs hover:bg-[#8C0D0D] hover:text-white transition cursor-pointer flex items-center gap-1.5"
                   >
                     <PackagePlus size={14} />
                     <span>+ Add to Branch Inventory</span>
@@ -2474,7 +2474,7 @@ export const Ingredients = () => {
                   <button
                     type="button"
                     onClick={closeStockLogsModal}
-                    className="px-5 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-xs hover:bg-slate-800 transition cursor-pointer"
+                    className="w-full sm:w-auto px-5 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-xs hover:bg-slate-800 transition cursor-pointer"
                   >
                     Close
                   </button>

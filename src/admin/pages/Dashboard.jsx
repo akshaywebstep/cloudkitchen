@@ -282,7 +282,7 @@ export const Dashboard = () => {
 
       {/* ═══════════ ROW 1: PRIMARY 6 KPI STAT CARDS ═══════════ */}
       {!isLoading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
           {/* 1. Total Gross Sales */}
           <div className={`p-5 rounded-2xl border ${cardBg} flex flex-col justify-between hover:shadow-card-hover transition-all duration-300 transform hover:-translate-y-1`}>
             <div className="flex items-center justify-between mb-2">
@@ -634,7 +634,7 @@ export const Dashboard = () => {
               <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 mb-3">
                 Order Acquisition Channels
               </h4>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div className={`p-3 rounded-2xl ${cardInnerBg} text-center`}>
                   <p className="text-[10px] font-extrabold uppercase text-slate-500 dark:text-slate-400">Direct / POS</p>
                   <p className={`text-base font-black mt-0.5 ${textPrimary}`}>₹{sourceManual.totalAmount?.toLocaleString('en-IN') || 0}</p>
@@ -664,7 +664,7 @@ export const Dashboard = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
           {/* Recent Orders Live Table (7 Cols) */}
-          <div className={`lg:col-span-7 rounded-3xl border ${cardBg} p-6 flex flex-col justify-between`}>
+          <div className={`lg:col-span-7 rounded-3xl border ${cardBg} p-6 flex flex-col justify-between min-w-0`}>
             <div>
               <div className="flex items-center justify-between mb-4">
                 <div>
@@ -684,8 +684,8 @@ export const Dashboard = () => {
                 </Link>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
+              <div className="overflow-x-auto min-w-0">
+                <table className="w-full min-w-[500px] text-left text-xs">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800 text-slate-400 font-extrabold uppercase text-[10px] tracking-wider">
                       <th className="pb-3">Order ID</th>

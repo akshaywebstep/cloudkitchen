@@ -20,7 +20,7 @@ export const MainLayout = ({ children }) => {
       >
         <Header />
 
-        <main className="flex-1 p-6 md:p-8 max-w-[100%] w-full mx-auto">
+        <main className="flex-1 p-3.5 sm:p-6 md:p-8 max-w-[100%] w-full mx-auto min-w-0 overflow-x-hidden">
           {children}
         </main>
       </div>

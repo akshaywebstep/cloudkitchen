@@ -1119,7 +1119,7 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
         {/* LEFT COLUMN: ADD / ATTACH INGREDIENTS PANEL                              */}
         {/* ========================================================================= */}
         {canCreate("ingredient") && (
-          <div className="rounded-[24px] border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs space-y-5 lg:sticky lg:top-6">
+          <div className="rounded-[24px] border border-slate-200/90 bg-white p-4 sm:p-6 shadow-xs space-y-5 lg:sticky lg:top-6 min-w-0">
             {/* Active Target Branch Badge Indicator (Header-synced) */}
             <div className="flex items-center justify-between gap-2.5 rounded-2xl bg-slate-50 border border-slate-200/80 p-3.5 shadow-2xs">
               <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -1622,7 +1622,7 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
         {/* ========================================================================= */}
         {/* RIGHT COLUMN: LIVE BRANCH INVENTORY & STOCK CONTROL TABLE                 */}
         {/* ========================================================================= */}
-        <div className="rounded-[24px] border border-slate-200/90 bg-white overflow-hidden shadow-xs">
+        <div className="rounded-[24px] border border-slate-200/90 bg-white overflow-hidden shadow-xs min-w-0">
           {/* Card Top Toolbar */}
           <div className="border-b border-slate-100 bg-slate-50/70 p-4 sm:p-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1722,7 +1722,7 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
             </div>
           ) : inventoryViewMode === "table" ? (
             /* Table View */
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto min-w-0">
               <table className="w-full min-w-[780px] text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/50 text-[11px] font-bold uppercase tracking-wider text-slate-400">
@@ -2074,8 +2074,8 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
       {stockModalOpen &&
         stockItem &&
         createPortal(
-          <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/50 p-4 backdrop-blur-xs animate-in fade-in">
-            <div className="w-full max-w-[460px] overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl animate-in zoom-in-95">
+          <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/50 p-2.5 sm:p-4 backdrop-blur-xs animate-in fade-in overflow-y-auto">
+            <div className="w-full max-w-[460px] max-h-[92vh] overflow-y-auto rounded-3xl border border-slate-200 bg-white p-4 sm:p-6 shadow-2xl animate-in zoom-in-95 my-auto">
               {/* Modal Header */}
               <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3.5">
                 <div className="flex items-center gap-3">
@@ -2463,8 +2463,8 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
       {/* ========================================================================= */}
       {stockLogsModalOpen &&
         createPortal(
-          <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/60 p-3 sm:p-5 backdrop-blur-xs animate-in fade-in overflow-y-auto">
-            <div className="w-full max-w-4xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl animate-in zoom-in-95 flex flex-col max-h-[92vh]">
+          <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/60 p-2.5 sm:p-5 backdrop-blur-xs animate-in fade-in overflow-y-auto">
+            <div className="w-full max-w-4xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl animate-in zoom-in-95 flex flex-col max-h-[92vh] min-w-0 my-auto">
               {/* Header */}
               <div className="flex items-center justify-between border-b border-slate-100 px-5 sm:px-6 py-4 bg-slate-50/80">
                 <div className="flex items-center gap-3 min-w-0">
@@ -2655,8 +2655,8 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                     </p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto rounded-2xl border border-slate-200/90 shadow-2xs bg-white">
-                    <table className="w-full text-left border-collapse text-xs">
+                  <div className="overflow-x-auto min-w-0 rounded-2xl border border-slate-200/90 shadow-2xs bg-white">
+                    <table className="w-full min-w-[650px] text-left border-collapse text-xs">
                       <thead>
                         <tr className="border-b border-slate-100 bg-slate-50/80 text-[10.5px] font-extrabold uppercase tracking-wider text-slate-400">
                           <th className="py-3 px-4">Date & Time</th>

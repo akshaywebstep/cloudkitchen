@@ -189,13 +189,13 @@ export function CustomerListPage({ apiState, onToast }) {
       </div>
 
       {/* Customer Table */}
-      <div className="overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm">
+      <div className="overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm min-w-0">
         {loading ? (
           <div className="py-20">
             <Loader variant="page" text="Loading customer records from server..." />
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto min-w-0">
             <table className="w-full min-w-[1050px] text-left border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">
@@ -412,15 +412,15 @@ function CustomerOrdersModal({ customer, onClose, apiState, onToast }) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-950/60 p-4 sm:p-6 backdrop-blur-sm flex min-h-screen items-center justify-center animate-in fade-in duration-200"
+      className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-950/60 p-2.5 sm:p-6 backdrop-blur-sm flex min-h-screen items-center justify-center animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-2xl my-auto flex max-h-[90vh] flex-col rounded-3xl bg-white shadow-2xl border border-slate-200/80 overflow-hidden"
+        className="relative w-full max-w-2xl my-auto flex max-h-[92vh] flex-col rounded-3xl bg-white shadow-2xl border border-slate-200/80 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header: Customer Identity */}
-        <div className="flex items-start justify-between p-5 sm:p-6 pb-4 border-b border-slate-100 bg-slate-50/60">
+        <div className="shrink-0 flex items-start justify-between p-4 sm:p-6 pb-3 sm:pb-4 border-b border-slate-100 bg-slate-50/60">
           <div className="flex items-start gap-3.5 min-w-0">
             <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-tr from-[#8D0606] to-[#b80808] text-white font-extrabold text-base shadow-sm">
               {customer.firstName?.charAt(0) || "C"}

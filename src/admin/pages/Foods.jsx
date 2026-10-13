@@ -891,11 +891,11 @@ export const Foods = () => {
       {/* EDIT DISH MODAL WITH VALIDATION */}
       {editingItem &&
         createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-3xl w-full overflow-hidden animate-modal-pop max-h-[92vh] flex flex-col">
-              <div className="bg-[#8C0D0D] text-white p-6 flex items-center justify-between shrink-0">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-3xl w-full overflow-hidden animate-modal-pop max-h-[92vh] flex flex-col my-auto">
+              <div className="bg-[#8C0D0D] text-white px-4 sm:px-6 py-3.5 sm:py-6 flex items-center justify-between shrink-0">
                 <div>
-                  <h3 className="text-lg font-extrabold flex items-center gap-2">
+                  <h3 className="text-base sm:text-lg font-extrabold flex items-center gap-2">
                     <Utensils className="w-5 h-5 text-rose-200" />
                     Edit Dish Details
                   </h3>
@@ -909,7 +909,7 @@ export const Foods = () => {
                 </button>
               </div>
 
-              <form onSubmit={handleEditSubmit} noValidate className="p-6 space-y-4 text-xs font-semibold overflow-y-auto">
+              <form onSubmit={handleEditSubmit} noValidate className="flex-1 p-4 sm:p-6 space-y-4 text-xs font-semibold overflow-y-auto">
                 {(editErrors.general || editErrors.form) && (
                   <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 flex items-start gap-2.5 text-rose-700 dark:text-rose-300">
                     <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
@@ -1437,12 +1437,12 @@ export const Foods = () => {
       {/* ═══════════ VIEW DISH DETAILS MODAL ═══════════ */}
       {viewingItem &&
         createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-3xl w-full overflow-hidden animate-modal-pop max-h-[92vh] flex flex-col">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-6 bg-slate-900/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-3xl w-full overflow-hidden animate-modal-pop max-h-[92vh] flex flex-col my-auto">
               {/* Header */}
-              <div className="bg-[#8C0D0D] text-white p-5 sm:p-6 flex items-center justify-between relative overflow-hidden shrink-0">
+              <div className="bg-[#8C0D0D] text-white px-4 sm:px-6 py-3.5 sm:py-6 flex items-center justify-between relative overflow-hidden shrink-0">
                 <div className="relative z-10">
-                  <h3 className="text-xl font-black flex items-center gap-2">
+                  <h3 className="text-lg sm:text-xl font-black flex items-center gap-2">
                     <Utensils className="w-5 h-5 text-rose-200" />
                     Dish Specifications
                   </h3>
@@ -1459,7 +1459,7 @@ export const Foods = () => {
               </div>
 
               {/* Modal Body */}
-              <div className="p-6 space-y-5 overflow-y-auto">
+              <div className="flex-1 p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto">
                 {/* Photo & Main Details */}
                 <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80">
                   <img

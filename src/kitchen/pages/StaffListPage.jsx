@@ -301,13 +301,13 @@ export function StaffListPage({ apiState, onToast }) {
       </div>
 
       {/* Staff Listing Table */}
-      <div className="overflow-hidden rounded-2xl bg-white border border-[#e2e8f0] shadow-sm">
+      <div className="overflow-hidden rounded-2xl bg-white border border-[#e2e8f0] shadow-sm min-w-0">
         {loading ? (
           <div className="py-20">
             <Loader variant="page" text="Loading staff records from server..." />
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto min-w-0">
             <table className="w-full min-w-[980px] text-left border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/75 text-[11px] font-bold uppercase tracking-wider text-slate-500">
@@ -762,15 +762,15 @@ function StaffFormModal({ staff, roles, branches, activeBranchId, onClose, onSuc
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-950/60 p-4 sm:p-6 backdrop-blur-sm flex min-h-screen items-center justify-center animate-in fade-in duration-200"
+      className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-950/60 p-2.5 sm:p-6 backdrop-blur-sm flex min-h-screen items-center justify-center animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-2xl my-auto flex max-h-[90vh] flex-col rounded-3xl bg-white shadow-2xl border border-slate-100 overflow-hidden"
+        className="relative w-full max-w-2xl my-auto flex max-h-[92vh] flex-col rounded-3xl bg-white shadow-2xl border border-slate-100 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="shrink-0 flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-6 py-4">
+        <div className="shrink-0 flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4 sm:px-6 py-3.5 sm:py-4">
           <div className="flex items-center gap-3">
             <div className="grid size-10 place-items-center rounded-xl bg-gradient-to-tr from-[#8D0606] to-[#b80808] text-white shadow-xs">
               {isEditMode ? <Edit size={20} /> : <UserPlus size={20} />}
@@ -1170,15 +1170,15 @@ function StaffDetailModal({ staff, onEdit, onManagePermissions, onClose }) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-950/60 p-4 sm:p-6 backdrop-blur-sm flex min-h-screen items-center justify-center animate-in fade-in duration-200"
+      className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-950/60 p-2.5 sm:p-6 backdrop-blur-sm flex min-h-screen items-center justify-center animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-lg my-auto flex max-h-[90vh] flex-col rounded-3xl bg-white shadow-2xl border border-slate-100 overflow-hidden"
+        className="relative w-full max-w-lg my-auto flex max-h-[92vh] flex-col rounded-3xl bg-white shadow-2xl border border-slate-100 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header Background */}
-        <div className="shrink-0 relative bg-gradient-to-br from-[#7A0505] to-[#9E0808] p-6 text-white">
+        <div className="shrink-0 relative bg-gradient-to-br from-[#7A0505] to-[#9E0808] p-4 sm:p-6 text-white">
           <button
             type="button"
             onClick={onClose}
@@ -1522,15 +1522,15 @@ function StaffPermissionsModal({ staff, onClose, onSuccess, onToast }) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-900/50 p-4 sm:p-6 backdrop-blur-xs flex min-h-screen items-center justify-center animate-in fade-in duration-150"
+      className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-900/50 p-2.5 sm:p-6 backdrop-blur-xs flex min-h-screen items-center justify-center animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-2xl my-auto flex max-h-[90vh] flex-col rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden"
+        className="relative w-full max-w-2xl my-auto flex max-h-[92vh] flex-col rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Clean Header */}
-        <div className="shrink-0 flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-white">
+        <div className="shrink-0 flex items-center justify-between border-b border-slate-100 px-4 sm:px-6 py-3.5 sm:py-4 bg-white">
           <div className="flex items-center gap-3">
             <div className="grid size-10 place-items-center rounded-xl bg-rose-50 text-[#8D0606] border border-rose-100 shadow-2xs">
               <ShieldCheck size={20} />

@@ -62,7 +62,7 @@ export function PageHeader({
               </button>
             )}
             <div className="min-w-0 flex-1">
-              <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-slate-900 leading-tight truncate">
+              <h1 className="text-base min-[400px]:text-lg sm:text-2xl font-bold tracking-tight text-slate-900 leading-tight truncate">
                 {title}
               </h1>
               {subtitle && (
@@ -75,7 +75,7 @@ export function PageHeader({
         </div>
 
         {(actions || children) && (
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0 pt-1 lg:pt-0">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0 pt-1 lg:pt-0 w-full sm:w-auto">
             {actions || children}
           </div>
         )}

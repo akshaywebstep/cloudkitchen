@@ -481,7 +481,7 @@ export default function App() {
                       }
                     }}
                   />
-                  <div className={`page-shell px-4 py-5 sm:px-6 lg:px-10 ${!isSubActive ? "pointer-events-none select-none filter blur-[1px]" : ""}`}>
+                  <div className={`page-shell px-3 sm:px-6 lg:px-10 py-3.5 sm:py-5 min-w-0 w-full ${!isSubActive ? "pointer-events-none select-none filter blur-[1px]" : ""}`}>
                     <Routes>
                       <Route path="/" element={<DashboardPage apiState={apiState} />} />
                       <Route path="dashboard" element={<DashboardPage apiState={apiState} />} />
