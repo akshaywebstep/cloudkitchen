@@ -603,7 +603,7 @@ export function CategoryPage({ apiState, refreshKitchenData, onToast }) {
         viewMode === "grid" ? (
           /* Grid Cards View */
           <div className="space-y-5">
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
+            <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
               {filteredDishes.map((dish) => (
                 <FoodItemCard
                   key={dish.id}
@@ -633,8 +633,8 @@ export function CategoryPage({ apiState, refreshKitchenData, onToast }) {
           </div>
         ) : (
           /* Table View */
-          <div className="overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-2xs">
-            <div className="overflow-x-auto">
+          <div className="overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-2xs min-w-0">
+            <div className="overflow-x-auto min-w-0">
               <table className="w-full min-w-[780px] text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500">
@@ -963,17 +963,17 @@ function DishDetailModal({ dish, onClose, onEdit, canUpdate = true }) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-950/60 p-4 sm:p-6 backdrop-blur-sm flex min-h-screen items-center justify-center animate-in fade-in duration-200"
+      className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-950/60 p-2.5 sm:p-6 backdrop-blur-sm flex min-h-screen items-center justify-center animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-xl my-auto flex max-h-[90vh] flex-col rounded-3xl bg-white shadow-2xl border border-slate-200/80 overflow-hidden"
+        className="relative w-full max-w-xl my-auto flex max-h-[92vh] flex-col rounded-3xl bg-white shadow-2xl border border-slate-200/80 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex items-start justify-between p-6 pb-4 border-b border-slate-100 bg-white">
+        <div className="flex items-start justify-between p-4 sm:p-6 pb-3 sm:pb-4 border-b border-slate-100 bg-white">
           <div>
-            <div className="flex flex-wrap items-center gap-2 mb-1.5">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-1.5">
               <span className="rounded-full bg-rose-50 px-2.5 py-0.5 text-[11px] font-extrabold text-[#8D0606] border border-rose-100">
                 {dish.category}
               </span>
@@ -1004,7 +1004,7 @@ function DishDetailModal({ dish, onClose, onEdit, canUpdate = true }) {
               </span>
             </div>
 
-            <h3 className="text-xl font-bold tracking-tight text-slate-900">{dish.name}</h3>
+            <h3 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">{dish.name}</h3>
           </div>
 
           <button
@@ -1017,7 +1017,7 @@ function DishDetailModal({ dish, onClose, onEdit, canUpdate = true }) {
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-5">
           {/* Photo & Price Header */}
           <div className="relative h-48 w-full overflow-hidden rounded-2xl bg-slate-100 border border-slate-200/70 shadow-xs">
             <img
@@ -1088,8 +1088,9 @@ function DishDetailModal({ dish, onClose, onEdit, canUpdate = true }) {
             </div>
 
             {dish.ingredients && dish.ingredients.length > 0 ? (
-              <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xs">
-                <table className="w-full text-left text-xs border-collapse">
+              <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xs min-w-0">
+                <div className="overflow-x-auto min-w-0">
+                  <table className="w-full min-w-[360px] text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200 text-[10.5px] font-bold uppercase tracking-wider text-slate-500">
                       <th className="pl-3.5 pr-2 py-2.5 w-8 text-slate-400">#</th>
@@ -1120,6 +1121,7 @@ function DishDetailModal({ dish, onClose, onEdit, canUpdate = true }) {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center text-xs text-slate-400">

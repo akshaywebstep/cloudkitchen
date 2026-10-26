@@ -461,8 +461,8 @@ export function WasteManagementPage({ apiState, onToast }) {
       </div>
 
       {/* Table Container */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xs">
-        <div className="overflow-x-auto">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xs min-w-0">
+        <div className="overflow-x-auto min-w-0">
           <table className="w-full min-w-[950px] text-left text-xs text-slate-600 border-collapse">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-extrabold uppercase tracking-wider text-slate-500 whitespace-nowrap">
@@ -893,15 +893,15 @@ function WasteCreateModal({ branchId, apiState, onClose, onSuccess, onToast }) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-900/50 p-4 sm:p-6 backdrop-blur-xs flex min-h-screen items-center justify-center animate-in fade-in duration-150"
+      className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-900/50 p-2.5 sm:p-6 backdrop-blur-xs flex min-h-screen items-center justify-center animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-lg my-auto flex flex-col rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden"
+        className="relative w-full max-w-lg my-auto flex max-h-[92vh] flex-col rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="shrink-0 flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-white">
+        <div className="shrink-0 flex items-center justify-between border-b border-slate-100 px-4 sm:px-6 py-3.5 sm:py-4 bg-white">
           <div className="flex items-center gap-3">
             <div className="grid size-10 place-items-center rounded-xl bg-rose-50 text-[#8D0606] border border-rose-100 shadow-2xs">
               <Trash2 size={20} />
@@ -924,7 +924,7 @@ function WasteCreateModal({ branchId, apiState, onClose, onSuccess, onToast }) {
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
           {/* Inline API Error Alert Banner */}
           {apiError && (
             <div className="rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-xs font-semibold text-rose-700 flex items-center gap-2 animate-in fade-in">

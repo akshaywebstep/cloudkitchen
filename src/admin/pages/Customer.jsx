@@ -237,7 +237,7 @@ export const Customer = () => {
       {/* Customer Cards Grid OR Empty State */}
       {filteredCustomers.length > 0 ? (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
             {paginatedCustomers.map((cust) => (
               <div
                 key={cust.id}
@@ -328,11 +328,11 @@ export const Customer = () => {
       {/* 1. ADD NEW CUSTOMER MODAL */}
       {isAddModalOpen && !selectedProfile &&
         createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-200">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-md w-full overflow-hidden animate-modal-pop">
-              <div className="bg-[#8C0D0D] text-white p-6 flex items-center justify-between">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-200 overflow-y-auto">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-md w-full max-h-[92vh] flex flex-col overflow-hidden animate-modal-pop my-auto">
+              <div className="shrink-0 bg-[#8C0D0D] text-white p-4 sm:p-6 flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-extrabold flex items-center gap-2 text-white">
+                  <h3 className="text-base sm:text-lg font-extrabold flex items-center gap-2 text-white">
                     <UserPlus className="w-5 h-5 text-amber-300" />
                     Add New Customer Profile
                   </h3>
@@ -346,7 +346,7 @@ export const Customer = () => {
                 </button>
               </div>
 
-              <form onSubmit={handleAddCustomer} noValidate className="p-6 space-y-4 text-xs font-semibold">
+              <form onSubmit={handleAddCustomer} noValidate className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 text-xs font-semibold">
                 <div>
                   <label className="block text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1 font-extrabold text-xs">
                     Full Name *
@@ -484,10 +484,10 @@ export const Customer = () => {
       {/* 2. CUSTOMER PROFILE VIEW MODAL */}
       {selectedProfile &&
         createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-200">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-lg w-full overflow-hidden animate-modal-pop">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-200 overflow-y-auto">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-lg w-full max-h-[92vh] flex flex-col overflow-hidden animate-modal-pop my-auto">
               {/* Profile Header */}
-              <div className="bg-gradient-to-r from-[#8C0D0D] to-[#600808] text-white p-6 relative">
+              <div className="shrink-0 bg-gradient-to-r from-[#8C0D0D] to-[#600808] text-white p-4 sm:p-6 relative">
                 <button
                   onClick={() => setSelectedProfile(null)}
                   className="absolute right-4 top-4 p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white"
@@ -499,11 +499,11 @@ export const Customer = () => {
                   <img
                     src={selectedProfile.avatar}
                     alt={selectedProfile.name}
-                    className="w-16 h-16 rounded-full object-cover ring-4 ring-white/20 shadow-md"
+                    className="w-14 sm:w-16 h-14 sm:h-16 rounded-full object-cover ring-4 ring-white/20 shadow-md"
                   />
                   <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-xl font-black">{selectedProfile.name}</h3>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-lg sm:text-xl font-black">{selectedProfile.name}</h3>
                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-white/20 text-white uppercase tracking-wider">
                         {selectedProfile.vipStatus}
                       </span>
@@ -515,7 +515,7 @@ export const Customer = () => {
               </div>
 
               {/* Profile Body */}
-              <div className="p-6 space-y-5">
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-5">
                 {/* Metrics */}
                 <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 text-center">
                   <div>
@@ -533,7 +533,7 @@ export const Customer = () => {
                   <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300 uppercase mb-1.5">
                     Update Member Loyalty Tier
                   </label>
-                  <div className="flex gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {['Regular', 'Silver VIP', 'Gold VIP', 'Platinum VIP'].map((tier) => (
                       <button
                         key={tier}

@@ -359,13 +359,13 @@ export function OrderListPage({ apiState, refreshKitchenData, onToast }) {
       </div>
 
       {/* Orders Table Listing */}
-      <div className="overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm">
+      <div className="overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm min-w-0">
         {loading ? (
           <div className="py-20">
             <Loader variant="page" text="Fetching branch orders from server..." />
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto min-w-0">
             <table className="w-full min-w-[1000px] text-left border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
@@ -610,7 +610,7 @@ export function OrderListPage({ apiState, refreshKitchenData, onToast }) {
 
       {/* Floating Bulk Action Bar */}
       {selectedOrderIds.length > 0 && canUpdate("order") && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex flex-wrap items-center gap-3 rounded-2xl bg-slate-900 px-5 py-3 text-white shadow-2xl border border-slate-800 animate-in fade-in slide-in-from-bottom-5">
+        <div className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-40 flex w-[calc(100%-24px)] max-w-xl flex-wrap items-center justify-between sm:justify-start gap-2 sm:gap-3 rounded-2xl bg-slate-900 px-3.5 py-2.5 sm:px-5 sm:py-3 text-white shadow-2xl border border-slate-800 animate-in fade-in slide-in-from-bottom-5">
           <div className="flex items-center gap-2 pr-3 border-r border-slate-700">
             <span className="grid size-6 place-items-center rounded-lg bg-[#8D0606] text-xs font-black text-white">
               {selectedOrderIds.length}
@@ -638,7 +638,7 @@ export function OrderListPage({ apiState, refreshKitchenData, onToast }) {
           <button
             type="button"
             onClick={() => setSelectedOrderIds([])}
-            className="ml-2 rounded-lg bg-white/10 px-2.5 py-1 text-xs font-semibold text-slate-300 hover:bg-white/20 transition"
+            className="ml-auto sm:ml-2 rounded-lg bg-white/10 px-2.5 py-1 text-xs font-semibold text-slate-300 hover:bg-white/20 transition"
           >
             Clear
           </button>
@@ -874,11 +874,11 @@ function CreateOrderModal({ branchId, branches, menus, onClose, onSuccess, onToa
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-950/60 p-4 sm:p-6 backdrop-blur-sm flex min-h-screen items-center justify-center animate-in fade-in duration-200"
+      className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-950/60 p-2.5 sm:p-6 backdrop-blur-sm flex min-h-screen items-center justify-center animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-3xl my-auto flex max-h-[90vh] flex-col rounded-3xl bg-white shadow-2xl border border-slate-100 overflow-hidden"
+        className="relative w-full max-w-3xl my-auto flex max-h-[92vh] flex-col rounded-3xl bg-white shadow-2xl border border-slate-100 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
@@ -1201,15 +1201,15 @@ function OrderDetailModal({ branchId, order, canUpdate = true, onStatusUpdate, o
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-950/60 p-4 sm:p-6 backdrop-blur-sm flex min-h-screen items-center justify-center animate-in fade-in duration-200"
+      className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-950/60 p-2.5 sm:p-6 backdrop-blur-sm flex min-h-screen items-center justify-center animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-xl my-auto flex max-h-[90vh] flex-col rounded-3xl bg-white shadow-2xl border border-slate-100 overflow-hidden"
+        className="relative w-full max-w-xl my-auto flex max-h-[92vh] flex-col rounded-3xl bg-white shadow-2xl border border-slate-100 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="shrink-0 relative bg-gradient-to-br from-[#7A0505] to-[#9E0808] p-6 text-white">
+        <div className="shrink-0 relative bg-gradient-to-br from-[#7A0505] to-[#9E0808] p-4 sm:p-6 text-white">
           <button
             type="button"
             onClick={onClose}

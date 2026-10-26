@@ -52,8 +52,8 @@ export const Header = () => {
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-white/95 dark:bg-[#1c2739] backdrop-blur-md border-b border-slate-100 dark:border-slate-800 px-6 py-4 transition-all">
-      <div className="flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-30 bg-white/95 dark:bg-[#1c2739] backdrop-blur-md border-b border-slate-100 dark:border-slate-800 px-3.5 sm:px-6 py-3 sm:py-4 transition-all">
+      <div className="flex items-center justify-between gap-2.5 sm:gap-4">
         {/* Left Section: Sidebar Toggle + Mobile Menu + Search */}
         <div className="flex items-center gap-3 flex-1 max-w-2xl">
           {/* Desktop Sidebar Collapse Toggle */}
@@ -126,7 +126,7 @@ export const Header = () => {
 
               {/* Notifications Dropdown Popup */}
               {activeDropdown === 'notifications' && (
-                <div className="absolute right-0 top-full mt-3 w-80 sm:w-96 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden z-50 animate-dropdown text-left">
+                <div className="absolute right-0 top-full mt-3 w-[calc(100vw-24px)] sm:w-96 max-w-sm bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden z-50 animate-dropdown text-left">
                   <div className="bg-blue-600 text-white p-4 flex items-center justify-between">
                     <div>
                       <h4 className="font-extrabold text-sm">Kitchen Notifications</h4>
@@ -223,7 +223,7 @@ export const Header = () => {
 
               {/* Messages Dropdown Popup */}
               {activeDropdown === 'messages' && (
-                <div className="absolute right-0 top-full mt-3 w-80 sm:w-96 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden z-50 animate-dropdown text-left">
+                <div className="absolute right-0 top-full mt-3 w-[calc(100vw-24px)] sm:w-96 max-w-sm bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden z-50 animate-dropdown text-left">
                   <div className="bg-sky-600 text-white p-4 flex items-center justify-between">
                     <div>
                       <h4 className="font-extrabold text-sm">Customer & Driver Messages</h4>
@@ -309,7 +309,7 @@ export const Header = () => {
 
               {/* Promotions Dropdown Popup */}
               {activeDropdown === 'promotions' && (
-                <div className="absolute right-0 top-full mt-3 w-80 sm:w-96 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden z-50 animate-dropdown text-left">
+                <div className="absolute right-0 top-full mt-3 w-[calc(100vw-24px)] sm:w-96 max-w-sm bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden z-50 animate-dropdown text-left">
                   <div className="bg-indigo-600 text-white p-4 flex items-center justify-between">
                     <div>
                       <h4 className="font-extrabold text-sm">Promotions & Loyalty Vouchers</h4>
@@ -406,7 +406,7 @@ export const Header = () => {
 
             {/* Profile Dropdown */}
             {activeDropdown === 'profile' && (
-              <div className="absolute right-0 mt-3 w-60 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 p-2 z-50 animate-dropdown text-left space-y-0.5">
+              <div className="absolute right-0 mt-3 w-[calc(100vw-24px)] sm:w-60 max-w-xs bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 p-2 z-50 animate-dropdown text-left space-y-0.5">
                 <div className="px-3 py-2.5 border-b border-slate-100 dark:border-slate-800 mb-1">
                   <p className="text-xs font-extrabold text-slate-900 dark:text-slate-100">{user?.name || 'Chef Admin'}</p>
                   <p className="text-[11px] text-slate-400 font-medium truncate">{user?.email || 'admin@cloudkitchens.io'}</p>

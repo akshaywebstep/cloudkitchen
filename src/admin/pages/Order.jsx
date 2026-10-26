@@ -309,9 +309,9 @@ export const Order = () => {
       {/* Orders Table OR Empty State */}
       {orders.length > 0 ? (
         <div className="space-y-4">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-card border border-slate-100 dark:border-slate-800 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-card border border-slate-100 dark:border-slate-800 overflow-hidden min-w-0">
+            <div className="overflow-x-auto min-w-0">
+              <table className="w-full min-w-[950px] text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50/80 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 uppercase text-[10px] font-extrabold tracking-wider border-b border-slate-100 dark:border-slate-800">
                     <th className="p-4 pl-6 w-12 text-center">#</th>
@@ -513,11 +513,11 @@ export const Order = () => {
       {/* ═══════════ DETAILED ORDER MODAL (SHOWING MAX DATA) ═══════════ */}
       {selectedOrder &&
         createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-2xl w-full overflow-hidden animate-modal-pop">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-modal-pop my-auto">
               
               {/* Modal Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40">
+              <div className="shrink-0 flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-[#8C0D0D] dark:text-rose-300 flex items-center justify-center font-black border border-rose-200/60 dark:border-rose-800/60">
                     <ShoppingBag className="w-5 h-5" />
@@ -557,7 +557,7 @@ export const Order = () => {
               </div>
 
               {/* Modal Body */}
-              <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto text-xs">
+              <div className="flex-1 p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto text-xs">
                 
                 {/* Top Meta Chips */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">

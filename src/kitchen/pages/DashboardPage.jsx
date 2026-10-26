@@ -204,7 +204,7 @@ export function DashboardPage({ apiState }) {
       )}
 
       {/* Metrics Row (Dynamic values from overview) */}
-      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5 sm:gap-5">
         <MetricCard
           title="Active Menus"
           value={activeMenusValue}
@@ -357,7 +357,7 @@ function RevenueBars({ salesTrend = [], overview = {} }) {
         </div>
 
         {/* Clear Legend */}
-        <div className="flex items-center gap-4 text-xs font-semibold">
+        <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs font-semibold">
           <div className="flex items-center gap-1.5">
             <span className="size-2.5 rounded-sm bg-sky-500" />
             <span className="text-slate-700">Revenue (₹)</span>

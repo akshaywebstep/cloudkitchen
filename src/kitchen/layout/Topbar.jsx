@@ -68,13 +68,13 @@ export function Topbar({ apiState, onLogout, onToast, onLogin, refreshKitchenDat
           <Menu size={18} />
         </button>
         <div className="min-w-0">
-          <h1 className="text-[15px] sm:text-lg font-semibold tracking-tight text-slate-900 truncate max-w-[160px] sm:max-w-none leading-tight">
+          <h1 className="text-[15px] sm:text-lg font-semibold tracking-tight text-slate-900 truncate max-w-[130px] min-[400px]:max-w-[190px] sm:max-w-none leading-tight">
             {title}
           </h1>
         </div>
       </div>
 
-      <div className="flex items-center gap-5">
+      <div className="flex items-center gap-2 sm:gap-4 lg:gap-5">
         <BranchHeaderSelect apiState={apiState} onBranchChange={onBranchChange} navigate={navigate} />
 
         {/* Alert Action Icons */}

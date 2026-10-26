@@ -2114,17 +2114,17 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
 
       {/* Quick Provision Stock Modal */}
       {showStockModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden space-y-0">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden space-y-0 max-h-[92vh] flex flex-col">
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/70">
-              <div className="flex items-center gap-2.5">
-                <div className="size-9 rounded-xl bg-rose-50 text-[#8D0606] grid place-items-center shadow-2xs">
+            <div className="shrink-0 flex items-center justify-between px-4 sm:px-5 py-3.5 sm:py-4 border-b border-slate-100 bg-slate-50/70">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="size-9 rounded-xl bg-rose-50 text-[#8D0606] grid place-items-center shadow-2xs shrink-0">
                   <Boxes size={18} />
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">Setup Category, Units & Stock for Ingredients</h3>
-                  <p className="text-[11px] text-slate-500">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold text-slate-900 truncate">Setup Category, Units & Stock for Ingredients</h3>
+                  <p className="text-[11px] text-slate-500 truncate">
                     Verify culinary category, recipe/inventory units, and initial stock before adding to kitchen.
                   </p>
                 </div>
@@ -2132,14 +2132,14 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
               <button
                 type="button"
                 onClick={() => setShowStockModal(false)}
-                className="size-7 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 grid place-items-center cursor-pointer transition"
+                className="size-7 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 grid place-items-center cursor-pointer transition shrink-0 ml-2"
               >
                 <X size={16} />
               </button>
             </div>
 
             {/* Modal Items List */}
-            <div className="p-5 max-h-[60vh] overflow-y-auto space-y-3">
+            <div className="p-3.5 sm:p-5 flex-1 overflow-y-auto space-y-3">
               {/* Quick Bulk Category Apply */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
                 <span className="text-[11.5px] font-bold text-slate-700">Quick Apply Category to All:</span>

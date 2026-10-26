@@ -1049,8 +1049,8 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
 
           {/* Branches Table */}
           {filteredBranches.length > 0 ? (
-            <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-xs">
-              <div className="overflow-x-auto">
+            <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-xs min-w-0">
+              <div className="overflow-x-auto min-w-0">
                 <table className="w-full min-w-[950px] text-left border-collapse">
                   <thead>
                     <tr className="border-b border-slate-100 bg-white text-[11px] font-bold uppercase tracking-wider text-slate-400">
@@ -1660,21 +1660,21 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
       {quickViewBranch &&
         createPortal(
           <div
-            className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-950/60 p-4 sm:p-6 backdrop-blur-sm flex min-h-screen items-center justify-center animate-in fade-in duration-200"
+            className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-950/60 p-2.5 sm:p-6 backdrop-blur-sm flex min-h-screen items-center justify-center animate-in fade-in duration-200"
             onClick={() => setQuickViewBranch(null)}
           >
             <div
-              className="relative w-full max-w-lg my-auto overflow-hidden rounded-[28px] bg-white shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200"
+              className="relative w-full max-w-lg my-auto max-h-[92vh] flex flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal Header */}
-              <div className="flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-white px-6 sm:px-7 py-5">
+              <div className="shrink-0 flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-slate-50/80 to-white px-4 sm:px-7 py-3.5 sm:py-5">
                 <div className="flex items-center gap-3.5">
                   <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-[#8D0606] text-white shadow-xs">
                     <Store size={22} />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold tracking-tight text-slate-900">
+                    <h3 className="text-base sm:text-lg font-bold tracking-tight text-slate-900">
                       {quickViewBranch.name || `Branch #${quickViewBranch.id}`}
                     </h3>
                     <p className="text-xs font-medium text-slate-500 mt-0.5">
@@ -1692,7 +1692,7 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
               </div>
 
               {/* Modal Body */}
-              <div className="p-6 sm:p-7 space-y-5 text-xs">
+              <div className="flex-1 overflow-y-auto p-4 sm:p-7 space-y-4 sm:space-y-5 text-xs">
                 {/* Status & Order Acceptance Cards */}
                 <div className="grid grid-cols-2 gap-3.5">
                   <div

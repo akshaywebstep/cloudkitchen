@@ -625,15 +625,15 @@ export const Branches = () => {
   };
 
   return (
-    <div className="space-y-7 pb-10 animate-fade-in mx-auto">
+    <div className="space-y-6 sm:space-y-7 pb-10 animate-fade-in mx-auto min-w-0 w-full">
 
       {/* ─── TOP HERO BANNER ─── */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 shadow-card border border-slate-200/80 dark:border-slate-800 relative overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-7 shadow-card border border-slate-200/80 dark:border-slate-800 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-rose-500/10 via-amber-500/5 to-transparent rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5 sm:gap-6">
           <div className="space-y-2">
-            <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
               <span className="px-3 py-1 rounded-full bg-rose-50 dark:bg-rose-950/60 text-[#8C0D0D] dark:text-rose-400 font-extrabold text-[11px] border border-rose-100 dark:border-rose-900/50 flex items-center gap-1.5">
                 Kitchen Branch Network
               </span>
@@ -643,7 +643,7 @@ export const Branches = () => {
               </span>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-2.5">
+            <h1 className="text-xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-2.5">
               <span>Kitchen Branches</span>
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium max-w-xl">
@@ -651,7 +651,7 @@ export const Branches = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 w-full sm:w-auto">
             <button
               onClick={() => {
                 setEditingBranch(null);
@@ -664,7 +664,7 @@ export const Branches = () => {
                 setErrors({});
                 setIsModalOpen(true);
               }}
-              className="px-5 py-3 rounded-2xl bg-[#8C0D0D] text-white hover:bg-rose-900 font-extrabold text-xs shadow-lg flex items-center gap-2 transition-all active:scale-95 shrink-0 cursor-pointer"
+              className="w-full sm:w-auto justify-center px-5 py-3 rounded-2xl bg-[#8C0D0D] text-white hover:bg-rose-900 font-extrabold text-xs shadow-lg flex items-center gap-2 transition-all active:scale-95 shrink-0 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Create New Branch</span>
@@ -674,7 +674,7 @@ export const Branches = () => {
       </div>
 
       {/* Search & Filter Bar */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-card border border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl p-3.5 sm:p-5 shadow-card border border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
         <div className="relative w-full md:w-80">
           <input
             type="text"
@@ -689,33 +689,33 @@ export const Branches = () => {
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
         </div>
 
-          {/* Filter by Kitchen */}
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-extrabold text-slate-500 uppercase">Filter Kitchen:</span>
-            <select
-              value={kitchenFilter}
-              onChange={(e) => {
-                setKitchenFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="px-4 py-2 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-bold focus:outline-none focus:border-brand-800 cursor-pointer"
-            >
-              <option value="All">All Kitchen Hubs ({kitchens.length})</option>
-              {kitchens.map((k) => (
-                <option key={k.id} value={k.id}>
-                  {k.kitchenName || k.name} {k.branchLimit ? `(${k.branchLimit.totalBranches}/${k.branchLimit.maxBranches} branches)` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* Filter by Kitchen */}
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3 w-full md:w-auto">
+          <span className="text-xs font-extrabold text-slate-500 uppercase shrink-0">Filter Kitchen:</span>
+          <select
+            value={kitchenFilter}
+            onChange={(e) => {
+              setKitchenFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="w-full sm:w-auto px-4 py-2 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-bold focus:outline-none focus:border-brand-800 cursor-pointer min-w-0"
+          >
+            <option value="All">All Kitchen Hubs ({kitchens.length})</option>
+            {kitchens.map((k) => (
+              <option key={k.id} value={k.id}>
+                {k.kitchenName || k.name} {k.branchLimit ? `(${k.branchLimit.totalBranches}/${k.branchLimit.maxBranches} branches)` : ''}
+              </option>
+            ))}
+          </select>
         </div>
+      </div>
 
-        {/* Branches Table List */}
-        {branches.length > 0 ? (
-          <div className="space-y-4">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-card border border-slate-100 dark:border-slate-800 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[900px]">
+      {/* Branches Table List */}
+      {branches.length > 0 ? (
+        <div className="space-y-4 min-w-0">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-card border border-slate-100 dark:border-slate-800 overflow-hidden min-w-0">
+            <div className="overflow-x-auto min-w-0">
+              <table className="w-full text-left border-collapse min-w-[850px]">
                   <thead>
                     <tr className="bg-slate-50/80 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 uppercase text-[10px] font-extrabold tracking-wider border-b border-slate-100 dark:border-slate-800">
                       <th className="p-4 pl-6 w-16">#</th>
@@ -846,11 +846,11 @@ export const Branches = () => {
       {/* VIEW BRANCH DETAILS MODAL */}
       {viewingBranch &&
         createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-lg w-full overflow-hidden animate-modal-pop">
-              <div className="bg-gradient-to-r from-[#8C0D0D] to-[#600808] text-white p-6 flex items-center justify-between">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-lg w-full overflow-hidden animate-modal-pop max-h-[92vh] flex flex-col my-auto">
+              <div className="bg-gradient-to-r from-[#8C0D0D] to-[#600808] text-white p-4 sm:p-6 flex items-center justify-between shrink-0">
                 <div>
-                  <h3 className="text-lg font-black flex items-center gap-2">
+                  <h3 className="text-base sm:text-lg font-black flex items-center gap-2">
                     <GitBranch className="w-5 h-5 text-amber-300" />
                     Branch Outlet: {viewingBranch.name}
                   </h3>
@@ -861,7 +861,7 @@ export const Branches = () => {
                 </button>
               </div>
 
-              <div className="p-6 space-y-4 text-xs font-medium text-slate-700 dark:text-slate-300">
+              <div className="p-4 sm:p-6 space-y-4 text-xs font-medium text-slate-700 dark:text-slate-300 flex-1 overflow-y-auto">
                 <div className="space-y-1">
                   <h4 className="text-base font-black text-slate-900 dark:text-white">{viewingBranch.name}</h4>
                   <p className="text-xs text-slate-500 font-semibold">
@@ -869,7 +869,7 @@ export const Branches = () => {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 sm:p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700">
                   <div>
                     <span className="text-[10px] uppercase font-bold text-slate-400 block">Address 1</span>
                     <span className="font-bold text-slate-900 dark:text-white block">{viewingBranch.addressLine1}</span>
@@ -900,7 +900,7 @@ export const Branches = () => {
                 </div>
 
                 <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-end">
-                  <button onClick={() => setViewingBranch(null)} className="px-5 py-2 rounded-xl bg-slate-900 text-white font-bold cursor-pointer">
+                  <button onClick={() => setViewingBranch(null)} className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-slate-900 text-white font-bold cursor-pointer">
                     Close
                   </button>
                 </div>
@@ -913,13 +913,13 @@ export const Branches = () => {
       {/* CREATE / EDIT BRANCH MODAL */}
       {isModalOpen &&
         createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-2xl w-full overflow-hidden animate-modal-pop max-h-[90vh] flex flex-col">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-2xl w-full overflow-hidden animate-modal-pop max-h-[92vh] flex flex-col my-auto">
 
               {/* Header */}
-              <div className="bg-[#8C0D0D] text-white p-6 flex items-center justify-between shrink-0">
+              <div className="bg-[#8C0D0D] text-white p-4 sm:p-6 flex items-center justify-between shrink-0">
                 <div>
-                  <h3 className="text-lg font-extrabold flex items-center gap-2 text-white">
+                  <h3 className="text-base sm:text-lg font-extrabold flex items-center gap-2 text-white">
                     <GitBranch className="w-5 h-5 text-amber-300" />
                     {editingBranch ? `Edit Branch: ${editingBranch.name}` : 'Create New Branch Outlet'}
                   </h3>
@@ -932,7 +932,7 @@ export const Branches = () => {
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} noValidate className="p-6 space-y-4 text-xs font-semibold overflow-y-auto">
+              <form onSubmit={handleSubmit} noValidate className="p-4 sm:p-6 space-y-4 text-xs font-semibold overflow-y-auto flex-1">
                 {(errors.general || errors.form) && (
                   <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 flex items-start gap-2.5 text-rose-700 dark:text-rose-300">
                     <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
@@ -1114,7 +1114,7 @@ export const Branches = () => {
                 </div>
 
                 {/* Address Line 1 & Line 2 */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div>
                     <label className="block text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1 font-extrabold">
                       Address Line 1 *
@@ -1156,7 +1156,7 @@ export const Branches = () => {
                 </div>
 
                 {/* Area, Landmark, Pincode */}
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                   <div>
                     <label className="block text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1 font-extrabold">
                       Area
@@ -1196,7 +1196,7 @@ export const Branches = () => {
                 </div>
 
                 {/* Country, State, City Selection (Displays Names, Stores IDs) */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                   <div>
                     <label className="block text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1 font-extrabold text-xs">
                       Country
@@ -1264,7 +1264,7 @@ export const Branches = () => {
                 </div>
 
                 {/* Contact Person Details */}
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                   <div>
                     <label className="block text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1 font-extrabold">Title</label>
                     <Select
@@ -1314,7 +1314,7 @@ export const Branches = () => {
                 </div>
 
                 {/* Contact Email & Phone */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div>
                     <label className="block text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1 font-extrabold">Contact Email</label>
                     <input
@@ -1350,7 +1350,7 @@ export const Branches = () => {
                   <label className="block text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2 font-extrabold">
                     Link Available Cuisines to Branch
                   </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-36 overflow-y-auto p-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                  <div className="grid grid-cols-1 min-[420px]:grid-cols-2 sm:grid-cols-3 gap-2 max-h-36 overflow-y-auto p-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                     {cuisines.map((c) => {
                       const isSelected = form.selectedCuisineIds.includes(c.id);
                       return (
@@ -1376,17 +1376,17 @@ export const Branches = () => {
                 </div>
 
                 {/* Form Buttons */}
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <div className="flex flex-wrap sm:flex-nowrap items-center justify-end gap-2.5 sm:gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold cursor-pointer"
+                    className="w-full sm:w-auto px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2.5 rounded-xl bg-brand-800 hover:bg-brand-900 text-white font-extrabold shadow-brand cursor-pointer"
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-brand-800 hover:bg-brand-900 text-white font-extrabold shadow-brand cursor-pointer"
                   >
                     {editingBranch ? 'Save Branch Changes' : 'Create Branch'}
                   </button>

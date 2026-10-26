@@ -296,14 +296,14 @@ export const Subscriptions = () => {
   };
 
   return (
-    <div className="space-y-6 pb-8 animate-fade-in mx-auto">
+    <div className="space-y-6 pb-8 animate-fade-in mx-auto min-w-0 w-full">
       {/* ═══════════ TOP HERO BANNER ═══════════ */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 shadow-card border border-slate-200/80 dark:border-slate-800 relative overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 sm:p-7 shadow-card border border-slate-200/80 dark:border-slate-800 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-rose-500/10 via-amber-500/5 to-transparent rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5 sm:gap-6">
           <div className="space-y-2">
-            <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
               <span className="px-3 py-1 rounded-full bg-rose-50 dark:bg-rose-950/60 text-[#8C0D0D] dark:text-rose-400 font-extrabold text-[11px] border border-rose-100 dark:border-rose-900/50 flex items-center gap-1.5">
                 SaaS Subscription Engine
               </span>
@@ -313,7 +313,7 @@ export const Subscriptions = () => {
               </span>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-2.5">
+            <h1 className="text-xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-2.5">
               <span>Subscription & Tier Management</span>
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium max-w-xl">
@@ -321,7 +321,7 @@ export const Subscriptions = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap w-full sm:w-auto">
             {/* Monthly / Annual Toggle */}
             <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl border border-slate-200 dark:border-slate-700 inline-flex items-center gap-1">
               <button
@@ -368,7 +368,7 @@ export const Subscriptions = () => {
                 });
                 setIsModalOpen(true);
               }}
-              className="px-5 py-3 rounded-2xl bg-[#8C0D0D] hover:bg-rose-900 text-white font-extrabold text-xs shadow-lg flex items-center gap-2 transition-all active:scale-95 shrink-0"
+              className="w-full sm:w-auto justify-center px-5 py-3 rounded-2xl bg-[#8C0D0D] hover:bg-rose-900 text-white font-extrabold text-xs shadow-lg flex items-center gap-2 transition-all active:scale-95 shrink-0"
             >
               <Plus className="w-4 h-4" />
               <span>Create New Plan</span>
@@ -378,13 +378,13 @@ export const Subscriptions = () => {
       </div>
 
       {/* Search & Filter Control Bar */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-card border border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl p-3.5 sm:p-5 shadow-card border border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div className="flex items-center gap-2">
-          <Layers className="w-5 h-5 text-[#8C0D0D] dark:text-rose-400" />
-          <h2 className="text-base font-extrabold text-slate-900 dark:text-white">Active Subscription Tiers</h2>
+          <Layers className="w-5 h-5 text-[#8C0D0D] dark:text-rose-400 shrink-0" />
+          <h2 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white">Active Subscription Tiers</h2>
         </div>
 
-        <div className="relative w-full md:w-64">
+        <div className="relative w-full sm:w-64">
           <input
             type="text"
             placeholder="Search plan title or features..."
@@ -401,8 +401,8 @@ export const Subscriptions = () => {
 
       {/* Subscription Cards Grid */}
       {subscriptions.length > 0 ? (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
+        <div className="space-y-6 min-w-0">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6 min-w-0">
             {subscriptions.map((plan) => {
               const displayPrice =
                 billingCycle === 'annual'
@@ -554,12 +554,12 @@ export const Subscriptions = () => {
       {/* CREATE / EDIT SUBSCRIPTION MODAL */}
       {isModalOpen &&
         createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-xl w-full overflow-hidden animate-modal-pop max-h-[92vh] flex flex-col">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-xl w-full overflow-hidden animate-modal-pop max-h-[92vh] flex flex-col my-auto">
               {/* Header */}
-              <div className="bg-[#8C0D0D] text-white p-6 flex items-center justify-between shrink-0 relative overflow-hidden">
+              <div className="bg-[#8C0D0D] text-white p-4 sm:p-6 flex items-center justify-between shrink-0 relative overflow-hidden">
                 <div className="relative z-10">
-                  <h3 className="text-xl font-black flex items-center gap-2">
+                  <h3 className="text-lg sm:text-xl font-black flex items-center gap-2">
                     <Sparkles className="w-5 h-5 text-rose-200" />
                     {editingId ? 'Edit Subscription Tier' : 'Create New Subscription Tier'}
                   </h3>
@@ -569,14 +569,14 @@ export const Subscriptions = () => {
                 </div>
                 <button
                   onClick={() => setIsModalOpen(false)}
-                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors relative z-10"
+                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors relative z-10 cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               {/* Form */}
-              <form onSubmit={handleSubmit} noValidate className="p-6 space-y-5 text-xs font-semibold overflow-y-auto">
+              <form onSubmit={handleSubmit} noValidate className="p-4 sm:p-6 space-y-4 sm:space-y-5 text-xs font-semibold overflow-y-auto flex-1">
                 {(errors.general || errors.form) && (
                   <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 flex items-start gap-2.5 text-rose-700 dark:text-rose-300">
                     <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
@@ -799,17 +799,17 @@ export const Subscriptions = () => {
                 </div>
 
                 {/* Form Buttons */}
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <div className="flex flex-wrap sm:flex-nowrap items-center justify-end gap-2.5 sm:gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold text-xs hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold text-xs hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-6 py-2.5 rounded-xl bg-[#8C0D0D] hover:bg-[#700a0a] text-white font-extrabold text-xs shadow-brand hover:shadow-lg transition-all flex items-center gap-2"
+                    className="w-full sm:w-auto justify-center px-6 py-2.5 rounded-xl bg-[#8C0D0D] hover:bg-[#700a0a] text-white font-extrabold text-xs shadow-brand hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer"
                   >
                     <Sparkles className="w-4 h-4" />
                     {editingId ? 'Save Changes' : 'Create Subscription Plan'}

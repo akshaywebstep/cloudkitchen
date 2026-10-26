@@ -748,9 +748,9 @@ export const Kitchens = () => {
       {/* Kitchen Listing Table OR Empty State */}
       {kitchens.length > 0 ? (
         <div className="space-y-4">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-card border border-slate-100 dark:border-slate-800 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-card border border-slate-100 dark:border-slate-800 overflow-hidden min-w-0">
+            <div className="overflow-x-auto min-w-0">
+              <table className="w-full min-w-[850px] text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50/80 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 uppercase text-[11px] font-extrabold tracking-wider border-b border-slate-100 dark:border-slate-800">
                     <th className="p-4 pl-6 w-16">#</th>
@@ -876,11 +876,11 @@ export const Kitchens = () => {
       {/* VIEW KITCHEN BY ID MODAL */}
       {viewingKitchen &&
         createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-md w-full overflow-hidden animate-modal-pop">
-              <div className="bg-gradient-to-r from-[#8C0D0D] to-[#600808] text-white p-6 flex items-center justify-between">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-md w-full max-h-[92vh] flex flex-col overflow-hidden animate-modal-pop my-auto">
+              <div className="shrink-0 bg-gradient-to-r from-[#8C0D0D] to-[#600808] text-white px-4 sm:px-6 py-3.5 sm:py-6 flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-black flex items-center gap-2">
+                  <h3 className="text-base sm:text-lg font-black flex items-center gap-2">
                     <Building2 className="w-5 h-5 text-amber-300" />
                     Kitchen Details: {viewingKitchen.kitchenName || viewingKitchen.name}
                   </h3>
@@ -894,7 +894,7 @@ export const Kitchens = () => {
                 </button>
               </div>
 
-              <div className="p-6 space-y-4 text-xs font-medium text-slate-700 dark:text-slate-300">
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 text-xs font-medium text-slate-700 dark:text-slate-300">
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 rounded-2xl bg-brand-50 border border-brand-200 overflow-hidden flex items-center justify-center">
                     {viewingKitchen.profilePicture ? (
@@ -960,11 +960,11 @@ export const Kitchens = () => {
       {/* CREATE / EDIT KITCHEN MODAL */}
       {isKitchenModalOpen &&
         createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-2xl w-full overflow-hidden animate-modal-pop max-h-[90vh] flex flex-col">
-              <div className="bg-[#8C0D0D] text-white p-6 flex items-center justify-between shrink-0">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-2xl w-full overflow-hidden animate-modal-pop max-h-[92vh] flex flex-col my-auto">
+              <div className="shrink-0 bg-[#8C0D0D] text-white px-4 sm:px-6 py-3.5 sm:py-6 flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-extrabold flex items-center gap-2 text-white">
+                  <h3 className="text-base sm:text-lg font-extrabold flex items-center gap-2 text-white">
                     <Building2 className="w-5 h-5 text-amber-300" />
                     {editingKitchen ? `Edit Kitchen: ${editingKitchen.name || editingKitchen.kitchenName}` : 'Create New Cloud Kitchen'}
                   </h3>
@@ -980,7 +980,7 @@ export const Kitchens = () => {
                 </button>
               </div>
 
-              <form onSubmit={handleKitchenSubmit} noValidate className="p-6 space-y-4 text-xs font-semibold overflow-y-auto">
+              <form onSubmit={handleKitchenSubmit} noValidate className="flex-1 p-4 sm:p-6 space-y-4 text-xs font-semibold overflow-y-auto">
                 {(kitchenErrors.general || kitchenErrors.form) && (
                   <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 flex items-start gap-2.5 text-rose-700 dark:text-rose-300">
                     <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
@@ -1362,7 +1362,7 @@ export const Kitchens = () => {
                     Contact Person Info
                   </span>
 
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-slate-700 dark:text-slate-300 uppercase mb-1">Title</label>
                       <Select
@@ -1462,11 +1462,11 @@ export const Kitchens = () => {
       {/* DOCUMENTS LISTING MODAL */}
       {activeDocumentsModal &&
         createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-lg w-full overflow-hidden animate-modal-pop">
-              <div className="bg-gradient-to-r from-[#8C0D0D] to-[#600808] text-white p-6 flex items-center justify-between">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-lg w-full max-h-[92vh] flex flex-col overflow-hidden animate-modal-pop my-auto">
+              <div className="shrink-0 bg-gradient-to-r from-[#8C0D0D] to-[#600808] text-white px-4 sm:px-6 py-3.5 sm:py-6 flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-black flex items-center gap-2">
+                  <h3 className="text-base sm:text-lg font-black flex items-center gap-2">
                     <ShieldCheck className="w-5 h-5 text-amber-300" />
                     {activeDocumentsModal.name} - Documents
                   </h3>
@@ -1480,7 +1480,7 @@ export const Kitchens = () => {
                 </button>
               </div>
 
-              <div className="p-6 space-y-4">
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
                 {activeDocumentsModal.documents?.length > 0 ? (
                   <div className="space-y-3">
                     {activeDocumentsModal.documents.map((doc) => (

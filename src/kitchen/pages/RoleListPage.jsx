@@ -178,13 +178,13 @@ export function RoleListPage({ apiState, onToast }) {
       </div>
 
       {/* Roles Listing Table */}
-      <div className="overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm">
+      <div className="overflow-hidden rounded-2xl bg-white border border-slate-200 shadow-sm min-w-0">
         {loading ? (
           <div className="py-20">
             <Loader variant="page" text="Fetching staff roles from server..." />
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto min-w-0">
             <table className="w-full min-w-[750px] text-left border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/75 text-[11px] font-bold uppercase tracking-wider text-slate-500">
@@ -442,21 +442,21 @@ function RoleFormModal({ role, apiState, onClose, onSuccess, onToast }) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-950/60 p-4 sm:p-6 backdrop-blur-sm flex min-h-screen items-center justify-center animate-in fade-in duration-200"
+      className="fixed inset-0 z-[99999] overflow-y-auto bg-slate-950/60 p-2.5 sm:p-6 backdrop-blur-sm flex min-h-screen items-center justify-center animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-lg my-auto flex flex-col rounded-3xl bg-white shadow-2xl border border-slate-100 overflow-hidden"
+        className="relative w-full max-w-lg my-auto flex max-h-[92vh] flex-col rounded-3xl bg-white shadow-2xl border border-slate-100 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="shrink-0 flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-6 py-4">
+        <div className="shrink-0 flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4 sm:px-6 py-3.5 sm:py-4">
           <div className="flex items-center gap-3">
             <div className="grid size-10 place-items-center rounded-xl bg-gradient-to-tr from-[#8D0606] to-[#b80808] text-white shadow-xs">
               <ShieldCheck size={20} />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-slate-900">
+              <h3 className="text-base sm:text-lg font-bold text-slate-900">
                 {isEditMode ? "Edit Staff Role" : "Create New Staff Role"}
               </h3>
               <p className="text-xs font-semibold text-slate-500">
@@ -476,7 +476,7 @@ function RoleFormModal({ role, apiState, onClose, onSuccess, onToast }) {
         </div>
 
         {/* Modal Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
           {error && (
             <div className="rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-xs font-semibold text-rose-700 flex items-center gap-2">
               <AlertCircle size={15} className="shrink-0" />
