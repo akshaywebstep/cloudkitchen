@@ -150,7 +150,11 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
     category: "",
     image: "",
     unit: "KG",
+    stock: "",
+    alertQuantity: "0",
+    expireAt: "",
   });
+  const [enableStockSection, setEnableStockSection] = useState(false);
   const [activeBranchId, setActiveBranchId] = useState(firstBranchId);
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState("");
@@ -535,6 +539,9 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
           category: item.category || "General",
           image: item.image,
           unit: defaultMasterUnit,
+          stock: "",
+          alertQuantity: "0",
+          expireAt: "",
         },
       ]);
     }
@@ -547,6 +554,12 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
   const updateSelectedMasterItemUnit = (id, newUnit) => {
     setSelectedMasterItems((prev) =>
       prev.map((sel) => (String(sel.id) === String(id) ? { ...sel, unit: newUnit } : sel))
+    );
+  };
+
+  const updateSelectedMasterItemProp = (id, prop, val) => {
+    setSelectedMasterItems((prev) =>
+      prev.map((sel) => (String(sel.id) === String(id) ? { ...sel, [prop]: val } : sel))
     );
   };
 
@@ -575,6 +588,9 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
         ingredients: selectedMasterItems.map((item) => ({
           id: Number(item.id),
           unit: item.unit || defaultMasterUnit || "KG",
+          stock: item.stock !== "" && !isNaN(Number(item.stock)) ? Number(item.stock) : 0,
+          alertQuantity: item.alertQuantity !== "" && !isNaN(Number(item.alertQuantity)) ? Number(item.alertQuantity) : 0,
+          expireAt: item.expireAt || undefined,
         })),
       };
 
@@ -633,7 +649,8 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
   const cancelEditInventory = () => {
     removeImage();
     setEditingInventory(null);
-    setCustomForm({ name: "", category: "", image: "", unit: "KG" });
+    setEnableStockSection(false);
+    setCustomForm({ name: "", category: "", image: "", unit: "KG", stock: "", alertQuantity: "0", expireAt: "" });
     setErrors({});
     setMessage("");
   };
@@ -998,12 +1015,21 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
     setSaving(true);
     setMessage("");
     try {
+      const stockVal = enableStockSection && customForm.stock !== "" && !isNaN(Number(customForm.stock))
+        ? Number(customForm.stock)
+        : 0;
+      const alertVal = customForm.alertQuantity !== "" && !isNaN(Number(customForm.alertQuantity))
+        ? Number(customForm.alertQuantity)
+        : 0;
+      const expireAtVal = enableStockSection && customForm.expireAt ? customForm.expireAt : undefined;
+
       if (editingInventory?.id) {
         if (imageFile instanceof File) {
           const formData = new FormData();
           formData.append("name", customForm.name.trim());
           formData.append("category", customForm.category.trim());
           formData.append("unit", customForm.unit || "KG");
+          formData.append("alertQuantity", String(alertVal));
           formData.append("image", imageFile); // Binary File stream!
           await api.updateBranchIngredient(activeBranchId, editingInventory.id, formData);
         } else {
@@ -1012,6 +1038,7 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
             category: customForm.category.trim(),
             image: customForm.image.trim() || undefined,
             unit: customForm.unit || "KG",
+            alertQuantity: alertVal,
           });
         }
         const successMsg = "Custom ingredient updated successfully.";
@@ -1025,6 +1052,9 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
           formData.append("name", customForm.name.trim());
           formData.append("category", customForm.category.trim());
           formData.append("unit", customForm.unit || "KG");
+          if (stockVal > 0) formData.append("stock", String(stockVal));
+          formData.append("alertQuantity", String(alertVal));
+          if (expireAtVal) formData.append("expireAt", expireAtVal);
           formData.append("image", imageFile); // Binary File stream!
           await api.createBranchIngredients(activeBranchId, formData);
         } else {
@@ -1035,6 +1065,9 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                 category: customForm.category.trim(),
                 image: customForm.image.trim() || undefined,
                 unit: customForm.unit || "KG",
+                stock: stockVal,
+                alertQuantity: alertVal,
+                expireAt: expireAtVal,
               },
             ],
           });
@@ -1044,7 +1077,8 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
         setMessage(successMsg);
         onToast?.({ message: successMsg, type: "success" });
         removeImage();
-        setCustomForm({ name: "", category: "", image: "", unit: "KG" });
+        setEnableStockSection(false);
+        setCustomForm({ name: "", category: "", image: "", unit: "KG", stock: "", alertQuantity: "0", expireAt: "" });
       }
 
       // Instant list API re-fetch & state refresh
@@ -1346,36 +1380,80 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                     </button>
                   </div>
 
-                  <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+                  <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
                     {selectedMasterItems.map((item) => (
                       <div
                         key={item.id}
-                        className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-2 text-xs shadow-2xs"
+                        className="rounded-xl border border-slate-200 bg-white p-2.5 text-xs shadow-2xs space-y-2"
                       >
-                        <div className="min-w-0">
-                          <p className="font-bold text-xs text-slate-800 truncate">{item.name}</p>
-                          <span className="text-[10px] text-slate-400">{item.category}</span>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-bold text-xs text-slate-800 truncate">{item.name}</p>
+                            <span className="text-[10px] text-slate-400">{item.category}</span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10.5px] font-bold text-slate-700">
+                              {item.unit || defaultMasterUnit || "KG"}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => removeSelectedMasterItem(item.id)}
+                              className="grid size-6 place-items-center rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
+                              title="Remove"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <select
-                            value={item.unit}
-                            onChange={(e) => updateSelectedMasterItemUnit(item.id, e.target.value)}
-                            className="h-7 rounded-lg border border-slate-200 bg-slate-50 px-1.5 text-[11px] font-bold text-slate-700 outline-none"
-                          >
-                            {unitOptions.map((u) => (
-                              <option key={u.value} value={u.value}>
-                                {u.label}
-                              </option>
-                            ))}
-                          </select>
-                          <button
-                            type="button"
-                            onClick={() => removeSelectedMasterItem(item.id)}
-                            className="grid size-6 place-items-center rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
-                          >
-                            <X size={12} />
-                          </button>
+                        {/* Optional Stock, Alert Qty & Expiry Date for Master Item */}
+                        <div className="space-y-2 pt-2 border-t border-slate-100">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-500 block mb-0.5">
+                                Initial Stock (opt)
+                              </span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="any"
+                                placeholder={`Qty in ${item.unit || defaultMasterUnit || "KG"}`}
+                                value={item.stock || ""}
+                                onChange={(e) => updateSelectedMasterItemProp(item.id, "stock", e.target.value)}
+                                className="h-7 w-full rounded-lg border border-slate-200 bg-slate-50/80 px-2 text-[11px] font-semibold text-slate-800 outline-none focus:border-[#8D0606] transition"
+                              />
+                            </div>
+
+                            <div>
+                              <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-500 block mb-0.5">
+                                Alert Qty
+                              </span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="any"
+                                placeholder="0"
+                                value={item.alertQuantity ?? "0"}
+                                onChange={(e) => updateSelectedMasterItemProp(item.id, "alertQuantity", e.target.value)}
+                                className="h-7 w-full rounded-lg border border-slate-200 bg-slate-50/80 px-2 text-[11px] font-semibold text-slate-800 outline-none focus:border-[#8D0606] transition"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-500 flex items-center justify-between mb-0.5">
+                              <span>Expiry Date</span>
+                              <span className="text-[9px] text-slate-400 font-normal lowercase">(optional)</span>
+                            </span>
+                            <input
+                              type="date"
+                              min={new Date().toISOString().split("T")[0]}
+                              value={item.expireAt || ""}
+                              onChange={(e) => updateSelectedMasterItemProp(item.id, "expireAt", e.target.value)}
+                              className="h-7 w-full rounded-lg border border-slate-200 bg-slate-50/80 px-2 text-[10.5px] font-semibold text-slate-800 outline-none focus:border-[#8D0606] transition"
+                            />
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -1573,6 +1651,88 @@ export function IngredientSetupPage({ apiState, refreshKitchenData, selectedPlan
                   </div>
                 )}
               </div>
+
+              {/* Add Stock Toggle & Collapsible Fields */}
+              {!editingInventory?.id && (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-3 transition">
+                  <label className="flex items-center justify-between cursor-pointer select-none">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`grid size-7 place-items-center rounded-lg transition ${
+                        enableStockSection ? "bg-amber-100 text-amber-800" : "bg-slate-200 text-slate-500"
+                      }`}>
+                        <Package size={14} />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-slate-800 block">Add Initial Stock?</span>
+                        <span className="text-[10px] text-slate-400">Record stock quantity, alert limit & expiry date</span>
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={enableStockSection}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setEnableStockSection(checked);
+                        if (!checked) {
+                          setCustomForm((f) => ({ ...f, stock: "", expireAt: "" }));
+                        }
+                      }}
+                      className="size-4 rounded border-slate-300 text-[#8D0606] focus:ring-[#8D0606]/20 cursor-pointer accent-[#8D0606]"
+                    />
+                  </label>
+
+                  {/* Stock Fields - only open when toggle is enabled */}
+                  {enableStockSection && (
+                    <div className="space-y-3 pt-3 border-t border-slate-200 animate-in fade-in slide-in-from-top-1">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-600">
+                            Initial Stock <span className="text-rose-600">*</span>
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            placeholder={`e.g. 50 (${customForm.unit || "KG"})`}
+                            value={customForm.stock}
+                            onChange={(e) => setCustomForm((f) => ({ ...f, stock: e.target.value }))}
+                            className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 outline-none transition focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-600">
+                            Alert Qty
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            placeholder="e.g. 0"
+                            value={customForm.alertQuantity}
+                            onChange={(e) => setCustomForm((f) => ({ ...f, alertQuantity: e.target.value }))}
+                            className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 outline-none transition focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center justify-between">
+                          <span>Expiry Date</span>
+                          <span className="text-[10px] text-slate-400 font-normal lowercase">(optional)</span>
+                        </label>
+                        <input
+                          type="date"
+                          min={new Date().toISOString().split("T")[0]}
+                          value={customForm.expireAt}
+                          onChange={(e) => setCustomForm((f) => ({ ...f, expireAt: e.target.value }))}
+                          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 outline-none transition focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="pt-2 flex gap-2">
                 {editingInventory ? (

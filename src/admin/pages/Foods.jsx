@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import Select from 'react-select';
 import {
@@ -53,6 +54,7 @@ import {
 import { STANDARD_MEASURE_UNITS, findUnitOption } from '../../constants/measureUnits';
 
 export const Foods = () => {
+  const navigate = useNavigate();
   const { setIsAddMenuOpen } = useApp();
   const toast = useToast();
   const { theme } = useTheme();
@@ -69,6 +71,43 @@ export const Foods = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+
+  // Category Tabs Horizontal Scroll State & Controls
+  const categoryScrollRef = useRef(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScrollable = () => {
+    const el = categoryScrollRef.current;
+    if (el) {
+      setCanScrollLeft(el.scrollLeft > 4);
+      setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 4);
+    }
+  };
+
+  useEffect(() => {
+    checkScrollable();
+    const handleResize = () => checkScrollable();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [categories]);
+
+  const handleScrollCategories = (direction) => {
+    if (categoryScrollRef.current) {
+      const scrollAmount = direction === 'left' ? -250 : 250;
+      categoryScrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+      setTimeout(checkScrollable, 300);
+    }
+  };
+
+  const handleCategoryWheel = (e) => {
+    if (categoryScrollRef.current) {
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        categoryScrollRef.current.scrollLeft += e.deltaY;
+        checkScrollable();
+      }
+    }
+  };
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -461,37 +500,7 @@ export const Foods = () => {
   };
 
   const openEditModal = (item) => {
-    setEditingItem({ ...item });
-    const mappedIngs = Array.isArray(item.ingredients)
-      ? item.ingredients.map((ing) => {
-          const rawId =
-            ing.inventoryItem?.ingredient?.id ||
-            ing.inventoryItem?.ingredientId ||
-            ing.ingredientId ||
-            ing.ingredient?.id ||
-            ing.id;
-          const rawName =
-            ing.inventoryItem?.ingredient?.name ||
-            ing.ingredient?.name ||
-            ing.name;
-          const matchedFromList = ingredientsList.find(
-            (i) =>
-              String(i.id) === String(rawId) ||
-              i.name?.toLowerCase() === (rawName || '').toLowerCase()
-          );
-          return {
-            id: Number(rawId || matchedFromList?.id || ing.id),
-            name: rawName || matchedFromList?.name || 'Ingredient',
-            quantity: Number(ing.quantityRequired ?? ing.quantity ?? 1),
-            unit: ing.unit || ing.inventoryItem?.unit || matchedFromList?.unit || 'gm',
-          };
-        })
-      : [];
-    setEditingIngredients(mappedIngs);
-    setTempEditIngId('');
-    setTempEditQty('');
-    setTempEditUnit('gm');
-    setEditErrors({});
+    navigate(`/admin/edit-menu/${item.id}`, { state: { editItem: item } });
   };
 
   const handleAddEditIngredient = () => {
@@ -691,7 +700,7 @@ export const Foods = () => {
 
           <div className="flex items-center gap-3 flex-wrap">
             <button
-              onClick={() => setIsAddMenuOpen(true)}
+              onClick={() => navigate('/admin/add-menu')}
               className="px-5 py-3 rounded-2xl bg-[#8C0D0D] text-white hover:bg-rose-900 font-extrabold text-xs shadow-lg flex items-center gap-2 transition-all active:scale-95 shrink-0"
             >
               <Plus className="w-4 h-4" />
@@ -701,75 +710,60 @@ export const Foods = () => {
         </div>
       </div>
 
-      {/* Segmented Category Pills & Search */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-card border border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="inline-flex items-center gap-1 bg-slate-100/90 dark:bg-slate-800/90 p-1.5 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-inner overflow-x-auto no-scrollbar">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => {
-                setSelectedCategory(cat);
+      {/* Filters & Category Navigation Card */}
+      <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-card border border-slate-100 dark:border-slate-800 space-y-4">
+        {/* Top Controls Row: Kitchen, Branch & Search */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Kitchen Filter Dropdown */}
+            <select
+              value={selectedKitchenId}
+              onChange={(e) => {
+                setSelectedKitchenId(e.target.value);
+                setSelectedBranchId('');
                 setCurrentPage(1);
               }}
-              className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all duration-200 whitespace-nowrap ${
-                selectedCategory === cat
-                  ? 'bg-[#8C0D0D] text-white shadow-md shadow-rose-900/20 scale-[1.02]'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-700/50'
-              }`}
+              className="px-3.5 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:border-[#8C0D0D] font-bold cursor-pointer"
             >
-              {cat}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          {/* Kitchen Filter Dropdown */}
-          <select
-            value={selectedKitchenId}
-            onChange={(e) => {
-              setSelectedKitchenId(e.target.value);
-              setSelectedBranchId('');
-              setCurrentPage(1);
-            }}
-            className="px-3 py-2 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:border-[#8C0D0D] font-bold cursor-pointer shrink-0"
-          >
-            <option value="">All Kitchens</option>
-            {kitchens.map((k) => (
-              <option key={k.id} value={k.id}>
-                {k.kitchenName || k.name || 'Kitchen'}
-              </option>
-            ))}
-          </select>
-
-          {/* Branch Filter Dropdown */}
-          <select
-            value={selectedBranchId}
-            onChange={(e) => {
-              setSelectedBranchId(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="px-3 py-2 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:border-[#8C0D0D] font-bold cursor-pointer shrink-0"
-          >
-            <option value="">All Branches</option>
-            {branches
-              .filter((b) => {
-                if (!selectedKitchenId) return true;
-                const kId = String(selectedKitchenId);
-                return (
-                  String(b.userId) === kId ||
-                  String(b.kitchenId) === kId ||
-                  String(b.user?.id) === kId ||
-                  String(b.kitchen?.id) === kId
-                );
-              })
-              .map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name || 'Branch'}
+              <option value="">All Kitchens</option>
+              {kitchens.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.kitchenName || k.name || 'Kitchen'}
                 </option>
               ))}
-          </select>
+            </select>
 
-          <div className="relative w-full md:w-64">
+            {/* Branch Filter Dropdown */}
+            <select
+              value={selectedBranchId}
+              onChange={(e) => {
+                setSelectedBranchId(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="px-3.5 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:border-[#8C0D0D] font-bold cursor-pointer"
+            >
+              <option value="">All Branches</option>
+              {branches
+                .filter((b) => {
+                  if (!selectedKitchenId) return true;
+                  const kId = String(selectedKitchenId);
+                  return (
+                    String(b.userId) === kId ||
+                    String(b.kitchenId) === kId ||
+                    String(b.user?.id) === kId ||
+                    String(b.kitchen?.id) === kId
+                  );
+                })
+                .map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name || 'Branch'}
+                  </option>
+                ))}
+            </select>
+          </div>
+
+          {/* Search Box */}
+          <div className="relative w-full md:w-80">
             <input
               type="text"
               placeholder="Search menu items..."
@@ -778,9 +772,66 @@ export const Foods = () => {
                 setSearch(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full pl-9 pr-4 py-2 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:border-[#8C0D0D] font-medium"
+              className="w-full pl-9 pr-4 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs focus:outline-none focus:border-[#8C0D0D] font-medium"
             />
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+          </div>
+        </div>
+
+        {/* Bottom Row: Full-width Category Tabs with Smooth Scroll & Arrows */}
+        <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+          <div className="relative flex items-center group">
+            {/* Scroll Left Button */}
+            {canScrollLeft && (
+              <button
+                type="button"
+                onClick={() => handleScrollCategories('left')}
+                className="absolute -left-3 z-10 p-2 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 shadow-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition active:scale-90 cursor-pointer flex items-center justify-center hover:text-[#8C0D0D]"
+                title="Scroll Left"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* Scrollable Category Container */}
+            <div
+              ref={categoryScrollRef}
+              onScroll={checkScrollable}
+              onWheel={handleCategoryWheel}
+              className="w-full flex items-center gap-1.5 bg-slate-100/90 dark:bg-slate-800/90 p-1.5 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-inner overflow-x-auto scroll-smooth select-none scrollbar-thin"
+              style={{
+                scrollbarWidth: 'thin',
+              }}
+            >
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => {
+                    setSelectedCategory(cat);
+                    setCurrentPage(1);
+                  }}
+                  className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all duration-200 whitespace-nowrap cursor-pointer shrink-0 ${
+                    selectedCategory === cat
+                      ? 'bg-[#8C0D0D] text-white shadow-md shadow-rose-900/20 scale-[1.02]'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-700/50'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            {/* Scroll Right Button */}
+            {canScrollRight && (
+              <button
+                type="button"
+                onClick={() => handleScrollCategories('right')}
+                className="absolute -right-3 z-10 p-2 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 shadow-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition active:scale-90 cursor-pointer flex items-center justify-center hover:text-[#8C0D0D]"
+                title="Scroll Right"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -889,551 +940,6 @@ export const Foods = () => {
       )}
 
       {/* EDIT DISH MODAL WITH VALIDATION */}
-      {editingItem &&
-        createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-3xl w-full overflow-hidden animate-modal-pop max-h-[92vh] flex flex-col my-auto">
-              <div className="bg-[#8C0D0D] text-white px-4 sm:px-6 py-3.5 sm:py-6 flex items-center justify-between shrink-0">
-                <div>
-                  <h3 className="text-base sm:text-lg font-extrabold flex items-center gap-2">
-                    <Utensils className="w-5 h-5 text-rose-200" />
-                    Edit Dish Details
-                  </h3>
-                  <p className="text-xs text-rose-200 mt-0.5">Update recipe ingredients, pricing & category</p>
-                </div>
-                <button
-                  onClick={() => setEditingItem(null)}
-                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <form onSubmit={handleEditSubmit} noValidate className="flex-1 p-4 sm:p-6 space-y-4 text-xs font-semibold overflow-y-auto">
-                {(editErrors.general || editErrors.form) && (
-                  <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 flex items-start gap-2.5 text-rose-700 dark:text-rose-300">
-                    <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
-                    <div className="text-xs font-bold leading-relaxed">{editErrors.general || editErrors.form}</div>
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <div className="flex items-center gap-4 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                    <img
-                      src={editingItem.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80'}
-                      alt={editingItem.name}
-                      className="w-16 h-16 rounded-xl object-cover ring-2 ring-[#8C0D0D]/40"
-                    />
-                    <div className="flex-1">
-                      <label className="block text-[11px] font-extrabold uppercase text-slate-400 mb-1">
-                        Dish Photo
-                      </label>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-100 shadow-xs">
-                          <UploadCloud className="w-3.5 h-3.5 text-[#8C0D0D] dark:text-rose-400" />
-                          Upload New Image
-                          <input type="file" accept="image/*" onChange={handleEditFileChange} className="hidden" />
-                        </label>
-                        {editingItem.image && (
-                          <button
-                            type="button"
-                            onClick={() => setEditingItem((prev) => ({ ...prev, image: '' }))}
-                            className="px-2.5 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 hover:bg-rose-100 text-xs font-bold transition-all cursor-pointer"
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </div>
-                      <p className="text-[10px] text-slate-400 font-semibold mt-1">
-                        Upload local file or enter image URL below
-                      </p>
-                    </div>
-                  </div>
-
-                  <input
-                    type="text"
-                    placeholder="Or paste food image URL (https://...)"
-                    value={typeof editingItem.image === 'string' && !editingItem.image.startsWith('data:image/') ? editingItem.image : ''}
-                    onChange={(e) => {
-                      setEditingItem((prev) => ({ ...prev, image: e.target.value }));
-                      if (editErrors.image) setEditErrors((prev) => ({ ...prev, image: null }));
-                    }}
-                    className={`w-full px-4 py-2.5 rounded-xl border text-xs font-medium focus:outline-none ${
-                      editErrors.image
-                        ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/40 text-rose-900 dark:bg-rose-950/20 dark:text-rose-200'
-                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:border-[#8C0D0D]'
-                    }`}
-                  />
-                  {editErrors.image && (
-                    <p className="text-xs font-bold text-rose-600 dark:text-rose-400 mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                      {editErrors.image}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1 font-extrabold text-xs">
-                    Dish Name *
-                  </label>
-                  <input
-                    id="food-name"
-                    type="text"
-                    placeholder="Enter dish name (e.g. Butter Chicken)..."
-                    value={editingItem.name}
-                    onChange={(e) => {
-                      setEditingItem({ ...editingItem, name: e.target.value });
-                      if (editErrors.name) setEditErrors((prev) => ({ ...prev, name: null }));
-                    }}
-                    className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium transition-all focus:outline-none ${
-                      editErrors.name
-                        ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/40 text-rose-900 dark:bg-rose-950/20 dark:text-rose-200'
-                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:border-[#8C0D0D]'
-                    }`}
-                  />
-                  {editErrors.name && (
-                    <p className="text-xs font-bold text-rose-600 dark:text-rose-400 mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                      {editErrors.name}
-                    </p>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1 font-extrabold text-xs">
-                      Price (₹) *
-                    </label>
-                    <input
-                      id="food-price"
-                      type="number"
-                      step="0.01"
-                      placeholder="Enter price (e.g. 299.00)..."
-                      value={editingItem.price}
-                      onChange={(e) => {
-                        setEditingItem({ ...editingItem, price: e.target.value });
-                        if (editErrors.price) setEditErrors((prev) => ({ ...prev, price: null }));
-                      }}
-                      className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium transition-all focus:outline-none ${
-                        editErrors.price
-                          ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/40 text-rose-900 dark:bg-rose-950/20 dark:text-rose-200'
-                          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:border-[#8C0D0D]'
-                      }`}
-                    />
-                    {editErrors.price && (
-                      <p className="text-xs font-bold text-rose-600 dark:text-rose-400 mt-1 flex items-center gap-1">
-                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                        {editErrors.price}
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1 font-extrabold text-xs">
-                      Status
-                    </label>
-                    <Select
-                      options={statusOptions}
-                      value={statusOptions.find((opt) => opt.value === (editingItem.status || 'ACTIVE')) || { value: 'ACTIVE', label: 'ACTIVE' }}
-                      onChange={(opt) => setEditingItem({ ...editingItem, status: opt ? opt.value : 'ACTIVE' })}
-                      styles={customSelectStyles}
-                      isSearchable={false}
-                      placeholder="Select status..."
-                      menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
-                      menuPosition="fixed"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1 font-extrabold text-xs">
-                      Category
-                    </label>
-                    <Select
-                      options={categoriesList.map((c) => ({ value: c.id, label: c.name || `Category #${c.id}` }))}
-                      value={
-                        (() => {
-                          const opts = categoriesList.map((c) => ({ value: c.id, label: c.name || `Category #${c.id}` }));
-                          return (
-                            opts.find(
-                              (opt) =>
-                                String(opt.value) === String(editingItem.categoryId) ||
-                                opt.label?.toLowerCase() === (editingItem.category || '').toLowerCase()
-                            ) || null
-                          );
-                        })()
-                      }
-                      onChange={(opt) => {
-                        const selectedCatId = opt ? opt.value : '';
-                        setEditingItem({
-                          ...editingItem,
-                          categoryId: selectedCatId,
-                          category: opt ? opt.label : '',
-                          subCategoryId: '',
-                          subCategory: null,
-                        });
-                      }}
-                      styles={customSelectStyles}
-                      isSearchable={true}
-                      placeholder="Select category..."
-                      menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
-                      menuPosition="fixed"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1 font-extrabold text-xs">
-                      Sub Menu / Sub Category
-                    </label>
-                    <Select
-                      options={
-                        (() => {
-                          const selectedCatObj = categoriesList.find(
-                            (c) =>
-                              String(c.id) === String(editingItem.categoryId) ||
-                              c.name?.toLowerCase() === (editingItem.category || '').toLowerCase()
-                          );
-                          const subs = selectedCatObj?.subCategories || [];
-                          return subs.map((s) => ({ value: s.id, label: s.name || `SubCategory #${s.id}` }));
-                        })()
-                      }
-                      value={
-                        (() => {
-                          const selectedCatObj = categoriesList.find(
-                            (c) =>
-                              String(c.id) === String(editingItem.categoryId) ||
-                              c.name?.toLowerCase() === (editingItem.category || '').toLowerCase()
-                          );
-                          const subs = selectedCatObj?.subCategories || [];
-                          const subOpts = subs.map((s) => ({ value: s.id, label: s.name || `SubCategory #${s.id}` }));
-                          return (
-                            subOpts.find(
-                              (opt) =>
-                                String(opt.value) === String(editingItem.subCategoryId) ||
-                                opt.label?.toLowerCase() === (editingItem.subCategory || '').toLowerCase()
-                            ) || null
-                          );
-                        })()
-                      }
-                      onChange={(opt) =>
-                        setEditingItem({
-                          ...editingItem,
-                          subCategoryId: opt ? opt.value : '',
-                          subCategory: opt ? opt.label : null,
-                        })
-                      }
-                      styles={customSelectStyles}
-                      isSearchable={true}
-                      isClearable={true}
-                      placeholder="Select sub menu (optional)..."
-                      menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
-                      menuPosition="fixed"
-                    />
-                  </div>
-                </div>
-
-                {/* Recipe & Ingredients Allocation Section */}
-                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-slate-700 dark:text-slate-300 uppercase tracking-wider font-extrabold text-xs flex items-center gap-1.5">
-                      <Scale className="w-3.5 h-3.5 text-[#8C0D0D] dark:text-rose-400" />
-                      <span>Recipe Ingredients ({editingIngredients.length})</span>
-                    </label>
-                    <span className="text-[10px] text-slate-400 font-semibold">
-                      Required for inventory deduction
-                    </span>
-                  </div>
-
-                  {/* Add Ingredient Bar */}
-                  <div className="flex flex-col sm:flex-row items-center gap-2">
-                    <div className="flex-1 w-full">
-                      <Select
-                        options={ingredientsList.map((i) => ({
-                          value: i.id,
-                          label: `${i.name} (${i.unit || 'GM'})`,
-                        }))}
-                        value={
-                          tempEditIngId
-                            ? ingredientsList
-                                .map((i) => ({
-                                  value: i.id,
-                                  label: `${i.name} (${i.unit || 'GM'})`,
-                                }))
-                                .find((opt) => opt.value === Number(tempEditIngId))
-                            : null
-                        }
-                        onChange={(opt) => {
-                          setTempEditIngId(opt ? opt.value : '');
-                          if (opt) {
-                            const ing = ingredientsList.find((i) => i.id === opt.value);
-                            if (ing?.unit) setTempEditUnit(ing.unit.toLowerCase());
-                          }
-                        }}
-                        styles={customSelectStyles}
-                        isSearchable={true}
-                        placeholder="Search & select ingredient..."
-                        menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
-                        menuPosition="fixed"
-                      />
-                    </div>
-
-                    <div className="w-full sm:w-28">
-                      <input
-                        type="number"
-                        step="0.01"
-                        placeholder="Qty (e.g. 50)"
-                        value={tempEditQty}
-                        onChange={(e) => setTempEditQty(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:border-[#8C0D0D]"
-                      />
-                    </div>
-
-                    <div className="w-full sm:w-28">
-                      <select
-                        value={findUnitOption(tempEditUnit).value}
-                        onChange={(e) => setTempEditUnit(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-semibold focus:outline-none focus:border-[#8C0D0D] cursor-pointer"
-                        title="Select Unit"
-                      >
-                        {STANDARD_MEASURE_UNITS.map((u) => (
-                          <option key={u.value} value={u.value}>
-                            {u.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handleAddEditIngredient}
-                      className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center justify-center gap-1 shadow cursor-pointer transition-all active:scale-95 shrink-0"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>Add</span>
-                    </button>
-                  </div>
-
-                  {/* Solution 1: Live Conversion Hint & Solution 2: Sanity Warning for Edit Add Bar */}
-                  {(() => {
-                    const tempHint = getConversionHint(tempEditQty, tempEditUnit);
-                    const tempWarning = getSanityWarning(tempEditQty, tempEditUnit);
-                    return (
-                      <div className="space-y-1.5">
-                        {tempWarning && (
-                          <div className="text-[11px] font-bold text-amber-900 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/70 p-2.5 rounded-xl border border-amber-300 dark:border-amber-700/80 flex items-center justify-between gap-2 animate-fade-in shadow-xs">
-                            <div className="flex items-center gap-1.5">
-                              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                              <span>{tempWarning.message}</span>
-                            </div>
-                            {tempWarning.fixPayload && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setTempEditQty(tempWarning.fixPayload.quantity);
-                                  setTempEditUnit(tempWarning.fixPayload.unit);
-                                }}
-                                className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-black text-[10px] cursor-pointer shrink-0 transition-all active:scale-95 shadow-xs"
-                              >
-                                {tempWarning.fixLabel}
-                              </button>
-                            )}
-                          </div>
-                        )}
-
-                        {tempHint && !tempWarning && (
-                          <div className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-800/60 flex items-center gap-1.5 animate-fade-in">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                            <span>{tempHint.text}</span>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
-
-                  {/* List of Ingredients with Auto Conversion Preview */}
-                  {editingIngredients.length > 0 ? (
-                    <div className="max-h-56 overflow-y-auto space-y-2 p-1">
-                      {editingIngredients.map((item) => {
-                        const rowHint = getConversionHint(item.quantity, item.unit);
-                        const rowWarning = getSanityWarning(item.quantity, item.unit);
-                        return (
-                          <div
-                            key={item.id}
-                            className="p-2.5 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/80 dark:border-slate-700 shadow-2xs space-y-1.5"
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2 min-w-0 flex-1">
-                                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                                <span className="font-extrabold text-slate-800 dark:text-slate-200 text-xs truncate">
-                                  {item.name}
-                                </span>
-                                {rowHint?.badge && (
-                                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-100 dark:border-emerald-900/50 hidden sm:inline-block">
-                                    {rowHint.badge}
-                                  </span>
-                                )}
-                              </div>
-
-                              <div className="flex items-center gap-2 shrink-0">
-                                <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0.01"
-                                    placeholder="Qty"
-                                    value={item.quantity}
-                                    onChange={(e) =>
-                                      handleUpdateEditIngredient(item.id, 'quantity', e.target.value)
-                                    }
-                                    className="w-16 px-1.5 py-1 text-center text-xs font-black bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#8C0D0D]"
-                                    title="Edit quantity"
-                                  />
-                                  <select
-                                    value={findUnitOption(item.unit).value}
-                                    onChange={(e) =>
-                                      handleUpdateEditIngredient(item.id, 'unit', e.target.value)
-                                    }
-                                    className="px-1.5 py-1 text-center text-[11px] font-extrabold bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 focus:outline-none focus:border-[#8C0D0D] uppercase cursor-pointer"
-                                    title="Edit unit"
-                                  >
-                                    {STANDARD_MEASURE_UNITS.map((u) => (
-                                      <option key={u.value} value={u.value}>
-                                        {u.label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveEditIngredient(item.id)}
-                                  className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-                                  title="Remove ingredient"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Row Sanity Warning */}
-                            {rowWarning && (
-                              <div className="text-[10px] font-bold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50 px-2 py-1 rounded-lg border border-amber-200 dark:border-amber-800 flex items-center justify-between gap-1">
-                                <span>{rowWarning.message}</span>
-                                {rowWarning.fixPayload && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      handleUpdateEditIngredient(item.id, 'quantity', rowWarning.fixPayload.quantity);
-                                      handleUpdateEditIngredient(item.id, 'unit', rowWarning.fixPayload.unit);
-                                    }}
-                                    className="px-2 py-0.5 bg-amber-600 text-white rounded font-black text-[9px] hover:bg-amber-700 cursor-pointer"
-                                  >
-                                    Auto-fix
-                                  </button>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-700 text-center">
-                      <p className="text-xs text-slate-400 font-semibold">
-                        No recipe ingredients assigned yet. Select from above to allocate ingredients.
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Solution 3: Stock Yield & Capacity Breakdown in Edit Modal */}
-                  {(() => {
-                    const stockCap = calculateStockCapacity(editingIngredients, ingredientsList);
-                    if (!stockCap || !stockCap.yields?.length) return null;
-                    return (
-                      <div className="p-3 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-850 text-white space-y-2 border border-slate-800 shadow-md">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-black text-amber-300 flex items-center gap-1.5">
-                            <Sparkles className="w-3.5 h-3.5" />
-                            Current Stock Capacity
-                          </span>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30 font-extrabold">
-                            Max ~{stockCap.maxDishes} Orders
-                          </span>
-                        </div>
-
-                        <div className="space-y-1 text-[11px] font-medium text-slate-300">
-                          {stockCap.yields.slice(0, 3).map((y) => (
-                            <div key={y.ingredientId} className="flex items-center justify-between">
-                              <span>
-                                {y.availableStock} {y.stockUnit} {y.name}
-                              </span>
-                              <span className="font-extrabold text-slate-200">
-                                = {y.dishesPossible} dishes
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-
-                        {stockCap.bottleneck && (
-                          <div className="pt-1 border-t border-slate-800 flex items-center gap-1 text-[10px] text-rose-300 font-bold">
-                            <AlertTriangle className="w-3 h-3 text-rose-400 shrink-0" />
-                            <span>
-                              <strong>{stockCap.bottleneck.name}</strong> sabse pehle khatam hoga (Bottleneck: ~{stockCap.bottleneck.dishesPossible} servings).
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1 font-extrabold text-xs">
-                    Description
-                  </label>
-                  <textarea
-                    rows="3"
-                    placeholder="Enter dish description or culinary notes..."
-                    value={editingItem.description}
-                    onChange={(e) => {
-                      setEditingItem({ ...editingItem, description: e.target.value });
-                      if (editErrors.description) setEditErrors((prev) => ({ ...prev, description: null }));
-                    }}
-                    className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium focus:outline-none ${
-                      editErrors.description
-                        ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/40 text-rose-900 dark:bg-rose-950/20 dark:text-rose-200'
-                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:border-[#8C0D0D]'
-                    }`}
-                  />
-                  {editErrors.description && (
-                    <p className="text-xs font-bold text-rose-600 dark:text-rose-400 mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                      {editErrors.description}
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setEditingItem(null)}
-                    className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2 rounded-xl bg-[#8C0D0D] hover:bg-[#700a0a] text-white font-extrabold shadow-brand cursor-pointer active:scale-95"
-                  >
-                    Save Changes
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>,
-          document.body
-        )}
-
       {/* ═══════════ VIEW DISH DETAILS MODAL ═══════════ */}
       {viewingItem &&
         createPortal(

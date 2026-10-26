@@ -63,12 +63,14 @@ const selectStyles = (hasError) => ({
     ...base,
     minHeight: 46,
     borderRadius: 12,
-    backgroundColor: "#ffffff",
-    borderColor: hasError ? "#ef4444" : state.isFocused ? "#8D0606" : "#e2e8f0",
+    backgroundColor: state.isDisabled ? "#f8fafc" : "#ffffff",
+    borderColor: hasError ? "#ef4444" : state.isFocused ? "#8D0606" : state.isDisabled ? "#e2e8f0" : "#e2e8f0",
+    opacity: state.isDisabled ? 0.75 : 1,
+    cursor: state.isDisabled ? "not-allowed" : "default",
     boxShadow: state.isFocused
       ? `0 0 0 3px ${hasError ? "rgba(239, 68, 68, 0.15)" : "rgba(141, 6, 6, 0.12)"}`
       : "0 1px 2px 0 rgba(0, 0, 0, 0.03)",
-    "&:hover": { borderColor: hasError ? "#ef4444" : "#8D0606" },
+    "&:hover": { borderColor: state.isDisabled ? "#e2e8f0" : hasError ? "#ef4444" : "#8D0606" },
     paddingLeft: 4,
     fontSize: 13,
     fontWeight: 500,
@@ -161,6 +163,8 @@ const TextField = React.forwardRef(function TextField(
           } ${
             error
               ? "border-rose-500 bg-rose-50/20 text-rose-900 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20"
+              : props.readOnly || props.disabled
+              ? "border-slate-200 bg-slate-100/80 text-slate-500 cursor-not-allowed select-none"
               : "border-[#e2e8f0] focus:border-[#8D0606] focus:ring-2 focus:ring-[#8D0606]/10"
           }`}
         />
@@ -330,7 +334,7 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
     landmark: branch?.landmark || "",
     area: branch?.area || "",
     pincode: branch?.pincode || "",
-    countryId: branch?.countryId ? String(branch.countryId) : defaultCountryId,
+    countryId: branch?.countryId ? String(branch.countryId) : "",
     stateId: branch?.stateId ? String(branch.stateId) : "",
     cityId: branch?.cityId ? String(branch.cityId) : "",
     contactFirstName: branch?.contactFirstName || kitchen?.contactFirstName || "",
@@ -628,19 +632,27 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
       try {
         const statesResponse = await api.states({ countryId: form.countryId });
         const states = Array.isArray(statesResponse?.data) ? statesResponse.data : [];
-        const selectedState = states.some((state) => String(state.id) === String(form.stateId))
-          ? form.stateId
-          : states[0]?.id || form.stateId;
-        const citiesResponse = await api.cities({ countryId: form.countryId, stateId: selectedState });
-        const cities = Array.isArray(citiesResponse?.data) ? citiesResponse.data : [];
+        if (!active) return;
+
+        // Preserve stateId only if it exists in the fetched states list (e.g. editing existing branch); never auto-default
+        const preservedStateId = states.some((state) => String(state.id) === String(form.stateId))
+          ? String(form.stateId)
+          : "";
+
+        let cities = [];
+        if (preservedStateId) {
+          const citiesResponse = await api.cities({ countryId: form.countryId, stateId: preservedStateId });
+          cities = Array.isArray(citiesResponse?.data) ? citiesResponse.data : [];
+        }
+
         if (!active) return;
         setLocationOptions({ states, cities, loading: false });
         setForm((current) => ({
           ...current,
-          stateId: String(selectedState || current.stateId),
+          stateId: preservedStateId,
           cityId: cities.some((city) => String(city.id) === String(current.cityId))
-            ? current.cityId
-            : String(cities[0]?.id || current.cityId),
+            ? String(current.cityId)
+            : "",
         }));
       } catch {
         if (active) setLocationOptions((current) => ({ ...current, loading: false }));
@@ -663,11 +675,12 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
         const cities = Array.isArray(citiesResponse?.data) ? citiesResponse.data : [];
         if (!active) return;
         setLocationOptions((current) => ({ ...current, cities }));
+        // Preserve cityId only if it exists in the fetched cities list; never auto-default
         setForm((current) => ({
           ...current,
           cityId: cities.some((city) => String(city.id) === String(current.cityId))
-            ? current.cityId
-            : String(cities[0]?.id || current.cityId),
+            ? String(current.cityId)
+            : "",
         }));
       } catch {
         if (active) setLocationOptions((current) => ({ ...current, cities: [] }));
@@ -1406,7 +1419,8 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                       options={countryOptions}
                       value={findOption(countryOptions, form.countryId)}
                       onChange={(option) => {
-                        setForm((f) => ({ ...f, countryId: option?.value || "" }));
+                        const newCountryId = option?.value || "";
+                        setForm((f) => ({ ...f, countryId: newCountryId, stateId: "", cityId: "" }));
                         setErrors((current) => (current.countryId ? { ...current, countryId: undefined } : current));
                       }}
                       placeholder="Select Country"
@@ -1419,7 +1433,8 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                       options={stateOptions}
                       value={findOption(stateOptions, form.stateId)}
                       onChange={(option) => {
-                        setForm((f) => ({ ...f, stateId: option?.value || "" }));
+                        const newStateId = option?.value || "";
+                        setForm((f) => ({ ...f, stateId: newStateId, cityId: "" }));
                         setErrors((current) => (current.stateId ? { ...current, stateId: undefined } : current));
                       }}
                       placeholder="Select State"
@@ -1469,50 +1484,51 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                 <FormSection
                   step="3"
                   title="Contact Person & Communication"
-                  subtitle="Primary point of contact for operational communication and dispatch."
+                  subtitle="Primary point of contact for operational communication and dispatch (Read-only)."
                   icon={User}
                 >
                   <div className="grid gap-4 sm:grid-cols-2">
                     <SelectField
                       ref={fieldRefs.contactTitle}
                       label="Contact Title"
+                      isDisabled
                       options={[
                         { value: "MR", label: "MR" },
                         { value: "MS", label: "MS" },
                         { value: "MRS", label: "MRS" },
                       ]}
                       value={{ value: form.contactTitle || "MR", label: form.contactTitle || "MR" }}
-                      onChange={(option) => setForm((f) => ({ ...f, contactTitle: option?.value || "MR" }))}
+                      onChange={() => {}}
                     />
                     <TextField
                       ref={fieldRefs.contactFirstName}
                       icon={User}
                       label="Contact Name"
-                      required
-                      placeholder="Enter manager first name (e.g. Rahul)"
+                      readOnly
+                      placeholder="Manager contact name"
                       value={form.contactFirstName}
-                      onChange={updateForm("contactFirstName")}
+                      onChange={() => {}}
                       error={errors.contactFirstName}
                     />
                     <TextField
                       ref={fieldRefs.contactEmail}
                       icon={Mail}
                       label="Contact Email"
-                      required
+                      readOnly
                       type="email"
-                      placeholder="Enter manager email address (e.g. manager@kitchen.com)"
+                      placeholder="Manager contact email"
                       value={form.contactEmail}
-                      onChange={updateForm("contactEmail")}
+                      onChange={() => {}}
                       error={errors.contactEmail}
                     />
                     <TextField
                       ref={fieldRefs.contactPhone}
                       icon={Phone}
                       label="Contact Phone"
-                      required
-                      placeholder="Enter 10-digit mobile number (e.g. 9876543210)"
+                      readOnly
+                      placeholder="Manager contact phone"
                       value={form.contactPhone}
-                      onChange={updateForm("contactPhone")}
+                      onChange={() => {}}
                       error={errors.contactPhone}
                     />
                   </div>
@@ -1768,7 +1784,7 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-3 pt-3.5 border-t border-slate-200/60">
+                  {/* <div className="flex items-start gap-3 pt-3.5 border-t border-slate-200/60">
                     <div className="grid size-8 place-items-center rounded-xl bg-white border border-slate-200/60 text-slate-500 shadow-2xs shrink-0 mt-0.5">
                       <Clock size={15} />
                     </div>
@@ -1779,7 +1795,7 @@ export function KitchenFormPage({ apiState, refreshKitchenData, onToast }) {
                         <span className="text-slate-400 font-medium">(~{quickViewBranch.prepTime || 20} mins prep time)</span>
                       </p>
                     </div>
-                  </div>
+                  </div> */}
                 </div>
 
                 {/* Assigned Cuisines */}

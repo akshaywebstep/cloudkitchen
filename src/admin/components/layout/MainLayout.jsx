@@ -1,7 +1,6 @@
 import React from 'react';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
-import { AddMenuModal } from '../common/AddMenuModal';
 import { useApp } from '../../context/AppContext';
 
 export const MainLayout = ({ children }) => {
@@ -25,8 +24,6 @@ export const MainLayout = ({ children }) => {
         </main>
       </div>
 
-      {/* Global Add Menu Item Modal */}
-      <AddMenuModal />
-    </div>
+          </div>
   );
 };

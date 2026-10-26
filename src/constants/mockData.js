@@ -1,6 +1,7 @@
 import {
   BarChart3,
   Boxes,
+  FolderTree,
   Building2,
   ClipboardList,
   Globe2,
@@ -35,6 +36,7 @@ export const sidebarSections = [
       { label: "Dashboard",        icon: LayoutDashboard, path: "/kitchen/dashboard",   module: "dashboard" },
       { label: "Orders",           icon: ShoppingBag,     path: "/kitchen/orders",      module: "order" },
       { label: "Food Menu",        icon: UtensilsCrossed, path: "/kitchen/menu",        module: "menu" },
+      { label: "Categories",       icon: FolderTree,      path: "/kitchen/categories",  module: "menu" },
       { label: "Ingredients",      icon: Boxes,           path: "/kitchen/ingredients", module: "ingredient" },
       { label: "Waste Management", icon: Trash2,          path: "/kitchen/waste",       module: "wasteManagement" },
     ],
@@ -62,6 +64,7 @@ export const sidebarItems = [
   { label: "Dashboard",        icon: LayoutDashboard, path: "/",             module: "dashboard" },
   { label: "Orders",           icon: ShoppingBag,     path: "/orders",       module: "order" },
   { label: "Food Menu",        icon: UtensilsCrossed, path: "/menu",         module: "menu" },
+  { label: "Categories",       icon: FolderTree,      path: "/categories",   module: "menu" },
   { label: "Ingredients",      icon: Boxes,           path: "/ingredients",  module: "ingredient" },
   { label: "Waste Management", icon: Trash2,          path: "/waste",        module: "wasteManagement" },
   { label: "Profile",          icon: UserCheck,       path: "/profile",      module: "profile" },

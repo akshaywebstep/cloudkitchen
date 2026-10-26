@@ -149,7 +149,17 @@ export const formatRecipeQty = (quantity, unit = '') => {
  * Solution 3: Stock Yield / Capacity Calculator
  */
 export const calculateStockCapacity = (ingredients = [], inventoryList = []) => {
-  if (!Array.isArray(ingredients) || ingredients.length === 0) return null;
+  if (!Array.isArray(ingredients) || ingredients.length === 0) {
+    return {
+      capacity: 0,
+      maxDishes: 0,
+      limitingIngredient: null,
+      limitingStock: 0,
+      limitingUnit: 'GM',
+      yields: [],
+      bottleneck: null,
+    };
+  }
 
   const yields = [];
 
@@ -158,50 +168,64 @@ export const calculateStockCapacity = (ingredients = [], inventoryList = []) => 
     if (!qty || isNaN(qty) || qty <= 0) return;
 
     // Find in inventory / ingredients list
-    const matched = inventoryList.find(
-      (inv) =>
-        String(inv.id) === String(ing.id) ||
-        inv.name?.toLowerCase() === ing.name?.toLowerCase()
-    );
+    const matched = Array.isArray(inventoryList)
+      ? inventoryList.find(
+          (inv) =>
+            String(inv.id) === String(ing.ingredientId || ing.id) ||
+            inv.name?.toLowerCase() === ing.name?.toLowerCase()
+        )
+      : null;
 
     const availableStock = parseFloat(
-      matched?.currentStock ?? matched?.stock ?? matched?.quantity ?? matched?.alertQuantity ?? 0
+      ing.currentStock ?? matched?.currentStock ?? matched?.stock ?? matched?.quantity ?? matched?.alertQuantity ?? 0
     );
 
-    if (availableStock > 0) {
-      const ingUnit = normalizeUnit(ing.unit);
-      const stockUnit = normalizeUnit(matched.unit || matched.inventoryItem?.unit);
+    const ingUnit = normalizeUnit(ing.unit);
+    const stockUnit = normalizeUnit(ing.stockUnit || matched?.unit || matched?.inventoryItem?.unit || ing.unit);
 
-      let effectiveStock = availableStock;
-      let effectiveDishNeed = qty;
+    let effectiveStock = availableStock;
+    let effectiveDishNeed = qty;
 
-      // Normalize standard metric for comparison
-      if (ingUnit === 'GM' && stockUnit === 'KG') effectiveStock = availableStock * 1000;
-      if (ingUnit === 'KG' && stockUnit === 'GM') effectiveDishNeed = qty * 1000;
-      if (ingUnit === 'ML' && stockUnit === 'LITER') effectiveStock = availableStock * 1000;
-      if (ingUnit === 'LITER' && stockUnit === 'ML') effectiveDishNeed = qty * 1000;
+    // Normalize standard metric for comparison
+    if (ingUnit === 'GM' && stockUnit === 'KG') effectiveStock = availableStock * 1000;
+    if (ingUnit === 'KG' && stockUnit === 'GM') effectiveDishNeed = qty * 1000;
+    if (ingUnit === 'ML' && stockUnit === 'LITER') effectiveStock = availableStock * 1000;
+    if (ingUnit === 'LITER' && stockUnit === 'ML') effectiveDishNeed = qty * 1000;
 
-      const dishesPossible = Math.floor(effectiveStock / effectiveDishNeed);
-      yields.push({
-        ingredientId: ing.id,
-        name: ing.name,
-        availableStock,
-        stockUnit: matched.unit || 'GM',
-        quantityPerDish: qty,
-        unitPerDish: ing.unit,
-        dishesPossible: Math.max(0, dishesPossible),
-      });
-    }
+    const dishesPossible = effectiveDishNeed > 0 ? Math.floor(effectiveStock / effectiveDishNeed) : 0;
+    yields.push({
+      ingredientId: ing.ingredientId || ing.id,
+      name: ing.name,
+      availableStock,
+      stockUnit: ing.stockUnit || matched?.unit || 'GM',
+      quantityPerDish: qty,
+      unitPerDish: ing.unit,
+      dishesPossible: Math.max(0, dishesPossible),
+    });
   });
 
-  if (yields.length === 0) return null;
+  if (yields.length === 0) {
+    return {
+      capacity: 0,
+      maxDishes: 0,
+      limitingIngredient: null,
+      limitingStock: 0,
+      limitingUnit: 'GM',
+      yields: [],
+      bottleneck: null,
+    };
+  }
 
   yields.sort((a, b) => a.dishesPossible - b.dishesPossible);
   const bottleneck = yields[0];
 
   return {
+    capacity: bottleneck ? bottleneck.dishesPossible : 0,
+    maxDishes: bottleneck ? bottleneck.dishesPossible : null,
+    limitingIngredient: bottleneck ? bottleneck.name : null,
+    limitingStock: bottleneck ? bottleneck.availableStock : 0,
+    limitingUnit: bottleneck ? bottleneck.stockUnit : 'GM',
     yields,
     bottleneck,
-    maxDishes: bottleneck ? bottleneck.dishesPossible : null,
   };
 };

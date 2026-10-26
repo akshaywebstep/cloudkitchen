@@ -4,7 +4,7 @@ import Select from "react-select";
 import CreatableSelect from "react-select/creatable";
 import {
   UtensilsCrossed,
-  DollarSign,
+  IndianRupee,
   FolderTree,
   Package,
   Scale,
@@ -158,6 +158,90 @@ export const normalizeInventoryStockUnit = (unit = "", weightInGm = null) => {
   return u;
 };
 
+// Detect common kitchen staples (Water, Salt, Ice, etc.) that chefs typically don't track as inventoried stock
+export const isCommonStaple = (name = "") => {
+  const clean = String(name || "").trim().toLowerCase();
+  if (!clean) return false;
+  // Strip parentheses e.g. "Salt (dough)", "Water (warm)" -> "salt", "water"
+  const stripped = clean.replace(/\(.*?\)/g, "").trim();
+
+  const staplePatterns = [
+    /^(water|drinking water|tap water|warm water|hot water|chilled water|ice water|normal water|pani|jal)$/i,
+    /^(salt|table salt|sea salt|black salt|rock salt|kala namak|sendha namak|namak)$/i,
+    /^(ice|ice cubes?|crushed ice)$/i,
+  ];
+
+  return staplePatterns.some((pattern) => pattern.test(clean) || pattern.test(stripped));
+};
+
+// Smart category match: Check if ingredient matches an existing admin or kitchen category/subcategory
+export const findSmartCategoryMatch = (ingredientName = "", availableCategories = [], dishCategory = "") => {
+  if (!ingredientName) {
+    return dishCategory?.trim() || availableCategories[0]?.value || "General";
+  }
+
+  const norm = String(ingredientName).toLowerCase().replace(/[,()]/g, " ").replace(/\s+/g, " ").trim();
+  const words = norm.split(" ").filter(Boolean);
+
+  // 1. Direct match with existing categories/subcategories in dynamicCategoryOptions
+  for (const cat of availableCategories) {
+    const catName = String(cat?.value || cat?.name || cat?.label || "").toLowerCase().trim();
+    if (!catName || catName === "general") continue;
+
+    // Direct match (e.g. category "Chicken" matches ingredient "Chicken Breast")
+    if (norm === catName || norm.includes(catName) || catName.includes(norm)) {
+      return cat.value;
+    }
+    // Word level match (if category name is a word in the ingredient)
+    if (words.some((w) => w.length >= 4 && (catName.includes(w) || w.includes(catName)))) {
+      return cat.value;
+    }
+  }
+
+  // 2. Culinary keyword matching to map common ingredients to existing categories
+  const CULINARY_MAPPINGS = [
+    {
+      keywords: ["milk", "butter", "cheese", "paneer", "cream", "curd", "dahi", "yogurt", "ghee", "cheddar", "mozzarella"],
+      targetCategories: ["dairy", "milk", "cheese", "paneer"],
+    },
+    {
+      keywords: ["chili", "mirch", "masala", "pepper", "turmeric", "haldi", "jeera", "cumin", "cardamom", "clove", "cinnamon", "coriander powder", "paprika", "oregano", "herb", "spice", "garam masala", "fenugreek", "kasuri methi", "mustard seed", "rai"],
+      targetCategories: ["spice", "masala", "herb", "seasoning"],
+    },
+    {
+      keywords: ["onion", "pyaz", "tomato", "tamatar", "garlic", "lahsun", "ginger", "adrak", "potato", "aloo", "carrot", "gajar", "capsicum", "shimla", "spinach", "palak", "cabbage", "cauliflower", "pea", "matar", "mushroom", "coriander leaves", "mint", "pudina", "lemon", "lime"],
+      targetCategories: ["vegetable", "veggie", "produce", "fresh", "veg"],
+    },
+    {
+      keywords: ["chicken", "mutton", "lamb", "beef", "pork", "fish", "prawn", "shrimp", "meat", "egg", "anda", "keema"],
+      targetCategories: ["meat", "poultry", "seafood", "non-veg", "chicken", "fish"],
+    },
+    {
+      keywords: ["oil", "tel", "mustard oil", "olive oil", "sauce", "vinegar", "soya", "soy", "ketchup", "mayo", "mayonnaise"],
+      targetCategories: ["oil", "sauce", "condiment", "dressing"],
+    },
+    {
+      keywords: ["flour", "maida", "atta", "besan", "rice", "chawal", "bread", "bun", "dough", "yeast", "sugar", "cheeni", "baking"],
+      targetCategories: ["bakery", "grain", "flour", "grocery", "staple"],
+    },
+  ];
+
+  for (const rule of CULINARY_MAPPINGS) {
+    const hasKeyword = rule.keywords.some((kw) => norm.includes(kw));
+    if (hasKeyword) {
+      for (const cat of availableCategories) {
+        const catName = String(cat?.value || cat?.name || cat?.label || "").toLowerCase();
+        if (rule.targetCategories.some((tc) => catName.includes(tc))) {
+          return cat.value;
+        }
+      }
+    }
+  }
+
+  // 3. Fallback: Dish's specific category if provided, otherwise first available category
+  return dishCategory?.trim() || availableCategories[0]?.value || "General";
+};
+
 const selectStyles = (hasError) => ({
   control: (base, state) => ({
     ...base,
@@ -256,9 +340,9 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
     if (editDish) {
       const rawPrice = editDish.priceNum || (typeof editDish.price === "string" ? editDish.price.replace(/[^\d.]/g, "") : editDish.price) || "";
       const catName = typeof editDish.category === "object" ? editDish.category?.name : editDish.category;
-      const catId = typeof editDish.category === "object" ? editDish.category?.id : editDish.categoryId;
+      const catId = typeof editDish.category === "object" ? editDish.category?.id : (editDish.categoryId || editDish.rawMenu?.categoryId);
       const subCatName = typeof editDish.subCategory === "object" ? editDish.subCategory?.name : editDish.subCategory;
-      const subCatId = typeof editDish.subCategory === "object" ? editDish.subCategory?.id : editDish.subCategoryId;
+      const subCatId = typeof editDish.subCategory === "object" ? editDish.subCategory?.id : (editDish.subCategoryId || editDish.rawMenu?.subCategoryId);
       return {
         name: editDish.name || "",
         description: editDish.description || "",
@@ -559,6 +643,8 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
           });
         } else {
           const autoStockUnit = normalizeInventoryStockUnit(item.unit, item.weightInGm);
+          const isStaple = isCommonStaple(item.name);
+          const smartCat = findSmartCategoryMatch(item.name, dynamicCategoryOptions, form.category);
           unmatchedList.push({
             name: item.name,
             image: item.image || "",
@@ -568,10 +654,11 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
             unit: item.unit || "GM",
             recipeQty: String(item.quantity || "1"),
             recipeUnit: item.unit || "GM",
-            category: form.category?.trim() || apiCategories?.[0]?.name || "General",
+            category: smartCat,
             initialStock: "0",
             stockUnit: autoStockUnit,
-            selected: true,
+            isStaple,
+            selected: !isStaple,
           });
         }
       });
@@ -648,7 +735,10 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
       selected.map((item) => ({
         name: item.name,
         image: item.image || "",
-        category: item.category || form.category?.trim() || apiCategories?.[0]?.name || "General",
+        category:
+          item.category && item.category !== "General"
+            ? item.category
+            : findSmartCategoryMatch(item.name, dynamicCategoryOptions, form.category),
         recipeQty: item.recipeQty || item.quantity || "1",
         recipeUnit: item.recipeUnit || item.unit || "GM",
         initialStock: item.initialStock !== undefined && item.initialStock !== "" ? item.initialStock : "0",
@@ -664,6 +754,10 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
       onToast?.({ message: "Please select an active kitchen branch first!", type: "error" });
       return;
     }
+    if (provisionItems.length === 0) {
+      onToast?.({ message: "No ingredients to provision. Please select or add ingredients.", type: "warning" });
+      return;
+    }
     setIsProvisioning(true);
     try {
       const payload = {
@@ -672,8 +766,8 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
           category: item.category || "General",
           image: item.image?.trim() || undefined,
           unit: item.stockUnit || item.recipeUnit || "GM",
-          initialStock: parseFloat(item.initialStock) || 0,
-          alertQuantity: 5,
+          initialStock: Math.max(0, parseFloat(item.initialStock) || 0),
+          alertQuantity: 0,
         })),
       };
 
@@ -1059,13 +1153,27 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
 
       const kitchenId = Number(apiState?.kitchen?.id || selectedBranch?.kitchenId || "");
 
-      // Send ID in category / subCategory payload if available, or object with name/id
-      const categoryPayload = form.categoryId
-        ? { id: Number(form.categoryId), name: form.category.trim() }
+      // Ensure categoryId and subCategoryId are resolved from menuCategoryOptions if available
+      const matchedCat = menuCategoryOptions.find(
+        (c) =>
+          (form.categoryId && String(c.id) === String(form.categoryId)) ||
+          (form.category && c.name?.toLowerCase().trim() === form.category?.toLowerCase().trim())
+      );
+      const finalCatId = form.categoryId || (matchedCat?.id ? String(matchedCat.id) : "");
+
+      const matchedSub = (matchedCat?.subCategories || menuSubCategoryOptions).find(
+        (s) =>
+          (form.subCategoryId && String(s.id) === String(form.subCategoryId)) ||
+          (form.subCategory && s.name?.toLowerCase().trim() === form.subCategory?.toLowerCase().trim())
+      );
+      const finalSubId = form.subCategoryId || (matchedSub?.id ? String(matchedSub.id) : "");
+
+      const categoryPayload = finalCatId
+        ? { id: Number(finalCatId), name: form.category.trim() }
         : { name: form.category.trim() || "Main Course" };
 
-      const subCategoryPayload = form.subCategoryId
-        ? { id: Number(form.subCategoryId), name: form.subCategory.trim() }
+      const subCategoryPayload = finalSubId
+        ? { id: Number(finalSubId), name: form.subCategory.trim() }
         : form.subCategory.trim()
         ? { name: form.subCategory.trim() }
         : undefined;
@@ -1084,9 +1192,9 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
         formData.append("price", String(form.price));
         formData.append("branchId", String(activeBranchId));
         if (kitchenId) formData.append("kitchenId", String(kitchenId));
-        if (form.categoryId) formData.append("categoryId", String(form.categoryId));
+        if (finalCatId) formData.append("categoryId", String(finalCatId));
         formData.append("category", JSON.stringify(categoryPayload));
-        if (form.subCategoryId) formData.append("subCategoryId", String(form.subCategoryId));
+        if (finalSubId) formData.append("subCategoryId", String(finalSubId));
         if (subCategoryPayload) formData.append("subCategory", JSON.stringify(subCategoryPayload));
         formData.append("ingredients", JSON.stringify(validIngredients));
         formData.append("image", imageFile);
@@ -1098,9 +1206,9 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
           price: Number(form.price),
           branchId: Number(activeBranchId),
           ...(kitchenId ? { kitchenId } : {}),
-          ...(form.categoryId ? { categoryId: Number(form.categoryId) } : {}),
+          ...(finalCatId ? { categoryId: Number(finalCatId) } : {}),
           category: categoryPayload,
-          ...(form.subCategoryId ? { subCategoryId: Number(form.subCategoryId) } : {}),
+          ...(finalSubId ? { subCategoryId: Number(finalSubId) } : {}),
           ...(subCategoryPayload ? { subCategory: subCategoryPayload } : {}),
           ingredients: validIngredients,
           ...(imagePreviewUrl ? { image: imagePreviewUrl.trim() } : {}),
@@ -1294,7 +1402,7 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
           {/* Price */}
           <TextField
             ref={priceRef}
-            icon={DollarSign}
+            icon={IndianRupee}
             label="Selling Price (₹)"
             required
             type="number"
@@ -1662,7 +1770,7 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
 
           {/* Table Header for Ingredients */}
           {recipeIngredients.length > 0 && (
-            <div className="hidden sm:grid grid-cols-[32px_1fr_130px_110px_130px_38px] gap-3 px-3.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <div className="hidden sm:grid grid-cols-[32px_1fr_130px_110px_130px_38px] gap-3 px-3.5 text-[11px] font-extrabold uppercase tracking-wider text-slate-900">
               <span>#</span>
               <span>Recipe Ingredient</span>
               <span>Weight / Qty</span>
@@ -2125,7 +2233,7 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
                 <div className="min-w-0">
                   <h3 className="text-sm font-bold text-slate-900 truncate">Setup Category, Units & Stock for Ingredients</h3>
                   <p className="text-[11px] text-slate-500 truncate">
-                    Verify culinary category, recipe/inventory units, and initial stock before adding to kitchen.
+                    Verify culinary category, recipe/inventory units, and initial stock (optional) before adding to kitchen.
                   </p>
                 </div>
               </div>
@@ -2141,7 +2249,7 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
             {/* Modal Items List */}
             <div className="p-3.5 sm:p-5 flex-1 overflow-y-auto space-y-3">
               {/* Quick Bulk Category Apply */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
                 <span className="text-[11.5px] font-bold text-slate-700">Quick Apply Category to All:</span>
                 <div className="w-full sm:w-64">
                   <CreatableSelect
@@ -2160,173 +2268,213 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
-                <div className="min-w-[620px] space-y-2.5">
-                  <div className="grid grid-cols-[1.2fr_1.1fr_140px_140px] gap-2.5 px-2 text-[10.5px] font-bold uppercase tracking-wider text-slate-400">
-                    <span>Ingredient</span>
-                    <span>Category</span>
-                    <span>Recipe Qty & Unit</span>
-                    <span>Initial Stock & Unit</span>
+              {provisionItems.length === 0 ? (
+                <div className="py-10 text-center space-y-2 rounded-2xl bg-slate-50 border border-slate-200/80">
+                  <div className="size-9 rounded-full bg-slate-200/70 text-slate-500 grid place-items-center mx-auto">
+                    <Check size={16} />
                   </div>
+                  <p className="text-xs font-bold text-slate-700">All suggested ingredients were removed or ignored.</p>
+                  <p className="text-[11px] text-slate-500">You can close this modal and proceed with your existing recipe.</p>
+                  <button
+                    type="button"
+                    onClick={() => setShowStockModal(false)}
+                    className="mt-1 px-4 py-1.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-xs font-bold text-slate-700 cursor-pointer shadow-2xs"
+                  >
+                    Close Modal
+                  </button>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <div className="min-w-[640px] space-y-2.5">
+                    <div className="grid grid-cols-[1.25fr_1.05fr_135px_155px_36px] gap-2.5 px-2 text-[11px] font-extrabold uppercase tracking-wider text-slate-900 items-center">
+                      <span>Ingredient</span>
+                      <span>Category</span>
+                      <span>Recipe Qty & Unit</span>
+                      <div className="flex items-center gap-1.5">
+                        <span>Initial Stock & Unit</span>
+                        <span className="rounded bg-slate-900 text-white px-1.5 py-0.2 text-[8.5px] font-bold uppercase tracking-tight">
+                          Optional
+                        </span>
+                      </div>
+                      <span className="text-center">Remove</span>
+                    </div>
 
-                  {provisionItems.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="grid grid-cols-[1.2fr_1.1fr_140px_140px] gap-2.5 items-center p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 text-xs"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        {item.image ? (
-                          <div className="relative group shrink-0 size-9 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs">
-                            <img
-                              src={item.image}
-                              alt={item.name}
-                              className="size-full object-cover"
-                              onError={(e) => {
-                                e.target.src = "https://images.unsplash.com/photo-1506368249639-73a05d6f6488?auto=format&fit=crop&w=100&q=80";
-                              }}
-                            />
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setProvisionItems((prev) =>
-                                  prev.map((p, i) => (i === idx ? { ...p, image: "" } : p))
-                                );
-                              }}
-                              className="absolute inset-0 bg-slate-950/60 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition cursor-pointer"
-                              title="Remove photo"
-                            >
-                              <X size={12} />
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActiveImageModalIdx(idx);
-                              setTempImageUrl(item.image || "");
-                            }}
-                            className="size-9 rounded-lg border border-dashed border-slate-300 hover:border-[#8D0606] bg-white hover:bg-rose-50/50 flex flex-col items-center justify-center text-slate-400 hover:text-[#8D0606] shrink-0 transition cursor-pointer shadow-2xs"
-                            title="Add optional photo"
-                          >
-                            <ImageIcon size={13} />
-                            <span className="text-[8px] font-bold leading-none mt-0.5">+Img</span>
-                          </button>
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <strong className="text-slate-800 block text-xs font-bold truncate">{item.name}</strong>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            {item.hint && <span className="text-[10px] text-slate-400 font-medium truncate">{item.hint}</span>}
+                    {provisionItems.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="grid grid-cols-[1.25fr_1.05fr_135px_155px_36px] gap-2.5 items-center p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 text-xs hover:border-slate-200 transition"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {item.image ? (
+                            <div className="relative group shrink-0 size-9 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs">
+                              <img
+                                src={item.image}
+                                alt={item.name}
+                                className="size-full object-cover"
+                                onError={(e) => {
+                                  e.target.src = "https://images.unsplash.com/photo-1506368249639-73a05d6f6488?auto=format&fit=crop&w=100&q=80";
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setProvisionItems((prev) =>
+                                    prev.map((p, i) => (i === idx ? { ...p, image: "" } : p))
+                                  );
+                                }}
+                                className="absolute inset-0 bg-slate-950/60 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition cursor-pointer"
+                                title="Remove photo"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+                          ) : (
                             <button
                               type="button"
                               onClick={() => {
                                 setActiveImageModalIdx(idx);
                                 setTempImageUrl(item.image || "");
                               }}
-                              className="text-[10px] font-semibold text-rose-700 hover:underline cursor-pointer"
+                              className="size-9 rounded-lg border border-dashed border-slate-300 hover:border-[#8D0606] bg-white hover:bg-rose-50/50 flex flex-col items-center justify-center text-slate-400 hover:text-[#8D0606] shrink-0 transition cursor-pointer shadow-2xs"
+                              title="Add optional photo"
                             >
-                              {item.image ? "Change photo" : "+ Photo (opt)"}
+                              <ImageIcon size={13} />
+                              <span className="text-[8px] font-bold leading-none mt-0.5">+Img</span>
+                            </button>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <strong className="text-slate-800 text-xs font-bold truncate block">{item.name}</strong>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {item.hint && <span className="text-[10px] text-slate-400 font-medium truncate">{item.hint}</span>}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveImageModalIdx(idx);
+                                  setTempImageUrl(item.image || "");
+                                }}
+                                className="text-[10px] font-semibold text-rose-700 hover:underline cursor-pointer"
+                              >
+                                {item.image ? "Change photo" : "+ Photo (opt)"}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                          <div>
+                            <CreatableSelect
+                              menuPortalTarget={document.body}
+                              styles={compactSelectStyles}
+                              options={dynamicCategoryOptions}
+                              value={item.category ? { value: item.category, label: item.category } : null}
+                              onChange={(opt) => {
+                                const val = opt?.value || opt?.label || "";
+                                setProvisionItems((prev) =>
+                                  prev.map((p, i) => (i === idx ? { ...p, category: val } : p))
+                                );
+                              }}
+                              placeholder="Select category..."
+                              isClearable={false}
+                            />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                min="0.001"
+                                step="0.01"
+                                value={item.recipeQty}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setProvisionItems((prev) =>
+                                    prev.map((p, i) => (i === idx ? { ...p, recipeQty: val } : p))
+                                  );
+                                }}
+                                className="h-8 w-14 rounded-lg border border-slate-200 bg-white px-1.5 text-xs font-bold text-slate-800 outline-none focus:border-[#8D0606] text-center"
+                                title="Quantity required in recipe cooking"
+                              />
+                              <select
+                                value={item.recipeUnit}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setProvisionItems((prev) =>
+                                    prev.map((p, i) => (i === idx ? { ...p, recipeUnit: val } : p))
+                                  );
+                                }}
+                                className="h-8 rounded-lg border border-slate-200 bg-white px-1 text-[11px] font-bold text-slate-700 outline-none focus:border-[#8D0606] cursor-pointer"
+                                title="Recipe cooking unit"
+                              >
+                                {STANDARD_MEASURE_UNITS.map((u) => (
+                                  <option key={u.value} value={u.value}>
+                                    {u.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.1"
+                                value={item.initialStock}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setProvisionItems((prev) =>
+                                    prev.map((p, i) => (i === idx ? { ...p, initialStock: val } : p))
+                                  );
+                                }}
+                                placeholder="0 (Add later)"
+                                className="h-8 w-16 rounded-lg border border-slate-200 bg-white px-1 text-xs font-bold text-slate-800 outline-none focus:border-[#8D0606] text-center placeholder:text-slate-400 placeholder:text-[9.5px]"
+                                title="Initial stock is optional. Leave as 0 if raw material has not arrived yet."
+                              />
+                              <select
+                                value={item.stockUnit}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setProvisionItems((prev) =>
+                                    prev.map((p, i) => (i === idx ? { ...p, stockUnit: val } : p))
+                                  );
+                                }}
+                                className="h-8 rounded-lg border border-slate-200 bg-white px-1 text-[11px] font-bold text-slate-700 outline-none focus:border-[#8D0606] cursor-pointer"
+                                title="Unit used to track stock in branch inventory"
+                              >
+                                {STANDARD_MEASURE_UNITS.map((u) => (
+                                  <option key={u.value} value={u.value}>
+                                    {u.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-center">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setProvisionItems((prev) => prev.filter((_, i) => i !== idx));
+                              }}
+                              className="size-7 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition cursor-pointer"
+                              title={`Remove "${item.name}" from provisioning`}
+                            >
+                              <Trash2 size={13} />
                             </button>
                           </div>
                         </div>
-                      </div>
-                      <div>
-                        <CreatableSelect
-                          menuPortalTarget={document.body}
-                          styles={compactSelectStyles}
-                          options={dynamicCategoryOptions}
-                          value={item.category ? { value: item.category, label: item.category } : null}
-                          onChange={(opt) => {
-                            const val = opt?.value || opt?.label || "";
-                            setProvisionItems((prev) =>
-                              prev.map((p, i) => (i === idx ? { ...p, category: val } : p))
-                            );
-                          }}
-                          placeholder="Select category..."
-                          isClearable={false}
-                        />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="number"
-                            min="0.001"
-                            step="0.01"
-                            value={item.recipeQty}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setProvisionItems((prev) =>
-                                prev.map((p, i) => (i === idx ? { ...p, recipeQty: val } : p))
-                              );
-                            }}
-                            className="h-8 w-14 rounded-lg border border-slate-200 bg-white px-1.5 text-xs font-bold text-slate-800 outline-none focus:border-[#8D0606] text-center"
-                            title="Quantity required in recipe cooking"
-                          />
-                          <select
-                            value={item.recipeUnit}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setProvisionItems((prev) =>
-                                prev.map((p, i) => (i === idx ? { ...p, recipeUnit: val } : p))
-                              );
-                            }}
-                            className="h-8 rounded-lg border border-slate-200 bg-white px-1 text-[11px] font-bold text-slate-700 outline-none focus:border-[#8D0606] cursor-pointer"
-                            title="Recipe cooking unit"
-                          >
-                            {STANDARD_MEASURE_UNITS.map((u) => (
-                              <option key={u.value} value={u.value}>
-                                {u.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.1"
-                            value={item.initialStock}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setProvisionItems((prev) =>
-                                prev.map((p, i) => (i === idx ? { ...p, initialStock: val } : p))
-                              );
-                            }}
-                            placeholder="0"
-                            className="h-8 w-14 rounded-lg border border-slate-200 bg-white px-1.5 text-xs font-bold text-slate-800 outline-none focus:border-[#8D0606] text-center"
-                            title="Initial physical stock in kitchen inventory"
-                          />
-                          <select
-                            value={item.stockUnit}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setProvisionItems((prev) =>
-                                prev.map((p, i) => (i === idx ? { ...p, stockUnit: val } : p))
-                              );
-                            }}
-                            className="h-8 rounded-lg border border-slate-200 bg-white px-1 text-[11px] font-bold text-slate-700 outline-none focus:border-[#8D0606] cursor-pointer"
-                            title="Unit used to track stock in branch inventory"
-                          >
-                            {STANDARD_MEASURE_UNITS.map((u) => (
-                              <option key={u.value} value={u.value}>
-                                {u.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                      ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200/80 text-[11px] text-amber-800 flex items-start gap-2">
-                <AlertCircle size={15} className="text-amber-600 shrink-0 mt-0.5" />
-                <span>
-                  <strong>Tip:</strong> Branch inventory stock is tracked in standard units like <strong>GM / KG / PIECE / LITER</strong> (not TSP or CUP). You can change recipe and inventory units anytime. Initial stock can stay <strong>0</strong> if physical raw material is not yet inwarded. Photo is <strong>optional</strong>.
-                </span>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/90 text-[11px] text-slate-700 flex items-start gap-2.5">
+                <AlertCircle size={15} className="text-slate-500 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p>
+                    <strong className="text-slate-900">Initial Stock is Optional:</strong> If physical stock has not arrived at your kitchen yet, leave it at <strong>0</strong>. Your dish recipe will be created and linked immediately. Inward batches, alert levels & expiry dates can be added later from <strong>Ingredients & Stock</strong>.
+                  </p>
+                  <p className="text-[10px] text-slate-500">
+                    Branch inventory tracks stock in standard units (GM / KG / PIECE / LITER). Photo is optional.
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -2343,7 +2491,7 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
               <button
                 type="button"
                 onClick={handleConfirmProvision}
-                disabled={isProvisioning}
+                disabled={isProvisioning || provisionItems.length === 0}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-[#8D0606] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#720505] active:scale-98 transition cursor-pointer disabled:opacity-50"
               >
                 {isProvisioning ? (
@@ -2354,7 +2502,7 @@ export function AddMenuPage({ apiState, refreshKitchenData, onToast }) {
                 ) : (
                   <>
                     <Check size={14} />
-                    <span>Confirm & Add to Recipe</span>
+                    <span>Confirm & Add to Recipe ({provisionItems.length})</span>
                   </>
                 )}
               </button>

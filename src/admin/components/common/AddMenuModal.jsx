@@ -6,7 +6,7 @@ import {
   X,
   Plus,
   Image as ImageIcon,
-  DollarSign,
+  IndianRupee,
   Utensils,
   UploadCloud,
   Trash2,
@@ -1058,7 +1058,7 @@ export const AddMenuModal = () => {
                       : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:border-[#8C0D0D]'
                   }`}
                 />
-                <DollarSign className={`w-4 h-4 absolute left-3 top-3 pointer-events-none ${errors.price ? 'text-rose-400' : 'text-slate-400'}`} />
+                <IndianRupee className={`w-4 h-4 absolute left-3 top-3 pointer-events-none ${errors.price ? 'text-rose-400' : 'text-slate-400'}`} />
               </div>
               {errors.price && (
                 <p className="text-xs font-bold text-rose-600 dark:text-rose-400 mt-1 flex items-center gap-1">

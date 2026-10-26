@@ -889,6 +889,19 @@ export const getMenuItemsByKitchenAndBranchApi = async (kitchenId, branchId, par
  * @param {Object|FormData} data - Menu item creation payload
  * @returns {Promise<Object>} Response object { status, message, data }
  */
+export const getMenuItemByIdApi = async (id) => {
+  try {
+    const token = localStorage.getItem('admin_token');
+    const response = await apiClient.get(`/admin/menu/menu-item/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.data;
+  } catch (error) {
+    if (error.response && error.response.data) return error.response.data;
+    return { status: false, message: error.message || 'Failed to fetch menu item details.' };
+  }
+};
+
 export const createMenuItemApi = async (data) => {
   try {
     const token = localStorage.getItem('admin_token');

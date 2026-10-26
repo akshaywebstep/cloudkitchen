@@ -890,9 +890,20 @@ export const MenuCategories = () => {
                                 <span className="font-extrabold text-slate-900 dark:text-white text-sm block">
                                   {c.name}
                                 </span>
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                  {isSub ? 'Sub-Category' : 'Root Line Category'}
-                                </span>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                    {isSub ? 'Sub-Category' : 'Root Line Category'}
+                                  </span>
+                                  {c.kitchen ? (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200/60 dark:border-rose-900/40 text-[9.5px] font-bold">
+                                      Kitchen: {c.kitchen.kitchenName || `ID #${c.kitchen.id}`}
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200/60 dark:border-sky-900/40 text-[9.5px] font-bold">
+                                      Admin / Global
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </td>
@@ -1085,6 +1096,17 @@ export const MenuCategories = () => {
                             <h3 className="font-extrabold text-slate-900 dark:text-white text-base leading-tight truncate">
                               {c.name}
                             </h3>
+                            <div className="mt-1">
+                              {c.kitchen ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200/60 dark:border-rose-900/40 text-[10px] font-bold">
+                                  Kitchen: {c.kitchen.kitchenName || `ID #${c.kitchen.id}`}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200/60 dark:border-sky-900/40 text-[10px] font-bold">
+                                  Admin / Global
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
 

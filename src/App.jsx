@@ -32,6 +32,7 @@ import { DashboardPage } from "./kitchen/pages/DashboardPage";
 import { OrderListPage } from "./kitchen/pages/OrderListPage";
 import { CustomerListPage } from "./kitchen/pages/CustomerListPage";
 import { CategoryPage } from "./kitchen/pages/CategoryPage";
+import { MenuCategoryPage } from "./kitchen/pages/MenuCategoryPage";
 import { AddMenuPage } from "./kitchen/pages/AddMenuPage";
 import { CustomerReviewPage } from "./kitchen/pages/CustomerReviewPage";
 import { KitchenFormPage } from "./kitchen/pages/KitchenFormPage";
@@ -488,6 +489,7 @@ export default function App() {
                       <Route path="orders" element={!isSubActive ? <Navigate to="/kitchen/dashboard" replace /> : <OrderListPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
                       <Route path="customers" element={!isSubActive ? <Navigate to="/kitchen/dashboard" replace /> : <CustomerListPage apiState={apiState} onToast={triggerToast} />} />
                       <Route path="menu" element={!isSubActive ? <Navigate to="/kitchen/dashboard" replace /> : <CategoryPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
+                      <Route path="categories" element={!isSubActive ? <Navigate to="/kitchen/dashboard" replace /> : <MenuCategoryPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
                       <Route path="add-menu" element={!isSubActive ? <Navigate to="/kitchen/dashboard" replace /> : <AddMenuPage apiState={apiState} refreshKitchenData={refreshKitchenData} onToast={triggerToast} />} />
                       <Route path="ingredients" element={!isSubActive ? <Navigate to="/kitchen/dashboard" replace /> : <IngredientSetupPage apiState={apiState} refreshKitchenData={refreshKitchenData} selectedPlan={apiState.selectedPlan} onToast={triggerToast} />} />
                       <Route path="waste" element={!isSubActive ? <Navigate to="/kitchen/dashboard" replace /> : <WasteManagementPage apiState={apiState} onToast={triggerToast} />} />
@@ -537,6 +539,7 @@ export default function App() {
         <Route path="/dashboard" element={<Navigate to="/kitchen/dashboard" replace />} />
         <Route path="/orders" element={<Navigate to="/kitchen/orders" replace />} />
         <Route path="/menu" element={<Navigate to="/kitchen/menu" replace />} />
+        <Route path="/categories" element={<Navigate to="/kitchen/categories" replace />} />
         <Route path="/add-menu" element={<Navigate to="/kitchen/add-menu" replace />} />
         <Route path="/ingredients" element={<Navigate to="/kitchen/ingredients" replace />} />
         <Route path="/customers" element={<Navigate to="/kitchen/customers" replace />} />

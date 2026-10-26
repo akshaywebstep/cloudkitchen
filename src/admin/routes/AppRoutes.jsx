@@ -20,6 +20,7 @@ import { MenuCategories } from '../pages/MenuCategories';
 import { Ingredients } from '../pages/Ingredients';
 import { WasteManagement } from '../pages/WasteManagement';
 import { Subscriptions } from '../pages/Subscriptions';
+import { AddMenuPage } from '../pages/AddMenuPage';
 import { useApp } from '../context/AppContext';
 import { Loader2, ShieldCheck } from 'lucide-react';
 import logoImg from '../assets/logo.jpg';
@@ -102,6 +103,10 @@ export const AppRoutes = () => {
                 <Route path="waste" element={<WasteManagement />} />
                 <Route path="orders" element={<Order />} />
                 <Route path="foods" element={<Foods />} />
+                <Route path="add-menu" element={<AddMenuPage />} />
+                <Route path="edit-menu/:id" element={<AddMenuPage />} />
+                <Route path="foods/add" element={<AddMenuPage />} />
+                <Route path="foods/edit/:id" element={<AddMenuPage />} />
                 <Route path="menu-items" element={<Foods />} />
                 <Route path="food-detail" element={<FoodDetail />} />
                 <Route path="calendar" element={<Calendar />} />

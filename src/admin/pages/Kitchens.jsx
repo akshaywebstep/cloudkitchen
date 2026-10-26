@@ -25,7 +25,9 @@ import {
   AlertCircle,
   Upload,
   Image as ImageIcon,
-  AlertTriangle
+  AlertTriangle,
+  Copy,
+  ExternalLink
 } from 'lucide-react';
 import { EmptyState } from '../components/common/EmptyState';
 import { Pagination } from '../components/common/Pagination';
@@ -59,6 +61,45 @@ const resolveImageUrl = (img) => {
   return null;
 };
 
+
+export const resolveDocumentFileUrl = (docPath) => {
+  if (!docPath || typeof docPath !== 'string') return '';
+  const trimmed = docPath.trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('data:') || trimmed.startsWith('blob:')) return trimmed;
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+
+  const apiBase = import.meta.env?.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
+  const serverBase = apiBase.replace(/\/api\/v1\/?$/, '');
+
+  if (trimmed.startsWith('/uploads')) return `${serverBase}${trimmed}`;
+  if (trimmed.startsWith('uploads/')) return `${serverBase}/${trimmed}`;
+  if (trimmed.includes('uploads/')) {
+    const relative = trimmed.substring(trimmed.indexOf('uploads/'));
+    return `${serverBase}/${relative.replace(/\\/g, '/')}`;
+  }
+  return `${serverBase}/${trimmed.replace(/^\/+/, '')}`;
+};
+
+export const isPdfDocument = (urlOrName = '') => {
+  if (!urlOrName) return false;
+  const clean = String(urlOrName).toLowerCase().split('?')[0];
+  return clean.endsWith('.pdf') || clean.includes('/pdf') || clean.includes('application/pdf');
+};
+
+export const isImageDocument = (urlOrName = '') => {
+  if (!urlOrName) return false;
+  const clean = String(urlOrName).toLowerCase().split('?')[0];
+  return (
+    clean.endsWith('.png') ||
+    clean.endsWith('.jpg') ||
+    clean.endsWith('.jpeg') ||
+    clean.endsWith('.webp') ||
+    clean.endsWith('.jfif') ||
+    clean.startsWith('data:image/')
+  );
+};
+
 const FALLBACK_PLANS = [
   { id: 1, name: 'Starter Tier Plan', title: 'Starter Tier Plan', price: 999, maxBranches: 1 },
   { id: 2, name: 'Growth Pro Plan', title: 'Growth Pro Plan', price: 2499, maxBranches: 3 },
@@ -87,6 +128,7 @@ export const Kitchens = () => {
   const [viewingKitchen, setViewingKitchen] = useState(null);
 
   const [activeDocumentsModal, setActiveDocumentsModal] = useState(null);
+  const [previewImageModal, setPreviewImageModal] = useState(null);
   const [activeBranchesModal, setActiveBranchesModal] = useState(null);
 
   const [isBranchFormOpen, setIsBranchFormOpen] = useState(false);
@@ -361,6 +403,60 @@ export const Kitchens = () => {
     }
   };
 
+
+
+  const handleCopyDocNumber = (text, label = 'Document Number') => {
+    if (!text) return;
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(text);
+      toast.success(`${label} copied to clipboard!`);
+    } else {
+      toast.info(`${label}: ${text}`);
+    }
+  };
+
+  const getResolvedKitchenDocuments = (k) => {
+    if (!k) return [];
+    const docs = Array.isArray(k.documents) ? [...k.documents] : [];
+
+    const hasFssai = docs.some((d) => String(d.type).toUpperCase() === 'FSSAI');
+    if (!hasFssai && (k.fssaiNumber || k.fssaiFile)) {
+      docs.push({
+        id: 'fssai-' + (k.id || 'k'),
+        type: 'FSSAI',
+        documentNumber: k.fssaiNumber || '',
+        documentFile: k.fssaiFile || '',
+        status: 'ACTIVE',
+      });
+    }
+
+    const hasGst = docs.some((d) => String(d.type).toUpperCase() === 'GST');
+    if (!hasGst && (k.gstNumber || k.gstFile)) {
+      docs.push({
+        id: 'gst-' + (k.id || 'k'),
+        type: 'GST',
+        documentNumber: k.gstNumber || '',
+        documentFile: k.gstFile || '',
+        status: 'ACTIVE',
+      });
+    }
+
+    return docs;
+  };
+
+  const openDocumentsModal = async (kitchen) => {
+    showLoading('Loading kitchen documents...');
+    try {
+      const res = await getKitchenByIdApi(kitchen.id);
+      hideLoading();
+      const kData = (res && res.status === true && res.data) ? res.data : kitchen;
+      setActiveDocumentsModal(kData);
+    } catch (err) {
+      hideLoading();
+      setActiveDocumentsModal(kitchen);
+    }
+  };
+
   // View Kitchen details by ID (GET //admin/kitchen/:id)
   const openViewKitchen = async (kitchenId) => {
     showLoading('Loading kitchen details by ID...');
@@ -374,6 +470,7 @@ export const Kitchens = () => {
 
         setViewingKitchen({
           ...kData,
+          documents: kData.documents || [],
           fssaiNumber: fssaiDoc?.documentNumber || kData.fssaiNumber || '',
           fssaiFile: fssaiDoc?.documentFile || kData.fssaiFile || '',
           gstNumber: gstDoc?.documentNumber || kData.gstNumber || '',
@@ -823,6 +920,13 @@ export const Kitchens = () => {
                             <Eye className="w-4 h-4" />
                           </button>
                           <button
+                            onClick={() => openDocumentsModal(k)}
+                            className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-600 hover:text-white transition-colors border border-blue-200 dark:border-blue-800 cursor-pointer active:scale-95 shadow-xs"
+                            title="View Kitchen Documents (PDF/Photo)"
+                          >
+                            <FileText className="w-4 h-4" />
+                          </button>
+                          <button
                             onClick={() => toggleKitchenStatus(k.id)}
                             className={`p-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                               k.status === 'Active'
@@ -877,7 +981,7 @@ export const Kitchens = () => {
       {viewingKitchen &&
         createPortal(
           <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-md w-full max-h-[92vh] flex flex-col overflow-hidden animate-modal-pop my-auto">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-modal-pop my-auto">
               <div className="shrink-0 bg-gradient-to-r from-[#8C0D0D] to-[#600808] text-white px-4 sm:px-6 py-3.5 sm:py-6 flex items-center justify-between">
                 <div>
                   <h3 className="text-base sm:text-lg font-black flex items-center gap-2">
@@ -942,6 +1046,196 @@ export const Kitchens = () => {
                     </div>
                   )}
                 </div>
+
+                {/* ═══════════ OFFICIAL DOCUMENTS & CERTIFICATES ═══════════ */}
+                {(() => {
+                  const docs = getResolvedKitchenDocuments(viewingKitchen);
+                  return (
+                    <div className="space-y-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
+                          <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                          Official Documents & Verification ({docs.length})
+                        </h4>
+                        <span className="text-[10px] font-bold text-slate-400">PDFs & Photo Certifications</span>
+                      </div>
+
+                      {docs.length === 0 ? (
+                        <div className="p-6 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 text-center space-y-1 bg-slate-50/50 dark:bg-slate-800/30">
+                          <FileText className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto" />
+                          <p className="text-xs font-bold text-slate-700 dark:text-slate-300">No verified documents uploaded</p>
+                          <p className="text-[10px] text-slate-400">FSSAI or GST documents will appear here once submitted.</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                          {docs.map((doc, idx) => {
+                            const isFssai = String(doc.type).toUpperCase() === 'FSSAI';
+                            const isGst = String(doc.type).toUpperCase() === 'GST';
+                            const docTitle = isFssai
+                              ? 'FSSAI Food Safety License'
+                              : isGst
+                              ? 'GST Registration Certificate'
+                              : `${doc.type} Document`;
+
+                            const fileUrl = resolveDocumentFileUrl(doc.documentFile);
+                            const hasFile = Boolean(fileUrl);
+                            const isPdf = isPdfDocument(fileUrl);
+                            const isImage = !isPdf && isImageDocument(fileUrl);
+
+                            return (
+                              <div
+                                key={doc.id || idx}
+                                className="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/50 space-y-3 transition hover:shadow-sm hover:border-slate-300 dark:hover:border-slate-600 group"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div
+                                      className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${
+                                        isFssai
+                                          ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 text-emerald-700 dark:text-emerald-300'
+                                          : isGst
+                                          ? 'bg-blue-50 dark:bg-blue-950/60 border-blue-200 text-blue-700 dark:text-blue-300'
+                                          : 'bg-purple-50 dark:bg-purple-950/60 border-purple-200 text-purple-700 dark:text-purple-300'
+                                      }`}
+                                    >
+                                      {isFssai ? <ShieldCheck className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <span className="text-[9.5px] font-black uppercase tracking-wider text-slate-400 block">
+                                        {doc.type}
+                                      </span>
+                                      <h5 className="font-extrabold text-slate-900 dark:text-white text-xs truncate">
+                                        {docTitle}
+                                      </h5>
+                                    </div>
+                                  </div>
+
+                                  <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 shrink-0">
+                                    {doc.status || 'ACTIVE'}
+                                  </span>
+                                </div>
+
+                                {/* Registration Number Tile */}
+                                <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 flex items-center justify-between gap-2 shadow-2xs">
+                                  <div className="min-w-0 flex-1">
+                                    <span className="text-[9px] font-extrabold uppercase text-slate-400 block">
+                                      Registration No.
+                                    </span>
+                                    <span className="font-mono font-bold text-xs text-slate-800 dark:text-slate-200 truncate block">
+                                      {doc.documentNumber || '—'}
+                                    </span>
+                                  </div>
+                                  {doc.documentNumber && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopyDocNumber(doc.documentNumber, `${doc.type} No.`)}
+                                      className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                                      title="Copy Registration Number"
+                                    >
+                                      <Copy className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+
+                                {/* File Preview / Action */}
+                                {hasFile ? (
+                                  <div className="space-y-2">
+                                    {isPdf ? (
+                                      <div className="p-3 rounded-xl bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200/80 dark:border-rose-900/40 flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                          <div className="w-8 h-8 rounded-lg bg-rose-600 text-white flex items-center justify-center shrink-0 font-black text-[10px] shadow-xs">
+                                            PDF
+                                          </div>
+                                          <div className="min-w-0">
+                                            <span className="font-bold text-xs text-slate-900 dark:text-white truncate block">
+                                              {doc.type}_Certificate.pdf
+                                            </span>
+                                            <span className="text-[10px] text-rose-700 dark:text-rose-400 font-semibold block">
+                                              Official PDF Document
+                                            </span>
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                          <a
+                                            href={fileUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="p-1.5 rounded-lg bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:text-rose-700 border border-slate-200 dark:border-slate-700 transition shadow-2xs cursor-pointer flex items-center gap-1 text-[11px] font-bold"
+                                            title="Open PDF in new tab"
+                                          >
+                                            <Eye className="w-3.5 h-3.5 text-blue-600" />
+                                            <span>View</span>
+                                          </a>
+                                          <a
+                                            href={fileUrl}
+                                            download
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="p-1.5 rounded-lg bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:text-rose-700 border border-slate-200 dark:border-slate-700 transition shadow-2xs cursor-pointer flex items-center gap-1 text-[11px] font-bold"
+                                            title="Download PDF"
+                                          >
+                                            <Download className="w-3.5 h-3.5 text-rose-700" />
+                                          </a>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="space-y-2">
+                                        <div
+                                          onClick={() => setPreviewImageModal(fileUrl)}
+                                          className="relative h-28 w-full rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 cursor-pointer group/img"
+                                          title="Click to view full photo"
+                                        >
+                                          <img
+                                            src={fileUrl}
+                                            alt={docTitle}
+                                            className="w-full h-full object-cover transition duration-300 group-hover/img:scale-105"
+                                            onError={(e) => {
+                                              e.currentTarget.style.display = 'none';
+                                            }}
+                                          />
+                                          <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white text-xs font-bold">
+                                            <Eye className="w-4 h-4" />
+                                            <span>Click to preview photo</span>
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => setPreviewImageModal(fileUrl)}
+                                            className="flex-1 py-1.5 px-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-blue-300 font-bold text-[11px] flex items-center justify-center gap-1.5 transition cursor-pointer shadow-2xs"
+                                          >
+                                            <Eye className="w-3.5 h-3.5 text-blue-600" />
+                                            <span>View Photo</span>
+                                          </button>
+                                          <a
+                                            href={fileUrl}
+                                            download
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="py-1.5 px-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:text-rose-700 font-bold text-[11px] flex items-center justify-center gap-1.5 transition cursor-pointer shadow-2xs"
+                                            title="Download photo"
+                                          >
+                                            <Download className="w-3.5 h-3.5 text-rose-700" />
+                                          </a>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="text-center py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-[11px] text-slate-400 italic">
+                                    No certificate file uploaded
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-end">
                   <button

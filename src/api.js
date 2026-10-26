@@ -3,7 +3,7 @@ import { STANDARD_PLANS } from "./utils/helpers";
 const API_ENV = "local"; // Change to "local" for local backend.
 
 export const API_BASE_OPTIONS = {
-  local: "http://localhost:3000/api/v1",
+  local: "https://dev2.screeningstar.co.in/api/v1",
   live: "https://dev2.screeningstar.co.in/api/v1",
 };
 const TOKEN_KEY = "cloudKitchenToken";
